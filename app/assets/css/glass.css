@@ -1,0 +1,185 @@
+/* ══════════════════════════════════════════════════════════════
+   20av · Liquid Glass — material "Velo negro"
+   Preset cerrado. Ver docs/01-velo-negro.md.
+
+   UN material para todo. No hay variantes por componente, ni por
+   fondo, ni por sección. El velo es negro fijo #0E0E0F: no se
+   adapta a lo que tenga debajo, y ahí está la gracia — es lo que
+   lo convierte en un sistema y no en un efecto.
+   ══════════════════════════════════════════════════════════════ */
+
+.av-glass{
+  /* ── geometría ────────────────────────────────────────────── */
+  --lg-r:        18px;   /* radio                                */
+  --lg-edge:     26px;   /* grosor de la lente                   */
+  --lg-scale:    82;     /* compresión del filo (va negativo)    */
+  --lg-aberr:    0;      /* aberración cromática en %            */
+
+  /* ── materia ──────────────────────────────────────────────── */
+  --lg-blur:     3px;
+  --lg-sat:      1.12;
+  --lg-bri:      0.85;
+
+  /* ── velo ─────────────────────────────────────────────────── */
+  --lg-veil:     14, 14, 15;   /* #0E0E0F                        */
+  --lg-veil-a:   0.35;         /* opacidad                       */
+  --lg-veil-c:   1;            /* cobertura: 0 filos · 1 uniforme */
+
+  /* ── luz ──────────────────────────────────────────────────── */
+  --lg-spec:     0.85;   /* filo especular                       */
+  --lg-elev:     0.80;   /* elevación → sombra exterior          */
+  --lg-ang:      135deg; /* lo reescribe el ratón en runtime     */
+
+  /* ── derivados (no tocar) ─────────────────────────────────── */
+  --lip: clamp(5px, calc(var(--lg-edge) * .5), 15px);
+  --v1:  calc(var(--lg-veil-a) * (1.55 - 0.55 * var(--lg-veil-c)));
+  --v2:  calc(var(--lg-veil-a) * (0.55 + 0.45 * var(--lg-veil-c)));
+  --v3:  calc(var(--lg-veil-a) * (1.15 - 0.15 * var(--lg-veil-c)));
+  /* con a=0.35 y c=1 las tres valen 0.35 → velo plano */
+
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--lg-r);
+  box-shadow:
+    0 calc(var(--lg-elev) * 26px) calc(var(--lg-elev) * 52px)
+      calc(var(--lg-elev) * -22px) rgba(20,14,0, calc(var(--lg-elev) * .42)),
+    0 calc(var(--lg-elev) *  2px) calc(var(--lg-elev) *  6px)
+      calc(var(--lg-elev) *  -2px) rgba(20,14,0, calc(var(--lg-elev) * .18));
+  transition: box-shadow .32s ease;
+}
+
+.av-glass > *{ border-radius: inherit }
+
+/* ── capa 1 · refracción + desenfoque ───────────────────────────
+   Sin lente por defecto: así Safari y Firefox caen solos al
+   desenfoque, sin @supports y sin salto de layout.              */
+.av-glass__back{
+  position: absolute; inset: 0; z-index: 0;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bri));
+          backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bri));
+}
+/* la clase la pone el composable sólo si el navegador soporta url() */
+.av-glass.is-lensed .av-glass__back{
+  backdrop-filter: var(--lg-lens) blur(var(--lg-blur))
+                   saturate(var(--lg-sat)) brightness(var(--lg-bri));
+}
+
+/* ── capa 2 · velo ─────────────────────────────────────────────
+   Las tres paradas salen de opacidad × cobertura.
+   cobertura 0 = carga en los filos · 1 = película uniforme      */
+.av-glass__veil{
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(var(--lg-ang),
+    rgba(var(--lg-veil), var(--v1))   0%,
+    rgba(var(--lg-veil), var(--v2))  46%,
+    rgba(var(--lg-veil), var(--v3)) 100%);
+}
+
+/* ── capa 3 · specular ─────────────────────────────────────────
+   El box-shadow da volumen; el ::after es el filo de luz, y su
+   ángulo lo escribe el ratón (--lg-ang).                        */
+.av-glass__spec{
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  box-shadow:
+    inset 0 calc(var(--lip) *  .28) calc(var(--lip) * .55) calc(var(--lip) * -.42)
+      rgba(255,255,255, calc(var(--lg-spec) * .55)),
+    inset 0 calc(var(--lip) * -.34) calc(var(--lip) * .55) calc(var(--lip) * -.46)
+      rgba(255,255,255, calc(var(--lg-spec) * .26)),
+    inset 0 0 calc(var(--lip) * 1.5) calc(var(--lip) * -.9)
+      rgba(14,10,0, calc(var(--lg-spec) * .34));
+}
+.av-glass__spec::after{
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+  background: linear-gradient(var(--lg-ang),
+    rgba(255,255,255, calc(var(--lg-spec) * 1))    0%,
+    rgba(255,255,255, calc(var(--lg-spec) * .14)) 26%,
+    rgba(255,255,255, 0)                          48%,
+    rgba(255,255,255, calc(var(--lg-spec) * .30)) 72%,
+    rgba(255,255,255, calc(var(--lg-spec) * .92)) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  transition: background .12s linear;   /* suaviza el giro de la luz */
+}
+
+.av-glass__body{ position: relative; z-index: 3 }
+
+/* ── la seleccion ──────────────────────────────────────────────────────────
+   El item activo de una barra. La regla general del material dice que lo que
+   va encima del vidrio se resuelve con relleno solido — esta es la UNICA
+   excepcion, y es deliberada: un relleno solido claro obliga a invertir el
+   icono a tinta, y entonces el item activo es la unica pieza de la barra con
+   otro color. Asi no: la seleccion vuelve a frostar lo que tiene detras, queda
+   un gris mas claro que el velo, y el glifo se queda blanco como sus vecinos.
+   Lo unico que cambia al activarse es que sube de 72% a 100%.
+
+   No lleva lente propia: seria un tercer filtro por item y la pieza es de 30 px
+   de alto, donde los topes de seguridad dejarian la lente en nada. Lleva el
+   desenfoque y el filo, que es lo que se ve a ese tamano. */
+.av-glass-sel{
+  /* Blanco, no amarillo. Se probó con el amarillo de marca (#FFD600 al 24%) y
+     no funcionó: el tinte convierte la selección en un elemento de color más en
+     una barra que no tiene ninguno, y compite con la burbuja del contador, que
+     es el único sitio donde ese amarillo sí trabaja. En blanco la selección no
+     es un color, es LUZ — el mismo vidrio un poco más encendido. */
+  --sel-tint: 255, 255, 255;
+  --sel-a:    0.10;
+
+  position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit;
+  -webkit-backdrop-filter: blur(2px) brightness(1.45) saturate(1.04);
+          backdrop-filter: blur(2px) brightness(1.45) saturate(1.04);
+  background: rgba(var(--sel-tint), var(--sel-a));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255, calc(var(--lg-spec) * .30)),
+    inset 0 -1px 0 rgba(0,0,0, .16),
+    0 1px 3px rgba(0,0,0, .18);
+}
+
+/* La burbuja del contador. Aqui SI va el amarillo de marca, y es el unico sitio
+   de la barra donde va: un acento corto, que es exactamente para lo que sirve
+   #FFD600. Muy cargado de tinte porque a 17 px el digito tiene que leerse.
+   Sigue siendo vidrio -- refracta y se aclara con lo que pase debajo. */
+.av-glass-bubble{
+  --sel-tint: 255, 214, 0;
+  --sel-a:    0.78;
+  -webkit-backdrop-filter: blur(2px) brightness(1.5) saturate(1.2);
+          backdrop-filter: blur(2px) brightness(1.5) saturate(1.2);
+  background: rgba(var(--sel-tint), var(--sel-a));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.35),
+    0 1px 4px rgba(0,0,0,.35);
+}
+
+@media (prefers-reduced-transparency: reduce){
+  .av-glass-sel, .av-glass-bubble{
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .av-glass-sel{ background: rgba(var(--sel-tint), .34) }
+  .av-glass-bubble{ background: rgb(var(--sel-tint)) }
+}
+
+/* ── glifos ────────────────────────────────────────────────────
+   Blanco fijo al 72%: es el "medio iluminado". El activo sube a
+   100%. El halo oscuro es lo que los salva cuando por detrás
+   pasa algo claro — el vidrio limpio no garantiza contraste.    */
+.av-glyph{
+  color: #FFFFFF;
+  opacity: .72;
+  filter:
+    drop-shadow(0 0 3px rgba(0,0,0,.80))
+    drop-shadow(0 1px 1px rgba(255,255,255,.22));
+  transition: opacity .25s ease, color .28s ease;
+}
+.av-glyph.is-active{ opacity: 1 }
+.av-glyph svg{ display: block; width: 21px; height: 21px }
+
+/* ── accesibilidad ─────────────────────────────────────────── */
+@media (prefers-reduced-transparency: reduce){
+  .av-glass__back{ display: none }
+  .av-glass__veil{ background: #14141A }
+}
+@media (prefers-reduced-motion: reduce){
+  .av-glass, .av-glass__spec::after, .av-glyph{ transition: none }
+}

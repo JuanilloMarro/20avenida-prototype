@@ -1,0 +1,63 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   20 Avenida — tokens
+
+   El MATERIAL no está aquí: vive entero en `glass.css`, en la clase `.av-glass`,
+   y de ahí lo lee la lente. Aquí está lo demás — marca, tipografía, medidas y
+   lo que se pinta ENCIMA del vidrio.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* marca — amarillo muestreado del letrero (#FFD600, h 50°, s 100%) */
+  --av-y-50:  #FFFBEB;
+  --av-y-100: #FFF3C4;
+  --av-y-200: #FFE985;
+  --av-y-300: #FFE04D;
+  --av-y-400: #FFD600;
+  --av-y-500: #F5C400;
+  --av-y-600: #E0AC00;
+  --av-y-700: #B88700;
+  --av-ink:   #0E0E0F;
+  --av-paper: #FBFAF7;
+
+  /* tipografía — PENDIENTE: la marca no tiene tipografía definida todavía */
+  --av-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+             "Helvetica Neue", Arial, sans-serif;
+
+  /* ── Lo que va ENCIMA del vidrio ──────────────────────────────────────────
+     Estos NO se invierten con el fondo, y es a propósito: el velo es negro
+     fijo (#0E0E0F al 42%), así que lo que se pinta encima está siempre sobre
+     oscuro, dé igual lo que pase por debajo. Ese es justamente el motivo de
+     tener un material estandarizado — el contraste del contenido deja de
+     depender del contexto.
+
+     El 72% es el mismo «medio iluminado» de `.av-glyph`: texto y glifo van a
+     la vez. El activo sube a sólido, no a otra capa de vidrio. */
+  --av-on-glass:        rgba(255,255,255,.72);
+  --av-on-glass-strong: #FFFFFF;
+  --av-on-glass-hover:  rgba(255,255,255,.10);
+  --av-on-glass-hair:   rgba(255,255,255,.14);
+  --av-solid-bg:        var(--av-paper);
+  --av-solid-fg:        var(--av-ink);
+
+  /* Barra de navegación. UN solo número: la marca, la píldora de enlaces y los
+     tres botones de acción miden todos `--av-nav-h`. Si esto cambia, cambian
+     las cuatro piezas a la vez y siguen alineadas.
+
+     A 70 px el material casi cabe entero: los topes recortan la lente de 26 a
+     23.8 y la compresión de 82 a 76.2. Una lente de 26 necesita 77 px de lado
+     corto para pintarse tal cual, así que a 70 estamos al 92% del material real
+     — a 46 px estábamos al 60%. Ver docs/01-velo-negro.md §2.
+
+     `--av-nav-space` es lo que el contenido tiene que dejar libre arriba: la
+     barra es `fixed` y no ocupa sitio en el flujo. */
+  --av-nav-h: 70px;
+  --av-nav-gap: 16px;
+  --av-nav-space: calc(var(--av-nav-h) + var(--av-nav-gap) * 2);
+}
+
+/* La escribe el escenario según el fondo activo (layouts/default.vue).
+   Afecta SÓLO al texto que va directo sobre la página, nunca al que va sobre
+   vidrio: encima del velo negro el contenido es claro siempre. */
+.is-light-bg {
+  color: var(--av-ink);
+}
