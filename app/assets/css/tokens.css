@@ -40,19 +40,28 @@
   --av-solid-fg:        var(--av-ink);
 
   /* Barra de navegación. UN solo número: la marca, la píldora de enlaces y los
-     tres botones de acción miden todos `--av-nav-h`. Si esto cambia, cambian
-     las cuatro piezas a la vez y siguen alineadas.
+     botones de acción miden todos `--av-nav-h`. Si esto cambia, cambian todas
+     las piezas a la vez y siguen alineadas.
 
      A 70 px el material casi cabe entero: los topes recortan la lente de 26 a
      23.8 y la compresión de 82 a 76.2. Una lente de 26 necesita 77 px de lado
      corto para pintarse tal cual, así que a 70 estamos al 92% del material real
      — a 46 px estábamos al 60%. Ver docs/01-velo-negro.md §2.
 
-     `--av-nav-space` es lo que el contenido tiene que dejar libre arriba: la
-     barra es `fixed` y no ocupa sitio en el flujo. */
+     La barra va ARRIBA en las dos disposiciones — escritorio y teléfono — así
+     que estas tres cuentas valen para las dos y no hacen falta variantes:
+
+       `--av-nav-top`    dónde se posa: el hueco de siempre más lo que se coma
+                         el notch. En escritorio `env()` es 0 y quedan los 16
+                         de siempre.
+       `--av-nav-space`  lo que el contenido tiene que dejar libre arriba: la
+                         barra es `fixed` y no ocupa sitio en el flujo.
+
+     Abajo no hay que reservar nada, y por eso no hay token para ello. */
   --av-nav-h: 70px;
   --av-nav-gap: 16px;
-  --av-nav-space: calc(var(--av-nav-h) + var(--av-nav-gap) * 2);
+  --av-nav-top: calc(var(--av-nav-gap) + env(safe-area-inset-top, 0px));
+  --av-nav-space: calc(var(--av-nav-top) + var(--av-nav-h) + var(--av-nav-gap));
 }
 
 /* La escribe el escenario según el fondo activo (layouts/default.vue).

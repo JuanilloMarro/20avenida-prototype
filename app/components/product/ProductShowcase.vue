@@ -141,6 +141,13 @@ const trackStyle = computed(() => (scrolls.value
 <style scoped>
 .ps {
   position: relative;
+  /* El margen lateral del frame. Vive aquí y no dentro del `padding` para que
+     el bloque de móvil lo cambie en un sitio y no reescriba la regla entera. */
+  --ps-pad-x: clamp(24px, 4vw, 64px);
+  /* La unidad de alto del frame. En `fluid` es el viewport; en `fixed` se pina
+     a 1024 (ver el bloque del final), y por eso pasa por una variable en vez de
+     escribir `vh` a pelo en la fórmula del zapato. */
+  --ps-vh: 1vh;
   background: var(--ps-surface);
   color: var(--ps-ink);
 }
@@ -205,7 +212,16 @@ const trackStyle = computed(() => (scrolls.value
   display: grid;
   /* las tres filas */
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding: var(--av-nav-space) clamp(24px, 4vw, 64px) clamp(28px, 4vh, 56px);
+  /* Arriba, el hueco de la barra — que va arriba en las dos disposiciones, así
+     que `--av-nav-space` sirve para las dos y no hay nada que reservar abajo.
+
+     Los laterales se ciñen en estrecho (ver el bloque de 560 px): ahí cada píxel
+     de ancho es alto de zapato, porque el que manda en un teléfono es el
+     ancho. */
+  padding:
+    var(--av-nav-space)
+    var(--ps-pad-x)
+    clamp(28px, calc(4 * var(--ps-vh)), 56px);
 }
 
 /* fila 1 — centrado en horizontal Y en vertical dentro de su fila.
@@ -257,12 +273,17 @@ const trackStyle = computed(() => (scrolls.value
    ancho de la fila, así que en una pantalla baja y ancha el zapato volvería a
    salirse por arriba. En `vh` el tope aguanta sea cual sea la proporción.
 
-   El `58%` es solo la red para pantallas estrechas y altas, donde el que se
-   pasaría es el ancho. */
+   `--ps-shoe-net` es solo la red para pantallas estrechas y altas, donde el que
+   se pasaría es el ancho. Es una VARIABLE y no el `58%` literal a propósito: en
+   móvil hay que abrir la red, y si eso se hace reescribiendo el `width` entero
+   se pierde el tope por alto — que es justo el que salva al teléfono en
+   horizontal, donde sobra ancho y no hay nada de alto. Se cambia la red, nunca
+   la fórmula. */
 .ps__seq {
   position: relative;
   --ps-shoe-max-h: 68;   /* % del alto de pantalla que NO pasa ningún frame */
-  width: min(58%, calc(var(--ps-shoe-max-h) * 1.032vh), 910px);
+  --ps-shoe-net: 58%;    /* red por ancho — la única pieza que cambia en móvil */
+  width: min(var(--ps-shoe-net), calc(var(--ps-shoe-max-h) * 1.032 * var(--ps-vh)), 910px);
 }
 .ps__shoe {
   position: absolute;
@@ -352,12 +373,44 @@ const trackStyle = computed(() => (scrolls.value
 }
 .ps__ticks i.is-on { background: var(--ps-ink); }
 
-@media (max-width: 900px) {
-  .ps__seq { width: 92%; }
+/* ── estrecho ───────────────────────────────────────────────────────────────
+   560 px, y NO los 900 del dock. Son dos preguntas distintas y confundirlas
+   costaba caro: el dock aparece cuando la barra de arriba no cabe, pero las dos
+   columnas de la fila 3 se apilan cuando no hay ANCHO para dos columnas. Un
+   teléfono en horizontal mide 844 de ancho — entra por el corte del dock, pero
+   le sobra ancho para las dos columnas, y apilándolas la fila pasaba de 120 px
+   a 225 y se comía el poco alto que hay. */
+@media (max-width: 560px) {
+  /* Aquí el que manda es el ANCHO — al revés que en escritorio — así que cada
+     píxel que se le quita al margen lateral es alto de zapato. */
+  .ps { --ps-pad-x: 16px; }
+
+  /* Se abre la red, y SÓLO la red: el tope por alto sigue en la fórmula. */
+  .ps__seq { --ps-shoe-net: 92%; }
+
   .ps__info { grid-template-columns: 1fr; }
   .ps__info-r { text-align: left; }
   .ps__ticks { justify-content: flex-start; }
 }
+
+/* ── la medida de diseño no mira por la ventana ─────────────────────────────
+   `frame="fixed"` son 1440×1024 EXACTOS — es la ruta /frame, la de las capturas
+   y la que va a Figma. El encuadre lo pone el propio frame, así que sus medidas
+   no pueden depender del viewport: con el navegador estrecho, los cortes de
+   arriba le metían el margen de teléfono y le apilaban la fila 3 dentro de un
+   lienzo de 1440, y una captura así miente.
+
+   Va DESPUÉS de los `@media` a propósito: misma especificidad, gana el último.
+   Los tres de dentro necesitan un descendiente porque compiten con reglas de la
+   misma forma. */
+.ps--fixed {
+  --ps-pad-x: 57.6px;   /* 4% de 1440, el mismo número que da el clamp ahí */
+  --ps-vh: 10.24px;     /* 1% de 1024: el alto del frame, no el de la ventana */
+}
+.ps--fixed .ps__seq { --ps-shoe-net: 58%; }
+.ps--fixed .ps__info { grid-template-columns: 1fr 1fr; }
+.ps--fixed .ps__info-r { text-align: right; }
+.ps--fixed .ps__ticks { justify-content: flex-end; }
 
 /* Sin movimiento: la secuencia deja de depender del scroll y se queda en el
    primer frame. El resto de la composición no cambia. */
