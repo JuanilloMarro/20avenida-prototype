@@ -45,8 +45,8 @@
  */
 import {
   ShoppingBag, Heart, User, MoreHorizontal, Search, X,
-  ChevronRight, ArrowRight, Check,
-  House, Store, Sparkles, LayoutGrid, Info, Mail,
+  ChevronLeft, ChevronRight, ArrowRight, Check,
+  House, Store, Sparkles, Info,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -56,12 +56,14 @@ const props = defineProps({
       /* El icono es para el menú de móvil — la píldora de escritorio es sólo
          texto y lo ignora. Es opcional: unos `items` de fuera sin icono siguen
          funcionando, el menú deja el hueco y alinea igual. */
-      { id: 'home', label: 'Home', to: '/', icon: House },
-      { id: 'shop', label: 'Shop', to: '/shop', icon: Store },
-      { id: 'new', label: 'New Arrivals', to: '/new', icon: Sparkles },
-      { id: 'collections', label: 'Collections', to: '/collections', icon: LayoutGrid },
-      { id: 'about', label: 'About', to: '/about', icon: Info },
-      { id: 'contact', label: 'Contact', to: '/contact', icon: Mail },
+      { id: 'home', label: 'Inicio', to: '/', icon: House },
+      { id: 'shop', label: 'Productos', to: '/shop', icon: Store },
+      { id: 'new', label: 'Próximamente', to: '/new', icon: Sparkles },
+      { id: 'about', label: 'Nosotros', to: '/about', icon: Info },
+      /* Cuenta entra también aquí, no sólo como icono suelto en la barra: en
+         móvil la barra desaparece con el menú abierto, así que sin esta fila no
+         habría forma de llegar a la cuenta mientras el menú está abierto. */
+      { id: 'account', label: 'Cuenta', to: '/account', icon: User },
     ]),
   },
   active: { type: String, default: 'home' },
@@ -81,13 +83,31 @@ const props = defineProps({
    */
   catalog: { type: Array, default: () => [] },
   /**
-   * El segundo nivel del menú. Son las familias por las que se filtra, y llevan
-   * `chevron` porque cada una abrirá lo suyo cuando exista.
+   * Los filtros, en ÁRBOL: cada nodo es `{ id, label, children? }`. Sin
+   * `children` es una hoja — se marca como aplicado. Con `children` es una
+   * rama — lleva a sus hijos, nunca se aplica ella misma.
+   *
+   * `Mujer` es hoja hoy porque sus subcategorías todavía no están definidas
+   * (PLACEHOLDER): en cuanto existan, basta con darle `children` y pasa a
+   * comportarse como `Hombre` sin tocar nada más.
    */
   filters: {
     type: Array,
     default: () => ([
-      { id: 'hombre', label: 'Hombre' },
+      {
+        id: 'hombre', label: 'Hombre', children: [
+          {
+            id: 'calzado', label: 'Calzado', children: [
+              { id: 'nike', label: 'Nike' },
+              { id: 'adidas', label: 'Adidas' },
+              { id: 'puma', label: 'Puma' },
+              { id: 'new-balance', label: 'New Balance' },
+            ],
+          },
+          { id: 'ropa', label: 'Ropa' },
+          { id: 'accesorios', label: 'Accesorios' },
+        ],
+      },
       { id: 'mujer', label: 'Mujer' },
       { id: 'productos', label: 'Productos' },
     ]),
@@ -123,6 +143,33 @@ const searchOpen = ref(false)
    poder enseñar el estado sin que nadie de fuera lo gobierne, y quien quiera
    gobernarlo escucha `filter` y recibe la lista completa. */
 const applied = ref([])
+
+/* El recorrido dentro del árbol de filtros: una pila de NODOS, no de ids — así
+   el título y la lista de la rama actual salen de leer el último elemento, sin
+   volver a recorrer el árbol desde la raíz cada vez.
+
+   Al elegir una rama, sus hermanas no se colapsan: DESAPARECEN, y sólo queda
+   lo de dentro más un botón para volver. Es la diferencia entre un acordeón y
+   un recorrido — aquí no hay dos niveles abiertos a la vez, hay uno solo, y
+   siempre se sabe cuál. */
+const filterPath = ref([])
+
+const currentFilters = computed(() => filterPath.value.length
+  ? filterPath.value.at(-1).children || []
+  : props.filters)
+
+const filterTitle = computed(() => filterPath.value.length
+  ? filterPath.value.at(-1).label
+  : 'Filtros')
+
+function openFilterNode(node) {
+  if (node.children?.length) filterPath.value = [...filterPath.value, node]
+  else toggleFilter(node.id)
+}
+
+function backFilters() {
+  filterPath.value = filterPath.value.slice(0, -1)
+}
 const moreBtn = ref(null)
 const searchBtn = ref(null)
 const menuList = ref(null)
@@ -135,6 +182,7 @@ const panelOpen = computed(() => menuOpen.value || searchOpen.value)
 
 function openMenu() {
   closeSearch(false)
+  filterPath.value = []   // el menú siempre se abre por la raíz del árbol
   menuOpen.value = true
   /* el foco entra al panel: con la barra oculta no queda nada detrás que tocar,
      y dejarlo en un botón que acaba de desaparecer lo mandaba al body */
@@ -235,6 +283,7 @@ function closePanels() {
 
 function onKey(e) {
   if (e.key !== 'Escape') return
+  if (menuOpen.value && filterPath.value.length) { backFilters(); return }
   closeMenu()
   closeSearch()
 }
@@ -425,33 +474,47 @@ onBeforeUnmount(() => {
     :style="{ '--av-vv': vvTop + 'px' }"
   >
     <div class="av-menu__body">
-      <div class="av-menu__scroll">
-        <ul ref="menuList" class="av-menu__list">
-          <li v-for="item in items" :key="item.id">
-            <a
-              :href="item.to"
-              class="av-menu__link"
-              :class="{ 'is-active': item.id === active }"
-              :aria-current="item.id === active ? 'page' : undefined"
-              @click.prevent="pickLink(item.id)"
-            >
-              <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
-              <span class="av-menu__icon av-glyph">
-                <component :is="item.icon" v-if="item.icon" :stroke-width="1.7" />
-              </span>
-              {{ item.label }}
-            </a>
-          </li>
-        </ul>
+      <!-- el menú: SIEMPRE completo y fuera del scroll — el usuario tiene que
+           ver las cinco opciones sin buscarlas, dure lo que dure la lista de
+           filtros de debajo. -->
+      <ul ref="menuList" class="av-menu__list av-menu__nav">
+        <li v-for="item in items" :key="item.id">
+          <a
+            :href="item.to"
+            class="av-menu__link"
+            :class="{ 'is-active': item.id === active }"
+            :aria-current="item.id === active ? 'page' : undefined"
+            @click.prevent="pickLink(item.id)"
+          >
+            <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
+            <span class="av-menu__icon av-glyph">
+              <component :is="item.icon" v-if="item.icon" :stroke-width="1.7" />
+            </span>
+            {{ item.label }}
+          </a>
+        </li>
+      </ul>
 
-        <!-- Los filtros van EXPLÍCITOS, en el mismo panel y a la vista: son
-             una sección más, no un sitio al que ir. Un botón que lleva a
-             otro panel cobra una apertura por cada filtro que quieras
-             poner, y encima esconde los que ya tienes puestos. -->
-        <div v-if="filters.length" class="av-menu__section">
-          <p class="av-menu__title">Filtros</p>
-          <!-- La misma burbuja del contador de la bolsa: el amarillo de
-               marca como acento corto, que es para lo único que sirve. -->
+      <!-- los filtros: EXPLÍCITOS y con más alto que el menú — son la parte
+           que se explora, y explorar necesita sitio. Se hunden en vez de
+           desplegarse: al elegir una rama sus hermanas se van del todo y sólo
+           queda lo de dentro, con un camino de vuelta arriba. -->
+      <div v-if="filters.length" class="av-menu__filters">
+        <div class="av-menu__section">
+          <button
+            v-if="filterPath.length"
+            type="button"
+            class="av-menu__back"
+            aria-label="Volver"
+            @click="backFilters"
+          >
+            <ChevronLeft :stroke-width="2.1" />
+          </button>
+          <p class="av-menu__title">{{ filterTitle }}</p>
+          <!-- La misma burbuja del contador de la bolsa: el amarillo de marca
+               como acento corto, que es para lo único que sirve. Cuenta el
+               total aplicado, no lo que hay en la rama actual — se ve desde
+               cualquier profundidad. -->
           <span v-if="applied.length" class="av-menu__count av-glass-bubble">{{ applied.length }}</span>
           <button
             v-if="applied.length"
@@ -461,20 +524,21 @@ onBeforeUnmount(() => {
           >Limpiar</button>
         </div>
 
-        <ul v-if="filters.length" class="av-menu__list">
-          <li v-for="f in filters" :key="f.id">
+        <ul class="av-menu__list av-menu__scroll">
+          <li v-for="node in currentFilters" :key="node.id">
             <button
               type="button"
               class="av-menu__link"
-              :class="{ 'is-active': isApplied(f.id) }"
-              :aria-pressed="isApplied(f.id)"
-              @click="toggleFilter(f.id)"
+              :class="{ 'is-active': !node.children && isApplied(node.id) }"
+              :aria-pressed="node.children ? undefined : isApplied(node.id)"
+              @click="openFilterNode(node)"
             >
-              <span v-if="isApplied(f.id)" class="av-glass-sel" aria-hidden="true" />
+              <span v-if="!node.children && isApplied(node.id)" class="av-glass-sel" aria-hidden="true" />
               <span class="av-menu__icon av-glyph">
-                <Check v-if="isApplied(f.id)" :stroke-width="2.2" />
+                <Check v-if="!node.children && isApplied(node.id)" :stroke-width="2.2" />
               </span>
-              {{ f.label }}
+              {{ node.label }}
+              <ChevronRight v-if="node.children?.length" class="av-menu__chev" :stroke-width="1.8" />
             </button>
           </li>
         </ul>
@@ -756,8 +820,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 900px) {
   /* La barra de arriba desaparece ENTERA — marca, píldora y acciones. En
-     teléfono hay una sola barra, arriba igual que en escritorio. Los seis
-     enlaces se van al menú del ⋯. */
+     teléfono hay una sola barra, arriba igual que en escritorio. Los enlaces y
+     los filtros se van al menú del ⋯. */
   .av-nav { display: none; }
 
   .av-bar {
@@ -816,15 +880,20 @@ onBeforeUnmount(() => {
     min-width: 244px;
     max-width: calc(100vw - var(--av-nav-gap) * 2);
 
-    /* Nunca más abajo del borde. Descuenta lo que ya se llevó la barra, el
-       teclado si estuviera, y deja el hueco de siempre al final. La LISTA
-       scrollea por dentro; el panel no se deforma.
+    /* HEIGHT, no max-height: el panel se ESTIRA hasta llenar el hueco entre la
+       barra y el borde de abajo, no se encoge a su contenido. Es a propósito
+       — los filtros piden más alto que el menú, y sin esto el panel se quedaba
+       tan corto como sus cinco enlaces y no había dónde darles ese alto.
+
+       Descuenta lo que ya se llevó la barra, el teclado si estuviera, y deja el
+       hueco de siempre al final. Nunca pasa del borde porque la altura sale de
+       restar, no de un tope.
 
        `display: flex` sobre `.av-glass` es seguro: las tres capas del material
        son `position: absolute`, así que no son ítems de flex y no se enteran. El
        único ítem es `__body`. */
     display: flex;
-    max-height: calc(100dvh - var(--av-nav-top) - var(--av-kb, 0px) - var(--av-nav-gap));
+    height: calc(100dvh - var(--av-nav-top) - var(--av-kb, 0px) - var(--av-nav-gap));
   }
   .av-menu :deep(.av-glass__body) {
     display: flex;
@@ -832,24 +901,33 @@ onBeforeUnmount(() => {
     flex: 1;
     min-height: 0;   /* sin esto un hijo con scroll no deja encoger al padre */
   }
+  /* `flex: 1` es lo que le falta a un hijo único de un flex column para
+     estirarse a la altura del padre — sin esto el panel medía 812 px pero el
+     cuerpo se quedaba en lo que sus hijos pidieran, y los filtros nunca veían
+     el alto que `.av-menu` les había dado. */
   .av-menu__body {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-height: 0;
     padding: 8px;
   }
 
-  /* Scrollea el CONTENEDOR y no cada lista: enlaces y filtros son un solo
-     recorrido. Sólo entra en juego cuando el panel ya tocó su techo. */
-  .av-menu__scroll {
+  /* El menú NO scrollea y NO se encoge: `flex: none` de sobra porque nadie le
+     pide que crezca, pero lo digo aquí porque es la regla — estas cinco filas
+     tienen que verse enteras siempre, pase lo que pase con los filtros. */
+  .av-menu__nav { flex: none; }
+
+  /* Los filtros se llevan lo que sobra: `flex: 1` es lo que hace que tengan
+     «mayor proporción de altura» sin escribir un número fijo que se desajuste
+     en cada teléfono. Column para que la cabecera se quede quieta y sólo la
+     lista de debajo scrollee. */
+  .av-menu__filters {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;   /* el scroll no se contagia a la página */
-    scrollbar-width: none;
   }
-  .av-menu__scroll::-webkit-scrollbar { display: none; }
 
   .av-menu__list {
     display: flex;
@@ -860,28 +938,48 @@ onBeforeUnmount(() => {
     list-style: none;
   }
 
-  /* Mismo 72% que el glifo y que los enlaces de escritorio: sobre el velo el
-     texto no cambia de tono por estar en otro sitio.
-     48 px de alto — por encima de los 44 que pide un objetivo táctil. */
+  /* Sólo la lista de filtros scrollea, y sólo cuando la rama actual no cabe
+     — con 3 o 4 hermanos no hace falta, pero un teléfono en horizontal tiene
+     poco alto y ahí sí entra en juego. */
+  .av-menu__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;   /* el scroll no se contagia a la página */
+    scrollbar-width: none;
+  }
+  .av-menu__scroll::-webkit-scrollbar { display: none; }
+
+  /* Mismo 72% que el glifo: sobre el velo el texto no cambia de tono por estar
+     en otro sitio.
+
+     LA LETRA A 10.5 px, y con ella lo demás a la misma proporción — icono,
+     hueco y relleno bajan todos junto con el texto, porque una fila no puede
+     tener una letra pequeña y un icono que sigue gritando el tamaño de antes.
+
+     El ALTO no baja con lo demás, y es la única pieza que no escala: 44 px es
+     el mínimo de un objetivo táctil, y bajar de ahí no libera espacio de
+     verdad — lo que hace es que el dedo falle. El alto que se gana viene del
+     relleno y el icono, no de pedirle menos al pulgar. */
   .av-menu__link {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 13px;
-    min-height: 48px;
-    padding: 0 14px;
+    gap: 9px;
+    min-height: 44px;
+    padding: 0 10px;
     border-radius: var(--lg-r-base);
-    font-size: 15.5px;
+    font-size: 10.5px;
     font-weight: 500;
-    letter-spacing: -.01em;
+    letter-spacing: -.005em;
     white-space: nowrap;
     color: var(--av-on-glass);
     text-decoration: none;
   }
   /* El icono reserva su hueco aunque no haya icono: así las etiquetas quedan en
      la misma columna con `items` de fuera que no traigan ninguno. */
-  .av-menu__icon { width: 20px; flex: none; }
-  .av-menu__icon :deep(svg) { width: 20px; height: 20px; }
+  .av-menu__icon { width: 14px; flex: none; }
+  .av-menu__icon :deep(svg) { width: 14px; height: 14px; }
 
   /* El activo lleva `.av-glass-sel`, igual que la píldora de escritorio, y el
      texto NO cambia: lo que marca la selección es el panel y sólo el panel. Es
@@ -889,25 +987,61 @@ onBeforeUnmount(() => {
      activo de una navegación. */
   .av-menu__link.is-active { color: var(--av-on-glass); }
 
+  /* la rama lleva el chevron pegado al borde derecho de su propia fila, no del
+     panel — el `margin-left: auto` empuja dentro del botón, no fuera de él */
+  .av-menu__chev {
+    margin-left: auto;
+    width: 15px;
+    height: 15px;
+    flex: none;
+    opacity: .5;
+  }
+
   /* ── la sección de filtros ────────────────────────────────────
-     Un filo de luz la separa de los enlaces — no una caja: encajonarla dentro
-     del panel sería dibujar una superficie sobre otra, y aquí no hay dos
+     Un filo de luz la separa del menú — no una caja: encajonarla dentro del
+     panel sería dibujar una superficie sobre otra, y aquí no hay dos
      superficies, hay dos cosas dentro de la misma. */
   .av-menu__section {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 10px 0 6px;
-    padding: 12px 14px 0;
+    gap: 7px;
+    flex: none;
+    margin: 8px 0 5px;
+    padding: 10px 10px 0;
     border-top: 1px solid var(--av-on-glass-hair);
   }
+  /* Volver un nivel. Redonda y pequeña a propósito: no compite con el título,
+     que es lo que dice dónde estás — esto sólo dice que se puede salir. */
+  .av-menu__back {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    margin-left: -4px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    padding: 0;
+    color: var(--av-on-glass-strong);
+    cursor: pointer;
+  }
+  .av-menu__back :deep(svg) { width: 15px; height: 15px; }
+
   .av-menu__title {
     margin: 0;
+    /* No escala con `.av-menu__link`: es un título, no una fila, y a 10.5 se
+       confundiría con los ítems que títula. */
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: .2em;
     text-transform: uppercase;
     color: var(--av-on-glass);
+    /* el título cambia («Filtros» → «Calzado») y puede ser más largo que el
+       hueco que queda junto al contador y «Limpiar» */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   /* la misma pieza que la burbuja de la bolsa, con las mismas medidas */
   .av-menu__count {
@@ -915,6 +1049,7 @@ onBeforeUnmount(() => {
     place-items: center;
     min-width: 18px;
     height: 18px;
+    flex: none;
     padding: 0 5px;
     border-radius: 999px;
     color: var(--av-ink);
@@ -925,6 +1060,7 @@ onBeforeUnmount(() => {
   }
   .av-menu__clear {
     margin-left: auto;
+    flex: none;
     border: 0;
     background: none;
     padding: 2px 0;
