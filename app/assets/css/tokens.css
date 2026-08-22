@@ -49,13 +49,16 @@
      las piezas a la vez y siguen alineadas.
 
      El precio del alto se paga en material: los topes recortan la lente a un
-     34% del lado corto. A 58 px la lente baja de 26 a 19.7 y la compresión de
-     82 a 63.1 — el 76% del material real. A 70 estábamos en el 92% y a 46 en el
-     60%. No es el material cambiando, es su propia regla; ver
+     34% del lado corto. A 55 px la lente baja de 26 a 18.7 y la compresión de
+     82 a 59.8 — el 72% del material real. A 58 era el 76%, a 70 el 92% y a 46
+     el 60%. No es el material cambiando, es su propia regla; ver
      docs/01-velo-negro.md §2.
 
-     58 y no menos porque el botón de dentro mide `--av-nav-h` menos 14, y a 58
-     eso deja 44 px — el mínimo de un objetivo táctil, clavado.
+     55. El botón de la barra de teléfono vive dentro y su alto es
+     `--av-nav-h` menos 10, o sea 45 px: sigue por encima de los 44 de un
+     objetivo táctil, que es el suelo real de este número. Ese menos-10 era
+     menos-14 cuando la barra medía 58; se ajustó al bajar, porque si no el
+     botón caía a 41 y se quedaba corto.
 
      La barra va ARRIBA en las dos disposiciones — escritorio y teléfono — así
      que estas tres cuentas valen para las dos y no hacen falta variantes:
@@ -67,7 +70,19 @@
                          barra es `fixed` y no ocupa sitio en el flujo.
 
      Abajo no hay que reservar nada, y por eso no hay token para ello. */
-  --av-nav-h: 58px;
+  --av-nav-h: 55px;
+  /* El relleno lateral de la cabecera y el hueco entre sus dos grupos. Salen a
+     token porque el desplegable del buscador —que es HERMANO de la cabecera, no
+     hijo— necesita saber dónde empieza la barra de búsqueda para caer justo
+     debajo, y esa cuenta es `relleno + marca + hueco`. Con los números sueltos
+     dentro del componente no habría forma de escribirla sin repetirlos. */
+  --av-nav-pad:  clamp(16px, 3vw, 34px);
+  --av-nav-lgap: clamp(10px, 1.44vw - 4.8px, 16px);
+  /* La barra de búsqueda de escritorio: ancho, y dónde arranca. El ancho es
+     también el del panel de resultados — caen alineados porque leen el mismo
+     par de números. */
+  --av-search-w: clamp(193px, 43.125vw - 359px, 320px);
+  --av-search-x: calc(var(--av-nav-pad) + var(--av-nav-h) + var(--av-nav-lgap));
   --av-nav-gap: 16px;
   --av-nav-top: calc(var(--av-nav-gap) + env(safe-area-inset-top, 0px));
   --av-nav-space: calc(var(--av-nav-top) + var(--av-nav-h) + var(--av-nav-gap));

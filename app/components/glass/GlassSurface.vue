@@ -37,7 +37,6 @@
  */
 import { ref, computed } from 'vue'
 import { useGlassLens } from '~/composables/useGlassLens'
-import { useGlassLight } from '~/composables/useGlassLight'
 
 const props = defineProps({
   /** radio en px. 0 = usa el token --lg-r (18). 999 = píldora */
@@ -73,7 +72,6 @@ const el = ref(null)
    Sin esto la lente no aparecia hasta que algo redimensionara la ventana, y el
    panel se veia como cristal limpio — velo y desenfoque, sin refraccion. */
 const { sync } = useGlassLens(el)
-useGlassLight(el)
 
 defineExpose({ sync })
 </script>

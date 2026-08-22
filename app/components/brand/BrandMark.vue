@@ -25,16 +25,23 @@
  * PENDIENTE: el logo vectorial (D-01). Con un SVG esto son dos rellenos.
  */
 const props = defineProps({
-  /** Alto en px. El ancho sale de la proporción del recorte. */
-  size: { type: Number, default: 36 },
+  /**
+   * Alto en px. El ancho sale de la proporción del recorte.
+   *
+   * `null` por defecto A PROPÓSITO: sin él la marca no escribe nada y el alto
+   * lo decide quien la coloca, atando `--av-mark-h` a su propio token. La barra
+   * hace justo eso (`--av-mark-h: var(--av-nav-h)`), y así el alto de la barra
+   * es UN número. Con un default numérico el estilo en línea ganaba siempre y
+   * la marca se quedaba clavada mientras la barra cambiaba de alto.
+   */
+  size: { type: Number, default: null },
   /** Añade el wordmark tipográfico al lado. */
   wordmark: Boolean,
 })
 
-/* El alto sale del prop, pero pasa por una custom property para que quien la
-   coloque pueda atarla a un token en vez de repetir el número. La barra lo usa
-   así: `--av-mark-h: var(--av-nav-h)`, y la marca sigue a la barra sola. */
-const style = computed(() => ({ '--av-mark-h': `${props.size}px` }))
+/* Sólo si se pide un alto concreto. Si no, no hay estilo en línea que pisar y
+   manda el `--av-mark-h` que herede del contenedor. */
+const style = computed(() => (props.size ? { '--av-mark-h': `${props.size}px` } : null))
 </script>
 
 <template>
@@ -54,14 +61,18 @@ const style = computed(() => ({ '--av-mark-h': `${props.size}px` }))
 
 .av-mark__img {
   display: block;
-  height: var(--av-mark-h);
+  /* el 36 es el suelo para quien la use suelta, sin contenedor que la ate */
+  height: var(--av-mark-h, 36px);
   width: auto;
   object-fit: contain;
-  /* el mismo halo que los glifos: el vidrio limpio no garantiza contraste, y
-     aquí tampoco lo garantiza el fondo de la página */
-  filter:
-    drop-shadow(0 0 3px rgba(0, 0, 0, .55))
-    drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  /* SIN halo. Lo llevaba mientras la marca iba suelta sobre el fondo de la
+     página, donde nada garantizaba el contraste. Dentro de su panel de vidrio
+     el velo negro ya la despega de lo que pase por detrás, y la sombra sólo
+     ensuciaba los filos del recorte.
+
+     Y hay un motivo de material además del estético: `filter` crea un backdrop
+     root, así que un halo aquí dejaría sin fondo que refractar a cualquier
+     `backdrop-filter` que viniera por dentro. */
 }
 
 .av-mark__word {

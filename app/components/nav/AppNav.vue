@@ -366,7 +366,11 @@ function openSearch(evt) {
   searchTrigger.value = evt?.currentTarget || null
   searchOpen.value = true
   nextTick(() => {
-    searchInput.value?.focus()
+    /* En escritorio el foco YA está donde tiene que estar —en la barra de la
+       cabecera, que es quien acaba de abrir esto— y moverlo al campo de la
+       ventana lo sacaría de debajo del cursor. En teléfono el del panel es el
+       único campo que hay. */
+    if (!isDeskSearch()) searchInput.value?.focus()
     /* Y la lente. Este panel vive con `v-show`, o sea que nace en
        `display: none` y ahi no hay nada que medir: su filtro se queda sin
        construir. Los observadores de la lente no lo rescatan de forma fiable
@@ -387,9 +391,12 @@ function closeSearch(refocus = true) {
   /* bajar el teclado a mano: si el input se queda con el foco, en Android sigue
      levantado sobre una barra que ya volvió a su sitio */
   searchInput.value?.blur()
+  deskInput.value?.blur()
   kbInset.value = 0
   vvTop.value = 0
-  if (refocus) nextTick(() => searchTrigger.value?.focus())
+  /* En escritorio NO se devuelve el foco: el disparador es el propio campo de
+     la barra, y enfocarlo dispara `@focus` y vuelve a abrir el panel. */
+  if (refocus && !isDeskSearch()) nextTick(() => searchTrigger.value?.focus())
 }
 
 /* El filtrado es local y tonto — nombre y línea, sin acentos ni mayúsculas —
@@ -480,18 +487,76 @@ onBeforeUnmount(() => {
        sobre todo lo que tiene debajo, así que una barra que siguiera ahí se
        vería refractada dentro del panel — vidrio detrás de vidrio, que es
        justo lo que el sistema no hace. -->
-  <header class="av-nav" :class="{ 'is-away': panelOpen }">
-    <!-- la marca, SIN panel: a la altura de la barra y suelta sobre el fondo.
-         Se lee sola porque el recorte tiene alfa de verdad y el halo la despega
-         de cualquier fondo — ya no depende de tener vidrio oscuro detrás. -->
-    <a
-      href="/"
-      class="av-nav__brand"
-      aria-label="20 Avenida — inicio"
-      @click.prevent="emit('select', 'home')"
-    >
-      <BrandMark :size="58" />
-    </a>
+  <!-- Ya NO se esconde con el buscador abierto: en escritorio el buscador es
+       una barra que vive DENTRO de esta cabecera, así que esconderla se llevaría
+       por delante el campo donde se está escribiendo. En teléfono la cabecera no
+       existe —`display: none`— y quien se esconde es `.av-bar`. -->
+  <header class="av-nav">
+    <!-- Marca y buscador van juntos, y por eso hay grupo: la cabecera es
+         `space-between` con dos extremos, y el de la izquierda son estas dos
+         piezas. -->
+    <div class="av-nav__left">
+      <!-- La marca, DENTRO de su panel circular. Estuvo suelta sobre el fondo
+           un tiempo, apoyada en un halo propio; vuelve al vidrio para que en la
+           cabecera no haya ninguna pieza con material distinto — todas heredan
+           el mismo Velo negro y el mismo `--av-nav-h`.
+
+           El recorte del rótulo es casi cuadrado, así que el círculo le corta
+           las esquinas. Es a propósito y está aceptado: lo que importa es que
+           la marca lea como parte del sistema. -->
+      <GlassSurface
+        :radius="999"
+        tag="a"
+        href="/"
+        class="av-nav__brand"
+        aria-label="20 Avenida — inicio"
+        @click.prevent="emit('select', 'home')"
+      >
+        <!-- sin `size`: el alto lo pone `--av-mark-h`, que `.av-nav__brand` ata
+             a `--av-nav-h`. Un número, no dos. -->
+        <BrandMark />
+      </GlassSurface>
+
+      <!-- LA BARRA DE BÚSQUEDA — sólo escritorio y tableta. Aquí buscar no es un
+           botón que abre una ventana: es un campo, siempre visible, y los
+           resultados caen debajo con su mismo ancho. La ventana a pantalla
+           completa se queda para el teléfono, donde sí tiene sentido porque no
+           hay sitio para un desplegable.
+
+           Va a la IZQUIERDA y no junto a los otros botones, y no es gusto: con
+           la píldora centrada sobre la pantalla, el hueco de la derecha da 69 px
+           a 1440 y 24 a 1280 — no cabe un campo de texto. El de la izquierda da
+           265 y 215. Es el único sitio donde entra sin descentrar la píldora. -->
+      <GlassSurface :radius="999" tag="form" class="av-nav__search" @submit.prevent="submitSearch">
+        <span class="av-glyph av-nav__search-icon" aria-hidden="true">
+          <Search :stroke-width="1.7" />
+        </span>
+        <input
+          ref="deskInput"
+          v-model="query"
+          type="search"
+          name="q"
+          placeholder="Buscar"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          enterkeyhint="search"
+          aria-label="Buscar en la tienda"
+          aria-controls="av-search"
+          :aria-expanded="searchOpen"
+          @focus="openSearch($event)"
+        >
+        <button
+          v-if="query"
+          type="button"
+          class="av-nav__search-clear"
+          aria-label="Borrar"
+          @click="query = ''; deskInput?.focus()"
+        >
+          <span class="av-glyph"><X :stroke-width="2" /></span>
+        </button>
+      </GlassSurface>
+    </div>
 
     <GlassSurface :radius="999" tag="nav" class="av-nav__pill" aria-label="Principal">
       <div class="av-nav__inner">
@@ -521,32 +586,13 @@ onBeforeUnmount(() => {
       </div>
     </GlassSurface>
 
-    <!-- Las acciones sueltas: sólo escritorio. Buscar · bolsa · favoritos ·
-         cuenta, todas iconos y todas su propia `GlassSurface`.
+    <!-- Las acciones sueltas: bolsa · favoritos · cuenta, cada una su propia
+         `GlassSurface`. La lupa ya no está aquí — es la barra de la izquierda.
 
-         Buscar abre el panel a pantalla completa — el `variant="panel"`, con
-         la lente de 80 px sin recortar. Es lo que trae ese material por encima
-         de 900 px: hasta ahora sólo existía en teléfono, y arriba se quedaba
-         todo en píldoras, donde el tope de seguridad deja la lente en 19.7.
-
-         El ⋯ NO está aquí, y es a propósito: el menú de tres puntos es una
-         pieza de TELÉFONO. En escritorio los enlaces ya se ven enteros en la
-         píldora del centro, así que un botón que los volviera a esconder
-         sobraría. -->
+         El ⋯ tampoco, y es a propósito: el menú de tres puntos es una pieza de
+         TELÉFONO. En escritorio los enlaces ya se ven enteros en la píldora del
+         centro, así que un botón que los volviera a esconder sobraría. -->
     <div class="av-nav__actions">
-      <GlassSurface :radius="999" class="av-nav__action">
-        <button
-          type="button"
-          aria-label="Buscar"
-          aria-haspopup="true"
-          aria-controls="av-search"
-          :aria-expanded="searchOpen"
-          @click="searchOpen ? closeSearch() : openSearch($event)"
-        >
-          <span class="av-glyph"><Search :stroke-width="1.7" /></span>
-        </button>
-      </GlassSurface>
-
       <GlassSurface
         v-for="a in actions"
         :key="a.id"
@@ -798,6 +844,11 @@ onBeforeUnmount(() => {
 
        `v-show` y no `v-if` — ver la nota del script: es lo que hace que el
        teclado suba en iOS. -->
+  <!-- Recoge el clic de fuera y sólo existe en escritorio: la ventana de
+       teléfono se come la pantalla y no tiene «fuera». Transparente — oscurecer
+       sería inventar una capa que el sistema no tiene. -->
+  <div v-if="searchOpen" class="av-search__scrim" aria-hidden="true" @click="closeSearch" />
+
   <GlassSurface
     ref="searchGlass"
     v-show="searchOpen"
@@ -861,7 +912,19 @@ onBeforeUnmount(() => {
 
           <ul v-if="results.length" class="av-search__results">
             <li v-for="p in results" :key="p.id">
-              <button type="button" class="av-card" @click="pickResult(p)">
+              <!-- VIDRIO, y con el velo NEGRO de siempre — sin variante. Se
+                   probó `light` (velo blanco, tinta negra) y se descartó
+                   mirándolo: el texto en negro se leía peor. Con el velo negro
+                   el contenido vuelve a ser blanco solo, porque los
+                   `--av-on-glass-*` de la base ya son claros: la ficha no
+                   escribe ni un color, cambia de material y el texto la sigue. -->
+              <GlassSurface
+                tag="button"
+                type="button"
+                variant="light"
+                class="av-card"
+                @click="pickResult(p)"
+              >
                 <span class="av-card__shot">
                   <img v-if="p.image" :src="p.image" :alt="p.name" loading="lazy" decoding="async">
                 </span>
@@ -875,7 +938,7 @@ onBeforeUnmount(() => {
                   </span>
                 </span>
                 <ChevronRight class="av-card__chev" :stroke-width="1.7" />
-              </button>
+              </GlassSurface>
             </li>
           </ul>
 
@@ -900,8 +963,11 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   z-index: 50;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Flex y no rejilla, porque la píldora ya no vive en una columna: va
+     ABSOLUTA y centrada sobre la pantalla — ver `.av-nav__pill`. Aquí sólo
+     quedan la marca y las acciones, una a cada extremo. */
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   /* Fluido y atado a los dos extremos, igual que el relleno de los enlaces:
      16 a 1440, 10 a 1024. Son seis píxeles que la píldora necesita justo en el
@@ -909,45 +975,147 @@ onBeforeUnmount(() => {
 
      NO es `--av-nav-gap` — ese token también fija dónde se posa la barra y el
      padding de los paneles, y ahí no se toca nada. */
-  gap: clamp(10px, 1.44vw - 4.8px, 16px);
-  padding: var(--av-nav-gap) clamp(16px, 3vw, 34px);
+  /* Los dos salen de `tokens.css`: el desplegable del buscador es hermano de
+     esta cabecera y necesita la misma cuenta para caer bajo la barra. */
+  gap: var(--av-nav-lgap);
+  padding: var(--av-nav-gap) var(--av-nav-pad);
   pointer-events: none;    /* el hueco entre piezas deja pasar el cursor */
 }
 .av-nav > * { pointer-events: auto; }
-/* La MISMA regla que `.av-bar.is-away`, hasta la propiedad: `visibility` y no
-   `display`, porque sale igual del árbol de accesibilidad —nada de botones
-   invisibles que un lector siga anunciando— y no obliga a rehacer el layout de
-   la cabecera al abrir y cerrar. */
-.av-nav.is-away { visibility: hidden; }
+/* Marca y buscador, pegados. El hueco es el mismo `--av-nav-lgap` que separa
+   los dos grupos de la cabecera, y tiene que serlo: es el número del que sale
+   `--av-search-x`, o sea dónde cae el desplegable. */
+.av-nav__left {
+  display: flex;
+  align-items: center;
+  gap: var(--av-nav-lgap);
+  min-width: 0;
+}
+
+/* ── la barra de búsqueda de escritorio ───────────────────────────────────
+   Un campo, no un botón. Mide `--av-search-w`, el mismo ancho con el que cae
+   el panel de resultados debajo. */
+.av-nav__search {
+  width: var(--av-search-w);
+  height: var(--av-nav-h);
+  flex: none;
+}
+/* La fila va en `__body` y no en la raíz — la raíz la ocupan las cuatro capas
+   del material, que son `absolute`. Puesto arriba, el icono y la X se salían
+   del campo por encima y por debajo. Es el mismo tropiezo que la ficha. */
+.av-nav__search > :deep(.av-glass__body) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 100%;
+  padding: 0 16px;
+}
+.av-nav__search-icon { flex: none; }
+.av-nav__search-icon :deep(svg) { width: 17px; height: 17px; }
+.av-nav__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  color: var(--av-on-glass-strong);
+}
+.av-nav__search input::placeholder { color: var(--av-on-glass); }
+.av-nav__search input::-webkit-search-cancel-button { display: none; }
+.av-nav__search-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.av-nav__search-clear :deep(svg) { width: 14px; height: 14px; }
 
 .av-nav__action {
   width: var(--av-nav-h);
   height: var(--av-nav-h);
   flex: none;
 }
-/* la marca no lleva panel: es la pieza mas alta de la barra y por eso se nota */
+/* La marca, en su panel circular: mismo material y mismo alto que todo lo demás
+   de la cabecera. Un número, no dos que haya que acordarse de mover a la vez. */
 .av-nav__brand {
-  display: grid;
-  place-items: center;
+  width: var(--av-nav-h);
   height: var(--av-nav-h);
   flex: none;
-  /* la marca es la pieza más alta de la barra y mide lo mismo que ella: un
-     número, no dos que haya que acordarse de mover a la vez */
-  --av-mark-h: var(--av-nav-h);
 }
+/* El rótulo va MÁS PEQUEÑO que el círculo, no a ras: al 60% del alto quedan
+   unos 11 px de aire a los lados y 4 en las esquinas, así que se ve que hay una
+   burbuja y no un icono recortado. El recorte es casi cuadrado y su diagonal es
+   lo que manda — a partir del 68% las esquinas empiezan a tocar el filo.
+
+   El `overflow: hidden` se queda de red: hoy no recorta nada, pero si algún día
+   entra un asset más alto no se saldrá de la burbuja. */
+.av-nav__brand {
+  --av-mark-h: calc(var(--av-nav-h) * .60);
+}
+.av-nav__brand > :deep(.av-glass__body) {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  overflow: hidden;
+}
+/* CENTRADA SOBRE LA PANTALLA, no sobre el hueco que le dejan los vecinos.
+   Estaba en la columna de en medio de una rejilla `auto 1fr auto` con
+   `justify-self: center`, y esa columna NO está centrada: arranca después de la
+   marca (58 px) y termina antes de las acciones (250). Su centro caía en 616 de
+   1425 cuando el de la pantalla está en 712 — 96 px corrida a la izquierda, que
+   es justo lo que se veía.
+
+   `1fr auto 1fr` habría centrado la columna, pero un `1fr` no baja de su
+   contenido: a 1024 las dos columnas laterales pedirían 250 cada una y la fila
+   se desbordaría. Sacarla del flujo es lo único que centra de verdad sin
+   reservar a los lados un sitio que no hay.
+
+   El precio está en `@media`: fuera del flujo, la píldora ya no empuja a nadie,
+   así que el solape hay que impedirlo con el ancho mínimo de la disposición.
+   Ver la nota del corte más abajo. */
 .av-nav__pill {
+  position: absolute;
+  left: 50%;
+  top: var(--av-nav-top);
+  transform: translateX(-50%);
   height: var(--av-nav-h);
-  justify-self: center;
-  max-width: 100%;
 }
 
-.av-nav__pill :deep(.av-glass__body) { height: 100%; }
-.av-nav__inner { display: flex; align-items: center; height: 100%; padding: 0 9px; }
+.av-nav__pill > :deep(.av-glass__body) { height: 100%; }
+/* `--av-nav-air` es el aire alrededor de la SELECCIÓN, y es UN número para los
+   cuatro lados:
+
+     · arriba y abajo   el enlace mide `--av-nav-h` menos dos veces el aire
+     · a los lados      la píldora reserva ese aire de relleno interior, y entre
+                        dos enlaces va el DOBLE, para que a cada selección le
+                        toque lo mismo contra su vecina que contra el borde
+
+   Antes eran tres números sin relación —13 de relleno vertical, 2 de hueco y 9
+   de relleno de la píldora— y la selección quedaba a 4.5 px del filo de arriba
+   y a 1 px de su vecina. */
+.av-nav__inner {
+  --av-nav-air: 5px;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--av-nav-air);
+}
 
 .av-nav__links {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(var(--av-nav-air) * 2);
   height: 100%;
   margin: 0;
   padding: 0;
@@ -979,7 +1147,19 @@ onBeforeUnmount(() => {
      Sin esto se recorta «Cuenta»: los enlaces son `nowrap` y la píldora vive en
      una columna `minmax(0, 1fr)`, así que al no caber no se encogen — se salen. */
   gap: clamp(6px, 1.2vw - 7.3px, 8px);
-  padding: 13px clamp(10px, 2.4vw - 14.6px, 20px);
+  /* El alto sale del AIRE, no de un relleno vertical: así la selección deja
+     exactamente `--av-nav-air` arriba y abajo, sin depender de la altura de
+     línea de la fuente. Y el relleno lateral bajó de 20 a 17 porque los huecos
+     entre enlaces pasaron de 2 a 10 px: ese ancho hay que sacarlo de algún
+     sitio o la píldora se come a los botones de la derecha. */
+  height: calc(var(--av-nav-h) - var(--av-nav-air) * 2);
+  padding-block: 0;
+  /* 17 a 1440, 11 a 1280 — la recta que pasa por los dos. La pendiente es
+     empinada a propósito: la píldora va centrada, así que su ancho se paga a
+     los DOS lados, y el lado corto es ahora el izquierdo, donde viven la marca
+     y la barra de búsqueda. En 160 px de ventana hay que soltar 72 px de
+     píldora para que no alcance a la barra. */
+  padding-inline: clamp(10px, 1.25vw - 6px, 12px);
   border: 0;
   border-radius: 999px;
   background: none;
@@ -1024,7 +1204,7 @@ onBeforeUnmount(() => {
    sin nada que refractar y dejarían de ser vidrio. */
 .av-glyph { display: grid; place-items: center; }
 
-.av-nav__action :deep(.av-glass__body) { height: 100%; }
+.av-nav__action > :deep(.av-glass__body) { height: 100%; }
 .av-nav__action button {
   position: relative;
   display: grid;
@@ -1087,7 +1267,9 @@ onBeforeUnmount(() => {
      mide 320 y respira en los tres teléfonos. Sigue muy por encima de los 44
      de un objetivo táctil. */
   width: 56px;
-  height: calc(var(--av-nav-h) - 14px);
+  /* menos 10 y no menos 14: con la barra a 55 esto da 45 px y el objetivo
+     táctil sigue por encima de los 44. A menos-14 caía a 41. */
+  height: calc(var(--av-nav-h) - 10px);
   border: 0;
   border-radius: 999px;
   background: none;
@@ -1095,17 +1277,33 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-/* El corte entre las dos disposiciones. Estuvo en 900 y sube a 1023 al meter
-   los iconos en la píldora: seis etiquetas MÁS seis iconos no caben con la
-   marca y los cuatro botones por debajo de eso — medido, el mínimo de la
-   píldora es 591 px y a 920 sólo quedan 498 libres. No es un número elegido a
-   ojo: es dónde deja de caber.
+/* El corte entre las dos disposiciones. Ha subido dos veces y las dos por lo
+   mismo: lo que la píldora pide creció.
 
-   1023 y no 1010, que es el mínimo exacto, para que la tableta en horizontal
-   (1024) entre en la disposición de escritorio con margen y no justo en el
-   filo. Por debajo queda la barra de teléfono, que es una disposición completa
-   y ya aprobada — no un escritorio recortado. */
-@media (max-width: 1023px) {
+     900   → sólo texto, y la píldora se centraba en el hueco libre.
+     1023  → entran los iconos: +143 px de píldora.
+     1279  → la píldora se centra en la PANTALLA, no en el hueco.
+
+   El último es el que manda ahora y no es un número a ojo. Centrada de verdad,
+   la píldora reparte su ancho a los dos lados del centro, y el lado corto es el
+   de las acciones: necesita `ancho/2 + acciones + hueco + margen ≤ mitad de la
+   pantalla`. Medido, lo que le sobra al borde derecho:
+
+     1024 → −60    1100 → −37    1180 → −14
+     1280 → +15    1366 → +43    1440 → +68
+
+   O sea que por debajo de ~1240 la píldora se mete debajo de los botones. Y no
+   se arregla apretando: quitar margen lateral da 15 px y bajar los botones a 48
+   otros 28 — 43 de los 60 que faltan, y encima rompería el alto único de la
+   barra.
+
+   Lo que sí lo arreglaría es una píldora más corta: con cuatro enlaces en vez
+   de seis sobran ~115 px y el corte podría volver a 1024. Es una decisión de
+   contenido, no de CSS.
+
+   Por debajo queda la barra de teléfono, que es una disposición completa y ya
+   aprobada — no un escritorio recortado. */
+@media (max-width: 1279px) {
   /* La barra de arriba desaparece ENTERA — marca, píldora y acciones. En
      teléfono hay una sola barra, arriba igual que en escritorio. Los enlaces y
      los filtros se van al menú del ⋯. */
@@ -1184,7 +1382,9 @@ onBeforeUnmount(() => {
   /* La misma caja que el buscador. El material también, y ahora se ve que lo
      es: los dos piden `variant="panel"` en vez de repetir sus tokens. */
 }
-.av-menu :deep(.av-glass__body) {
+/* `>`, por lo mismo que en `.av-search`: el selector descendiente alcanzaba al
+   cuerpo de cualquier vidrio anidado. */
+.av-menu > :deep(.av-glass__body) {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1446,7 +1646,12 @@ onBeforeUnmount(() => {
      copiados a mano en este bloque Y en el del menú, con la única garantía de
      que alguien se acordara de tocar los dos a la vez. */
 }
-.av-search :deep(.av-glass__body) {
+/* `>` y NO descendiente, y esto costó un rato: dentro del panel hay OTRA
+   `GlassSurface` —la ficha de resultado— y `.av-search .av-glass__body` también
+   alcanzaba a la suya. La ficha heredaba `flex-direction: column` del buscador
+   y se pintaba en columna: la foto arriba, el texto debajo y el chevron al
+   final, centrados. Cada superficie manda sobre SU cuerpo y sobre ninguno más. */
+.av-search > :deep(.av-glass__body) {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1612,23 +1817,60 @@ onBeforeUnmount(() => {
 .av-search__all :deep(svg) { width: 16px; height: 16px; }
 
 /* ── la tarjeta de resultado ──────────────────────────────────────
-   SÓLIDA, y no es una elección estética: el §6 dice que el vidrio es de la capa
-   que flota y que las tarjetas de una lista son contenido. Además el precio no
-   puede depender de la foto que pase por detrás. Sobre papel manda
-   `--av-solid-*`, nunca los tonos de encima del velo. */
+   VIDRIO `light` —velo blanco, el mismo de los botones claros— con el texto en
+   BLANCO.
+
+   Es la única pieza que rompe una variante por dentro, y se escribe porque hay
+   que saberlo: `light` existe justamente para mover el velo Y el contenido a la
+   vez —velo claro, contenido a tinta— y aquí se le devuelven los cuatro
+   `--av-on-glass-*` a claro.
+
+   El número, para que esté en algún sitio: medido sobre el panel del buscador,
+   el velo `light` compone un gris de ~140 y el blanco encima da 3.3:1, por
+   debajo del 4.5 de AA (la tinta sobre ese mismo gris daba 6.0). Si hay que
+   subirlo sin cambiar el color de la letra, el botón es BAJAR `--lg-veil-a` de
+   la variante —menos velo blanco, fondo más oscuro—. No se toca desde aquí
+   porque `light` es compartida.
+
+   Deja de valer `--av-solid-*`. Esos son los tonos del PAPEL, y aquí ya no hay
+   papel debajo del texto: hay velo.
+
+   Escrito porque contradice al §6 —«nada de vidrio en la capa de contenido, y
+   nada de vidrio sobre vidrio»— y la contradicción es a propósito, pedida:
+   sobre el panel a pantalla completa la ficha blanca sólida era el único objeto
+   opaco de todo el sistema y se leía como un parche. Lo que la regla protege es
+   que el precio se lea, y eso lo sigue garantizando el velo, que es FIJO: no se
+   adapta a la foto que pase por detrás.
+
+   Lo que sigue en pie de la regla: son dos capas compuestas más por resultado.
+   Con la lista corta del buscador va sobrado; en una grilla larga de producto,
+   no — ahí las fichas vuelven a ser sólidas. */
 .av-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: block;
   width: 100%;
-  padding: 10px 12px;
   border: 0;
-  border-radius: var(--lg-r-base);
-  background: var(--av-solid-bg);
-  color: var(--av-solid-fg);
+  padding: 0;
+  background: none;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  /* Los cuatro tokens de contenido, de vuelta a claro. `.av-glass--light` los
+     acaba de poner a tinta y aquí se deshace. Van como TOKENS y no como un
+     `color` suelto para que los hijos —línea, nombre, precio, chevron y la caja
+     de la foto— sigan sin escribir ni un color propio. */
+  --av-on-glass:        rgba(255, 255, 255, .72);
+  --av-on-glass-strong: #FFFFFF;
+  --av-on-glass-hover:  rgba(255, 255, 255, .10);
+  --av-on-glass-hair:   rgba(255, 255, 255, .14);
+  color: var(--av-on-glass-strong);
+}
+/* La fila vive en `__body`, no en la raíz: la raíz la ocupan las cuatro capas
+   del material y son `absolute`, así que el flex tiene que estar por dentro. */
+.av-card > :deep(.av-glass__body) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
 }
 .av-card__shot {
   display: grid;
@@ -1638,7 +1880,7 @@ onBeforeUnmount(() => {
   flex: none;
   border-radius: var(--lg-r-base);
   overflow: hidden;
-  background: var(--av-solid-hair);
+  background: var(--av-on-glass-hair);
 }
 .av-card__shot img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -1655,7 +1897,7 @@ onBeforeUnmount(() => {
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: -.005em;
-  color: var(--av-solid-fg-soft);
+  color: var(--av-on-glass);
   /* una línea y con puntos suspensivos: el nombre largo no puede empujar al
      precio fuera de la tarjeta */
   overflow: hidden;
@@ -1666,14 +1908,14 @@ onBeforeUnmount(() => {
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: -.005em;
-  color: var(--av-solid-fg);
+  color: var(--av-on-glass-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .av-card__prices { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-.av-card__prices b { font-size: 13.5px; font-weight: 500; color: var(--av-solid-fg); font-variant-numeric: tabular-nums; }
-.av-card__prices s { font-size: 13.5px; color: var(--av-solid-fg-soft); }
+.av-card__prices b { font-size: 13.5px; font-weight: 500; color: var(--av-on-glass-strong); font-variant-numeric: tabular-nums; }
+.av-card__prices s { font-size: 13.5px; color: var(--av-on-glass); }
 /* El amarillo de marca como acento corto, que es para lo que sirve — el mismo
    papel que la burbuja del contador en la barra. */
 /* La burbuja del descuento es la única de la tarjeta que se sale de los 13.5,
@@ -1689,7 +1931,68 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 700;
 }
-.av-card__chev { width: 18px; height: 18px; flex: none; color: var(--av-solid-fg-soft); }
+.av-card__chev { width: 18px; height: 18px; flex: none; color: var(--av-on-glass); }
+
+/* ══ el buscador en ESCRITORIO Y TABLETA ═══════════════════════════════════
+   Aquí no es una ventana: es una barra en la cabecera y un desplegable que cae
+   debajo con su mismo ancho. La ventana a pantalla completa se queda para el
+   teléfono, donde no hay sitio para colgar nada de nada.
+
+   La misma pieza sirve para los dos casos y sólo cambia su caja, que es la
+   razón de que esto sea una media query y no un segundo componente: el
+   contenido —sugerencias, resultados, «ver todos»— es idéntico.
+
+   Dónde cae: `--av-search-x` es `relleno + marca + hueco`, exactamente donde el
+   flujo coloca la barra, y `--av-search-w` es su ancho. Los dos viven en
+   `tokens.css` justamente para que la barra y el desplegable no puedan
+   desalinearse — leen el mismo par de números. */
+.av-search__scrim { display: none; }
+
+@media (min-width: 1280px) {
+  /* recoge el clic de fuera; va por debajo del panel y por encima de todo lo
+     demás, y transparente a propósito */
+  .av-search__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 57;
+    background: none;
+  }
+
+  .av-search {
+    /* deshace el `inset: 0` y el `100vw` de la ventana */
+    inset: auto;
+    top: calc(var(--av-nav-top) + var(--av-nav-h) + 8px);
+    left: var(--av-search-x);
+    width: var(--av-search-w);
+    height: auto;
+    max-height: min(58vh, 520px);
+
+    /* Y deshace la GEOMETRÍA de la variante `panel`, que es de superficies que
+       se comen la pantalla: aquí la pieza mide 240 px de ancho y una lente de
+       80 se la comería entera. Vuelve a la base — radio del sistema, lente de
+       26, compresión de 82 — y recupera el marco, porque un desplegable sí
+       tiene esquina y sí se despega de lo que hay debajo. */
+    --lg-r:     var(--lg-r-base);
+    --lg-edge:  26px;
+    --lg-scale: 82;
+    --lg-frame: 1;
+  }
+
+  /* el campo ya está en la cabecera; aquí sobra, y con él la X de cerrar */
+  .av-search__head { display: none; }
+
+  .av-search__body { padding: 10px; }
+  .av-search__scroll { padding-top: 0; }
+  .av-search__title { margin-bottom: 6px; padding: 0 2px; }
+  .av-search__all { margin-top: 10px; }
+
+  /* La ficha se estrecha con el panel: a 240 px la foto de 62 se comía la
+     mitad. 44 deja sitio al nombre, que es lo que se lee. */
+  .av-card__shot { width: 44px; height: 44px; }
+  .av-card > :deep(.av-glass__body) { gap: 10px; padding: 8px 10px; }
+  .av-card__chev { display: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .av-search__scroll { scroll-behavior: auto; }

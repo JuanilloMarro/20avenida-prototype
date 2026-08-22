@@ -649,3 +649,290 @@ OPiOS`, el «Macintosh con táctil» de iPadOS 13+, y Safari de escritorio como
 pueda arreglar desde aquí: es el motor. Allí el material es velo + desenfoque +
 saturación + el filo especular, sin refracción.
 
+**2026-08-22 · Fuera la luz que sigue al ratón.**
+`useGlassLight` era un `pointermove` global que recalculaba `--lg-ang` para cada
+superficie desde su propio centro. En teoría eso separa un cristal físico de un
+degradado pegado; en la práctica se veía como un fallo — con un gesto rápido el
+puntero cruza el centro de la pieza y el filo salta de un lado al otro en un
+fotograma, y el `transition: background .12s` que lo suavizaba sólo convertía el
+salto en un parpadeo.
+
+`--lg-ang` pasa a ser una diagonal fija de 135°, la misma para el velo y para el
+especular. El fichero se borró; está en el historial de git.
+
+**2026-08-22 · La ficha del buscador: de sólida a vidrio `light` con texto blanco.**
+Era `background: var(--av-solid-bg)` — el único objeto opaco de todo el sistema,
+y sobre el panel a pantalla completa se leía como un parche. Contradice el §6
+(«nada de vidrio en la capa de contenido, nada de vidrio sobre vidrio») y la
+contradicción es deliberada.
+
+Se probaron las dos combinaciones y se eligió mirándolas:
+
+| | fondo compuesto | contraste del texto |
+|---|---|---|
+| `light` + tinta negra | ~140 gris | 6.0:1 · tono suave 3.9:1 |
+| velo negro + blanco | ~57 | 11.3:1 · tono suave 6.8:1 |
+| **`light` + blanco** ← elegido | ~140 gris | **3.2:1 · tono suave 2.4:1** |
+
+El elegido es el que peor mide. Queda escrito: está por debajo del 4.5:1 de AA.
+Si hay que subirlo sin cambiar el color de la letra, el botón es BAJAR
+`--lg-veil-a` en la ficha —menos velo blanco, fondo más oscuro, blanco que
+resalta más—; subirlo lo empeora.
+
+La ficha es además la única pieza que rompe una variante por dentro: `light`
+invierte los cuatro `--av-on-glass-*` a tinta y la ficha se los devuelve a
+claro. Van como tokens y no como `color` suelto, así que los hijos siguen sin
+escribir ni un color propio.
+
+**2026-08-22 · `:deep()` descendiente filtrándose a vidrios anidados.**
+`.av-search :deep(.av-glass__body)` alcanzaba también al cuerpo de la ficha, que
+es otra `GlassSurface` dentro del panel. La ficha heredaba
+`flex-direction: column` y se pintaba en columna — foto arriba, texto debajo,
+chevron al final. Todos los `:deep(.av-glass__body)` pasan a `> :deep(...)`:
+cada superficie manda sobre SU cuerpo y sobre ninguno más.
+
+**2026-08-22 · La píldora se centra sobre la PANTALLA, y el corte sube a 1279.**
+Estaba en la columna de en medio de una rejilla `auto 1fr auto`, y esa columna
+no está centrada: arranca tras la marca (58) y acaba antes de las acciones
+(250). Su centro caía en 616 de 1425 — 96 px a la izquierda del de la pantalla.
+
+`1fr auto 1fr` la centraría pero desborda: un `1fr` no baja de su contenido y a
+1024 las dos laterales pedirían 250 cada una. La solución es sacarla del flujo
+(`absolute; left: 50%; translateX(-50%)`), y el precio es que ya no empuja a
+nadie, así que el solape hay que impedirlo con el ancho mínimo de la
+disposición. Holgura contra los botones, medida:
+
+| 1024 | 1100 | 1180 | **1280** | 1366 | 1440 |
+|---|---|---|---|---|---|
+| −60 | −37 | −14 | **+24** | +48 | +69 |
+
+De ahí el corte en **1279**. No se arregla apretando —quitar margen da 15 px y
+bajar los botones a 48 otros 28, de los 60 que faltan, rompiendo además el alto
+único—. Lo que sí lo arreglaría es una píldora más corta: con cuatro enlaces en
+vez de seis sobrarían ~115 px y el corte podría volver a 1024. Es una decisión
+de contenido.
+
+**2026-08-22 · `--av-nav-h`: 58 → 55.**
+El suelo del número es el botón de la barra de teléfono, que vive dentro y tiene
+que quedarse en 44 px de objetivo táctil. Era `--av-nav-h` menos 14 (44 clavados
+a 58); al bajar a 55 habría caído a 41, así que el resto pasa a menos 10 y da 45.
+
+Y la marca dejó de llevar su propio número: `<BrandMark>` tenía `:size="58"` en
+la plantilla, que ganaba por estilo en línea, así que la barra bajaba y la marca
+no. Ahora `size` es `null` por defecto y el alto lo pone `--av-mark-h`, que la
+barra ata a `--av-nav-h`. Un número.
+
+En material, 55 recorta la lente a 18.7 y la compresión a 59.8 — el 72% del
+preset. A 58 era el 76%.
+
+**2026-08-22 · Aire alrededor de la selección de la píldora: `--av-nav-air`.**
+La selección quedaba a 4.5 px del filo de arriba y a 1 px de su vecina, porque
+la separaban tres números sin relación: 13 de relleno vertical del enlace, 2 de
+hueco entre enlaces y 9 de relleno interior de la píldora. Ahora es UNO, y vale
+para los cuatro lados: el enlace mide `--av-nav-h` menos dos veces el aire, la
+píldora reserva ese aire de relleno, y entre dos enlaces va el doble — así a
+cada selección le toca lo mismo contra su vecina que contra el borde.
+
+A 5 px, los huecos pasaron de 2 a 10 y eso engorda la píldora 40 px. Como va
+centrada, ese ancho se paga a los dos lados, así que el relleno lateral del
+enlace bajó de 20 a 17 (a 1280, a 12) para devolverlo.
+
+**2026-08-22 · Buscar: ventana en teléfono, barra + desplegable en escritorio.**
+A pantalla completa sólo tiene sentido donde no hay sitio para colgar nada. En
+escritorio y tableta ocupaba la pantalla entera para enseñar dos resultados.
+
+Ahora en la cabecera hay un CAMPO, no un botón, y los resultados caen debajo con
+su mismo ancho. Es la MISMA pieza —`#av-search`, con sus sugerencias, sus fichas
+y su «ver todos»—: lo único que cambia entre los dos casos es la caja, en una
+`@media`. Por eso no hay un segundo componente.
+
+**Va a la izquierda, junto a la marca, y no es gusto.** Con la píldora centrada
+sobre la pantalla el hueco de la derecha daba 69 px a 1440 y 24 a 1280 — no cabe
+un campo de texto. Y no se arregla estrechando la píldora: aun con su relleno al
+mínimo, el hueco derecho llega a 160 px a 1440 y a 83 a 1280. El izquierdo daba
+265 y 215. Es el único sitio donde entra sin descentrar la píldora.
+
+Medido después del cambio, con la barra ya puesta:
+
+| ancho | barra | holgura izq. | holgura der. | desvío del centro |
+|---|---|---|---|---|
+| 1280 | 179 | 28 | 93 | 0 |
+| 1366 | 191 | 38 | 115 | 0 |
+| 1440 | 202 | 47 | 134 | 0 |
+| 1600 | 224 | 105 | 214 | 0 |
+
+Dos números nuevos en `tokens.css`, y viven ahí y no en el componente porque el
+desplegable es HERMANO de la cabecera, no hijo, y necesita la misma cuenta para
+caer alineado: `--av-search-x` (`relleno + marca + hueco`, donde el flujo pone
+la barra) y `--av-search-w` (su ancho, que es también el del desplegable).
+
+La cabecera deja de esconderse con el buscador abierto: el campo vive dentro de
+ella. Y aparece un velo transparente para el clic de fuera, que sólo existe en
+escritorio — la ventana de teléfono no tiene «fuera».
+
+**2026-08-22 · `--lg-frame`: el marco del material pasa a ser un token.**
+La variante `panel` apagaba la elevación y el filo especular con
+`box-shadow: none` en tres reglas sueltas. Dejó de servir en cuanto la misma
+superficie tuvo dos casos: el buscador va a sangre en teléfono y es un
+desplegable CON esquina en escritorio, y deshacer tres reglas en una media query
+es justo el desorden que el material evita.
+
+Ahora `--lg-frame` (1 = con marco · 0 = a sangre) multiplica las alfas de la
+sombra de elevación y de las tres sombras internas del especular, y es la
+opacidad del anillo de 1.4 px. `panel` lo pone a 0; el buscador de escritorio lo
+devuelve a 1 con una línea.
+
+**2026-08-22 · `:deep()` otra vez: el `<form>` del buscador.**
+Mismo tropiezo que la ficha, y por eso vale la pena escribirlo dos veces: puse
+`display: flex` en `.av-nav__search`, que es la RAÍZ de una `GlassSurface`. Las
+cuatro capas del material son `absolute` y el contenido vive en `__body`, así
+que la lupa y la X se salían del campo por arriba y por abajo. La fila siempre
+va en `> :deep(.av-glass__body)`.
+
+**2026-08-22 · La marca vuelve a su panel circular, y pierde el halo.**
+Estuvo suelta sobre el fondo, apoyada en un `drop-shadow` propio, desde que se
+la sacó del vidrio para que se leyera sobre el frame claro. Vuelve al panel para
+que en la cabecera no quede ninguna pieza con material distinto: marca, barra de
+búsqueda, píldora y botones son ahora el mismo Velo negro y el mismo
+`--av-nav-h`.
+
+El círculo recorta el rótulo —el recorte es casi cuadrado y pierde las
+esquinas— y está aceptado. El halo se va porque el velo negro ya la despega, y
+además porque `filter` crea un backdrop root: un halo ahí dejaría sin fondo que
+refractar a cualquier `backdrop-filter` que entrara por dentro. Es la misma
+trampa que ya costó un bug con `.av-glyph`.
+
+**2026-08-22 · La barra de búsqueda, más ancha.**
+
+| ancho de ventana | barra antes | ahora |
+|---|---|---|
+| 1280 | 179 | **193** |
+| 1366 | 191 | **214** |
+| 1440 | 202 | **232** |
+| 1600 | 224 | **250** |
+
+El panel de resultados crece con ella sin tocar nada: los dos leen
+`--av-search-w`. Lo paga la píldora, cuyo relleno lateral baja a 10 px en el
+corte (era 11). Queda una holgura de 16–19 px entre la barra y la píldora, que
+es justo el hueco de la cabecera (`--av-nav-lgap`, 13.6–16): todos los huecos de
+la fila miden ya lo mismo.
+
+**2026-08-22 · La barra de búsqueda crece SÓLO en escritorio.**
+En tableta en horizontal (1280) se queda en 193 px, que es lo que cabe. De ahí
+para arriba sube deprisa, porque el sitio existe y sólo hay que quitárselo a la
+píldora:
+
+| ventana | barra | relleno del enlace | holgura izq. |
+|---|---|---|---|
+| 1280 | 193 | 10 | 19 |
+| 1366 | 230 | 11 | 18 |
+| 1440 | **262** | 12 | 16 |
+| 1600 | **320** | 12 | 38 |
+
+La cuenta es fija: con la píldora centrada, cada píxel que gana la barra se lo
+tiene que quitar la píldora por DOS —uno a cada lado del centro—. De 232 a 262
+son 60 px de píldora, o sea 5 de relleno en cada uno de sus doce costados. El
+tope de la barra está en 320: más allá el relleno del enlace bajaría de 10 y las
+etiquetas empezarían a tocarse.
+
+Efecto secundario que conviene ver escrito: a la derecha quedan 164 px libres a
+1440 y 244 a 1600. Es el precio de centrar la píldora sobre la pantalla teniendo
+un lado más cargado que el otro, y se aceptó a sabiendas.
+
+**2026-08-22 · El rótulo, con aire dentro de su burbuja.**
+Iba a ras del círculo y se recortaba por las esquinas. Ahora va al **60% del
+alto**: quedan ~11 px de aire a los lados y ~4 en las esquinas, así que se ve
+que hay una burbuja y no un icono cortado. Lo que manda es la diagonal —el
+recorte es casi cuadrado—, y a partir del 68% las esquinas vuelven a tocar el
+filo. El `overflow: hidden` se queda de red por si algún día entra un asset más
+alto.
+
+**2026-08-22 · La luz vuelve al FILO: fuera los resplandores de borde completo.**
+`.av-glass__spec` llevaba dos `inset` blancos que recorrían ENTERO el canto de
+arriba y el de abajo. En una pieza pequeña pasaban por reflejo; en una píldora
+de 700 px eso no es un reflejo, es una barra encendida — y era justo lo que se
+veía mal. Se van los dos. Queda la sombra interna oscura, que da volumen sin
+iluminar nada, y el anillo del `::after`, que ahora es toda la luz que hay.
+
+**El perfil del anillo pasa a ser MONÓTONO: máximo en el borde y caída continua.**
+Primero se probó con el pico al 16/84% para que el círculo lo viera —ver la nota
+de geometría de abajo—, y estaba mal por otro lado: con el máximo dentro, la luz
+nacía apagada en la esquina, subía y se desplomaba, y eso se lee como un parche
+brillante en medio del canto, no como luz entrando por el filo.
+
+Ahora los dos extremos del degradado son las dos esquinas de la diagonal de
+`--lg-ang` —0% la superior izquierda, 100% la inferior derecha— y de cada una
+sale el brillo a tope difuminándose (.86 · .62 · .36 · .21) hasta un **suelo de
+.17** en el centro. La caída es más rápida que lineal: a un tercio del camino ya
+sólo queda el 36%. En una píldora el brillo vive en las dos tapas y su entorno;
+en un círculo es un arco que recorre el cuadrante.
+
+**Suelo y no cero**, y esto fue la última corrección: bajando a cero el canto
+largo de la píldora desaparecía y la pieza se quedaba sin silueta. Lo que se
+busca es un filo CONTINUO con dos zonas encendidas, no dos trozos de filo
+sueltos.
+
+**Y vuelve un resplandor interior**, esta vez como `box-shadow: inset` y no como
+capa con máscara. Un `box-shadow` se difumina y no tiene filo interior — que es
+exactamente lo que arruinó el `::before`. Uniforme y flojo (.13): la dirección
+la pone el anillo; esto sólo evita que el filo parezca una línea pegada encima.
+
+**La geometría que condiciona el perfil.** Un `linear-gradient` mide sobre la
+CAJA, no sobre la forma. En un círculo la diagonal de la caja es 1.414·d y el
+círculo sólo ocupa el tramo central: su punto más «arriba-izquierda» cae en el
+**14.6%** del degradado y el opuesto en el **85.4%**. Por eso el perfil no puede
+desplomarse antes del 15% — si lo hace, el anillo del círculo sólo ve las colas
+y el botón sale apagado, que es exactamente lo que pasaba con los picos en 0/100
+y una caída brusca. Con el máximo en el borde y una caída suave, a 14.6% todavía
+queda el 78%.
+
+**Y un intento fallido que conviene no repetir: el halo del `::before`.**
+Se añadió un segundo anillo, más grueso y tenue, para que el filo pareciera luz
+entrando en el canto y no una línea dibujada encima. Salió mal y se quitó: la
+máscara de `padding` recorta una BANDA de grosor constante, con el filo interior
+tan nítido como el exterior, así que en vez de un resplandor aparecía un
+**segundo borde** a 6 px del primero. Un halo de verdad pediría desenfocar esa
+capa, y el desenfoque se sale de la pieza. Un solo anillo.
+
+**2026-08-22 · Se va todo el negro pegado al filo, y el especular baja a 0.60.**
+Reportado que en las esquinas encendidas «sobresale un negro». Aislado
+apagando cada sospechoso por separado y midiendo el perfil de luminancia a
+través del canto, en vez de a ojo. Eran dos, y la sombra de elevación —el
+sospechoso obvio— **no** era ninguno: quitarla mueve el fondo de 222 a 225,
+tres niveles.
+
+1. **La viñeta oscura de `.av-glass__spec`** — `inset 0 0 lip*1.5 lip*-.9
+   rgba(14,10,0,.34)`, puesta en su día para dar volumen. Aporta poco tono pero
+   cae exactamente donde el anillo brilla, y ese salto de blanco a gris sucio es
+   lo que se lee como borde negro. Fuera; el volumen ya lo dan el velo y el
+   propio anillo.
+2. **El contorno oscuro de `.av-glass-sel`** — `inset 0 -1px 0 rgba(0,0,0,.16)`
+   más `0 1px 3px rgba(0,0,0,.18)`. Los dos juntos recortaban la selección en
+   negro justo por debajo de su filo encendido. Fuera también: la selección se
+   distingue por ser MÁS CLARA que el velo, no necesita que la perfilen.
+
+Y `--lg-spec` baja de **0.85 a 0.60**: el filo estaba demasiado marcado y se
+leía como un trazo dibujado encima. Al ser el multiplicador de todo lo
+especular, baja a la vez el anillo, el resplandor interior y el filo superior de
+la selección — la pieza se apaga entera, no sólo su contorno.
+
+Queda una cosa que NO es un defecto y conviene no confundirla con esto: sobre un
+fondo claro el vidrio mide 112 contra los 222 de la página. Esa diferencia es el
+velo negro al 45% con el brillo al 0.85, o sea el material haciendo su trabajo,
+y la silueta oscura que se ve alrededor de la pieza sale de ahí.
+
+**2026-08-22 · La variante `light` se había quedado con el filo a tope.**
+Al bajar `--lg-spec` de 0.85 a 0.60, `.av-glass--light` seguía pinchándolo a 1
+—lo tenía desde que se creó, porque sobre un velo claro el filo necesita algo
+más para despegarse—. Resultado: las fichas del buscador eran las ÚNICAS piezas
+con el contorno marcado mientras todo lo demás se había suavizado.
+
+Pasa a **0.72**, que es el 0.60 de la base con el mismo +20% que tenía antes.
+No puede escribirse como `calc(var(--lg-spec) * 1.2)`: sería una referencia
+cíclica, porque se está redefiniendo la misma propiedad. Queda anotado en
+`glass.css` para que se mueva con la base si ésta vuelve a cambiar.
+
+Auditadas las diez superficies visibles: todas con el mismo anillo de 1.5 px a
+135°, `--lg-frame: 1`, y `--lg-spec` en 0.60 salvo las dos fichas `light` en
+0.72.
+

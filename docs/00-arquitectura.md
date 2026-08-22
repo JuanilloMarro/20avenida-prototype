@@ -47,7 +47,6 @@ app/
 │  └─ ui/                             ← shadcn-vue, generado por CLI
 ├─ composables/
 │     useGlassLens.js       la lente: mapa de desplazamiento + topes
-│     useGlassLight.js      la luz sigue al ratón, por elemento
 │     useScrollSequence.js  el scrollover del producto
 │     useFitText.js         el texto gigante llena su caja
 ├─ layouts/      default.vue          ← el escenario
@@ -117,7 +116,8 @@ por decisión.
 
 - `prefers-reduced-transparency` → sin `backdrop-filter` y el velo pasa a
   `#14141A` sólido. Mismo radio, misma sombra, **nada de layout se mueve**.
-- `prefers-reduced-motion` → sin transiciones y la luz deja de seguir al ratón.
+- `prefers-reduced-motion` → sin transiciones. La luz ya no sigue al ratón en
+  ningún caso: el filo especular es una diagonal fija de 135°.
 - **WebKit y Firefox no resuelven `backdrop-filter: url()`.** `useGlassLens` lo
   detecta y ni siquiera pone la clase `is-lensed`: se queda en blur + saturate +
   specular. Se pierde la lente, el material se mantiene, no hay salto de layout.

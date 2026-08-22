@@ -114,7 +114,8 @@ Cuatro capas, ninguna con fondo opaco:
 
 /* ── capa 3 · specular ─────────────────────────────────────────
    El box-shadow da volumen; el ::after es el filo de luz, y su
-   ángulo lo escribe el ratón (--lg-ang).                        */
+   la luz vive en el FILO, en dos lóbulos opuestos sobre la
+   diagonal fija de --lg-ang. Ver docs/20-decisiones.md.        */
 .av-glass__spec{
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
   box-shadow:
@@ -364,55 +365,25 @@ export function useGlassLens (elRef) {
 
 ---
 
-## 3. `composables/useGlassLight.js` — la luz sigue al ratón
+## 3. La luz del filo — FIJA
 
-Un único listener global y un `requestAnimationFrame`. Cada superficie calcula
-el ángulo **desde su propio centro** hacia el puntero, así que dos piezas en
-sitios distintos de la pantalla reciben la luz desde ángulos distintos — que es
-lo que hace que se lea como cristal físico y no como un degradado pegado.
+`--lg-ang: 135deg`, y no lo mueve nada.
 
-```js
-// composables/useGlassLight.js
-import { onMounted, onBeforeUnmount, unref } from 'vue'
+Hubo un `composables/useGlassLight.js`: un `pointermove` global con
+`requestAnimationFrame` que recalculaba el ángulo para cada superficie desde su
+propio centro, de modo que dos piezas en sitios distintos de la pantalla
+recibían la luz desde ángulos distintos. En teoría eso es lo que separa un
+cristal físico de un degradado pegado.
 
-const nodes = new Set()
-let raf = 0, mx = 0, my = 0, bound = false
+En la práctica se veía como un fallo. Con un gesto rápido el ángulo salta de
+golpe —el puntero cruza el centro de la pieza y el filo pasa de un lado al otro
+en un fotograma— y el `transition: background .12s` que lo suavizaba no llegaba
+a tapar el salto: sólo lo convertía en un parpadeo. Un vidrio quieto se lee
+mejor como vidrio que uno que persigue el cursor.
 
-function apply () {
-  raf = 0
-  for (const el of nodes) {
-    const r = el.getBoundingClientRect()
-    if (!r.width) continue
-    const a = Math.atan2(my - (r.top + r.height / 2),
-                         mx - (r.left + r.width / 2)) * 180 / Math.PI + 90
-    el.style.setProperty('--lg-ang', a.toFixed(1) + 'deg')
-  }
-}
-
-function onMove (e) {
-  mx = e.clientX; my = e.clientY
-  if (!raf) raf = requestAnimationFrame(apply)
-}
-
-export function useGlassLight (elRef) {
-  onMounted(() => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const el = unref(elRef); if (!el) return
-    nodes.add(el)
-    if (!bound) {
-      window.addEventListener('pointermove', onMove, { passive: true })
-      bound = true
-    }
-  })
-  onBeforeUnmount(() => {
-    const el = unref(elRef); if (el) nodes.delete(el)
-    if (bound && nodes.size === 0) {
-      window.removeEventListener('pointermove', onMove)
-      bound = false
-    }
-  })
-}
-```
+Retirado el 2026-08-22. El fichero se borró; está en el historial de git si
+alguna vez hace falta. Lo que queda es el token, y sigue siendo el mismo para
+el velo y para el especular — cambiarlo gira los dos a la vez.
 
 ---
 
@@ -421,8 +392,7 @@ export function useGlassLight (elRef) {
 ```vue
 <script setup>
 import { ref } from 'vue'
-import { useGlassLens }  from '~/composables/useGlassLens'
-import { useGlassLight } from '~/composables/useGlassLight'
+import { useGlassLens } from '~/composables/useGlassLens'
 
 const props = defineProps({
   /** radio en px. 0 = usa el token --lg-r (18). 999 = píldora */
@@ -432,7 +402,6 @@ const props = defineProps({
 
 const el = ref(null)
 useGlassLens(el)
-useGlassLight(el)
 </script>
 
 <template>

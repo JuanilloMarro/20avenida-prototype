@@ -51,8 +51,10 @@ export function clamp(w, h, m = VELO_NEGRO) {
  * backdrop. Es la única pérdida real del salto prototipo → Figma, y la razón
  * por la que el HTML sigue siendo la referencia de verdad.
  *
- * `lightAngle` es un valor fijo aquí porque en Figma no hay cursor al que
- * seguir; en el prototipo lo escribe `useGlassLight` por elemento.
+ * `lightAngle` es fijo, y ya lo es en los dos lados: el prototipo tenía un
+ * `pointermove` que lo movía por elemento y se quitó — el filo saltaba con los
+ * gestos rápidos y parecía un fallo. Los 135° de aquí son los mismos que los de
+ * `--lg-ang`.
  */
 export function toFigmaGlass(w, h, lightAngle = 135) {
   const m = clamp(w, h)

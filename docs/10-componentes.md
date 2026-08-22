@@ -43,7 +43,7 @@ material estandarizado, es uno copiado.
 | variante | qué mueve | para qué |
 |---|---|---|
 | `panel` | `--lg-r: 0` · `--lg-edge: 80` · `--lg-scale: 50` | superficie a pantalla completa — menú, buscador |
-| `light` | velo **blanco**, brillo, especular, halo y los cuatro `--av-on-glass-*` a tinta | piezas que deben leerse como luz — **los botones de la barra**, en las dos disposiciones |
+| `light` | velo **blanco**, brillo, especular, halo y los cuatro `--av-on-glass-*` a tinta | piezas que deben leerse como luz. **Hoy no la usa nadie**: se probó en los botones de la barra y en la ficha del buscador, y las dos veces se descartó mirándolo. Si alguna vez lleva TEXTO, súbele el velo de 0.16 a ~0.42 — a 0.16 el tono suave se queda en 3.9:1 |
 
 Una variante **no es un material nuevo**: es el mismo Velo negro con unos pocos
 tokens movidos. Lo que no se nombra, se hereda — y esa es toda la herencia que
@@ -183,14 +183,27 @@ Valen para todo, no sólo para la barra:
   escrita: el input del buscador va a 16 px porque por debajo iOS hace zoom solo
   al enfocar, y la burbuja de un contador, que es un número y no texto.
 
-**Seis piezas separadas, no una barra:** marca · píldora de enlaces · cuatro
-botones (buscar · bolsa · favoritos · cuenta). Cada una es su propia
-`GlassSurface`.
+**Piezas separadas, no una barra:** marca · **barra de búsqueda** · píldora de
+enlaces · tres botones (bolsa · favoritos · cuenta). Cada una es su propia
+`GlassSurface`. Marca y buscador van juntos a la izquierda; la píldora, centrada
+sobre la pantalla; los botones, a la derecha.
 
-- **La marca va FUERA de la píldora.** Dentro sería vidrio sobre vidrio.
-- **Todas miden `--av-nav-h` = 58 px.** Un solo token: cambiarlo las mueve a la
-  vez. A 58 los topes recortan la lente a 19.7 y la compresión a 63.1 — la regla
-  del material actuando, no una excepción.
+**Buscar es un campo, no un botón** — y los resultados caen debajo con su mismo
+ancho, no en una ventana. La ventana a pantalla completa se queda para el
+teléfono. Misma pieza, distinta caja: la diferencia es una `@media`.
+
+- **La marca va FUERA de la píldora, en su propio panel circular.** Dentro sería
+  vidrio sobre vidrio. El círculo **recorta** el rótulo —el recorte es casi
+  cuadrado y pierde las esquinas— y está aceptado: importa más que no haya
+  ninguna pieza de la cabecera con material distinto. Y ya no lleva halo: dentro
+  del vidrio el velo negro la despega sola, y un `filter` ahí crearía un
+  backdrop root.
+- **Todas miden `--av-nav-h` = 55 px.** Un solo token: cambiarlo las mueve a la
+  vez, la marca incluida — `<BrandMark>` ya no lleva `size`, hereda
+  `--av-mark-h`. A 55 los topes recortan la lente a 18.7 y la compresión a
+  59.8 — la regla del material actuando, no una excepción. El suelo del número
+  es el botón de la barra de teléfono: mide `--av-nav-h` menos 10, o sea 45, y
+  por debajo de 44 deja de ser un objetivo táctil.
 - **Una píldora de 900 px** obligaría a regenerar un mapa de desplazamiento de
   900 px en cada resize. Piezas pequeñas son mapas pequeños.
 - **El ítem activo NO es sólido:** lleva `.av-glass-sel`, la única excepción
@@ -200,12 +213,27 @@ botones (buscar · bolsa · favoritos · cuenta). Cada una es su propia
   `<a>`: `.av-glyph` lleva `filter`, y un ancestro con `filter` es un backdrop
   root — mataría el `backdrop-filter` de la selección que tiene al lado.
 
-**El corte entre disposiciones está en 1023 px**, no en 900. Seis etiquetas más
-seis iconos no caben con la marca y los cuatro botones por debajo de eso: el
-mínimo de la píldora es 591 px y a 920 sólo quedan 498 libres. A 1024 sobran 29
-en navegador de escritorio (44 en una tableta, que no gasta 15 en barra de
-scroll), y de ahí para arriba el margen sólo crece — 75 a 1100, 179 a 1280, 284
-a 1440.
+**La píldora va centrada sobre la PANTALLA**, no sobre el hueco que le dejan la
+marca y los botones. Va `position: absolute; left: 50%; translateX(-50%)`, fuera
+del flujo. En una rejilla `auto 1fr auto` la columna de en medio arranca después
+de la marca y termina antes de las acciones, así que su centro caía 96 px a la
+izquierda del de la pantalla; y `1fr auto 1fr`, que sí la centraría, desborda
+porque un `1fr` no baja de su contenido.
+
+**El corte entre disposiciones está en 1279 px.** Ha subido dos veces, siempre
+porque creció lo que la píldora pide: 900 (sólo texto) → 1023 (con iconos, +143
+px) → 1279 (centrada de verdad). Centrada, el lado corto es el de las acciones,
+y lo que le sobra al borde derecho es:
+
+| ancho | 1024 | 1100 | 1180 | **1280** | 1366 | 1440 |
+|---|---|---|---|---|---|---|
+| holgura | −60 | −37 | −14 | **+15** | +43 | +68 |
+
+Por debajo de ~1240 la píldora se metería bajo los botones, y no se arregla
+apretando: quitar margen da 15 px y bajar los botones a 48 otros 28 — 43 de los
+60 que faltan, rompiendo además el alto único. Lo que sí lo arreglaría es una
+píldora más corta: con cuatro enlaces en vez de seis sobrarían ~115 px y el
+corte podría volver a 1024. Es una decisión de contenido.
 
 Para que quepa, tres medidas de la barra son **fluidas y atadas a los dos
 extremos** (1440 → el valor aprobado, 1024 → el mínimo que cabe), en vez de a un

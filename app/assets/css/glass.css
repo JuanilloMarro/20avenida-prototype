@@ -41,11 +41,29 @@
   --lg-veil-c:   1;            /* cobertura: 0 filos · 1 uniforme */
 
   /* ── luz ──────────────────────────────────────────────────── */
-  --lg-spec:     0.85;   /* filo especular                       */
+  /* 0.60, bajado desde 0.85. El filo estaba demasiado marcado — se leía como
+     un trazo dibujado encima y no como luz. Al ser el multiplicador de TODO lo
+     especular, baja a la vez el anillo, el resplandor interior y el filo
+     superior de la selección, que es justo lo que se quiere: que la pieza se
+     apague entera, no sólo su contorno. */
+  --lg-spec:     0.60;   /* filo especular                       */
   --lg-halo:     0,0,0;         /* el halo que despega al glifo  */
   --lg-glow:     255,255,255;   /* el brillo bajo el glifo       */
   --lg-elev:     0.80;   /* elevación → sombra exterior          */
-  --lg-ang:      135deg; /* lo reescribe el ratón en runtime     */
+  /* EL MARCO: la sombra que despega la pieza y el filo especular de 1.4 px del
+     perímetro. 1 = puesto · 0 = a sangre.
+
+     Es un token y no un `box-shadow: none` suelto porque la misma superficie
+     cambia de caso según el ancho: el buscador va a sangre en teléfono y es un
+     desplegable con esquina en escritorio. Con un token, eso es una línea en la
+     media query en vez de deshacer tres reglas a mano. */
+  --lg-frame:    1;
+  /* FIJO. Lo reescribía el ratón —`useGlassLight`, un `pointermove` global que
+     recalculaba el ángulo desde el centro de cada pieza— y se quitó: con un
+     gesto rápido el filo saltaba de golpe de un lado al otro y parecía un
+     fallo, no un reflejo. Un vidrio quieto con la luz siempre en la misma
+     diagonal se lee mejor como vidrio que uno que persigue el cursor. */
+  --lg-ang:      135deg;
 
   /* ── derivados (no tocar) ─────────────────────────────────── */
   --lip: clamp(5px, calc(var(--lg-edge) * .5), 15px);
@@ -59,9 +77,9 @@
   border-radius: var(--lg-r);
   box-shadow:
     0 calc(var(--lg-elev) * 26px) calc(var(--lg-elev) * 52px)
-      calc(var(--lg-elev) * -22px) rgba(20,14,0, calc(var(--lg-elev) * .42)),
+      calc(var(--lg-elev) * -22px) rgba(20,14,0, calc(var(--lg-elev) * var(--lg-frame) * .42)),
     0 calc(var(--lg-elev) *  2px) calc(var(--lg-elev) *  6px)
-      calc(var(--lg-elev) *  -2px) rgba(20,14,0, calc(var(--lg-elev) * .18));
+      calc(var(--lg-elev) *  -2px) rgba(20,14,0, calc(var(--lg-elev) * var(--lg-frame) * .18));
   transition: box-shadow .32s ease;
 }
 
@@ -93,31 +111,134 @@
 }
 
 /* ── capa 3 · specular ─────────────────────────────────────────
-   El box-shadow da volumen; el ::after es el filo de luz, y su
-   ángulo lo escribe el ratón (--lg-ang).                        */
+   La luz vive en el FILO y sólo en el filo, en dos lóbulos opuestos sobre la
+   diagonal de `--lg-ang`: uno donde entra la luz y otro donde sale. En medio,
+   nada.
+
+   Llevaba además dos resplandores internos que recorrían ENTERO el borde de
+   arriba y el de abajo (`inset 0 ±lip …`). En una pieza pequeña pasaban por
+   reflejo; en una barra de 700 px eso no es un reflejo, es una barra
+   encendida — que es justo lo que se veía mal. Se van. Queda la sombra interna
+   oscura, que da volumen sin iluminar nada.
+
+   Los DOS lóbulos, y no uno: un vidrio real devuelve luz por donde la recibe y
+   por donde la deja escapar al otro lado. Con uno solo la pieza se lee como un
+   botón con un brillo pegado.                                  */
 .av-glass__spec{
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
   box-shadow:
-    inset 0 calc(var(--lip) *  .28) calc(var(--lip) * .55) calc(var(--lip) * -.42)
-      rgba(255,255,255, calc(var(--lg-spec) * .55)),
-    inset 0 calc(var(--lip) * -.34) calc(var(--lip) * .55) calc(var(--lip) * -.46)
-      rgba(255,255,255, calc(var(--lg-spec) * .26)),
-    inset 0 0 calc(var(--lip) * 1.5) calc(var(--lip) * -.9)
-      rgba(14,10,0, calc(var(--lg-spec) * .34));
+    /* El resplandor interior. Va como `box-shadow` y NO como otra capa con
+       máscara: un `box-shadow` se difumina y no tiene filo interior, que es
+       justo lo que arruinó el intento del `::before` — allí salía un segundo
+       borde. Uniforme y flojo a propósito: lo que da la dirección es el anillo,
+       esto sólo evita que el filo parezca una línea pegada encima. */
+    inset 0 0 calc(var(--lip) * 1.1) calc(var(--lip) * -.35)
+      rgba(255,255,255, calc(var(--lg-spec) * var(--lg-frame) * .13));
+  /* AQUÍ HABÍA UNA VIÑETA OSCURA — `inset 0 0 lip*1.5 lip*-.9 rgba(14,10,0,.34)`
+     — puesta para dar volumen. Era la franja negra que asomaba justo por dentro
+     del filo encendido: donde el anillo brilla más, el salto de blanco a ese
+     gris se leía como un borde negro pegado a la luz. Aislado apagándola por
+     separado de la sombra de elevación; la elevación no tenía nada que ver.
+
+     No se sustituye por nada: el volumen ya lo dan el velo y el propio anillo,
+     y lo que se pidió es que en el filo sólo haya iluminación. */
 }
+
+/* UN SOLO anillo. Hubo un segundo, más grueso y tenue, pensado como halo — y
+   no funcionó: la máscara de `padding` recorta una BANDA de grosor constante,
+   con su filo interior tan nítido como el exterior, así que en vez de un
+   resplandor salía un segundo borde a 6 px del primero. Un halo de verdad
+   pediría desenfocarlo, y el desenfoque se sale de la pieza.
+
+   El anillo: `padding` px pegados al borde, restando el contenido al fondo. */
 .av-glass__spec::after{
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
-  background: linear-gradient(var(--lg-ang),
-    rgba(255,255,255, calc(var(--lg-spec) * 1))    0%,
-    rgba(255,255,255, calc(var(--lg-spec) * .14)) 26%,
-    rgba(255,255,255, 0)                          48%,
-    rgba(255,255,255, calc(var(--lg-spec) * .30)) 72%,
-    rgba(255,255,255, calc(var(--lg-spec) * .92)) 100%);
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  opacity: var(--lg-frame);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask-composite: exclude;
-  transition: background .12s linear;   /* suaviza el giro de la luz */
+}
+
+/* EL PERFIL ES MONÓTONO: máximo EN el borde y caída continua hacia dentro. No
+   hay pico intermedio, y esa fue la corrección clave — con el máximo al 16% la
+   luz nacía apagada en la esquina, subía y luego se desplomaba, y eso se lee
+   como un parche brillante en medio del canto, no como luz entrando por el
+   filo.
+
+   Los dos extremos del degradado son las dos esquinas de la diagonal de
+   `--lg-ang`: el 0% es la superior izquierda y el 100% la inferior derecha. De
+   cada una sale el brillo a tope y se va difuminando —.86 · .62 · .36 · .21—
+   hasta un SUELO de .17 en el centro.
+
+   Suelo y no cero: el contorno tiene que existir en toda la vuelta. Bajando a
+   cero el canto largo de una píldora desaparecía y la pieza dejaba de tener
+   silueta — lo que se busca es un filo continuo con dos zonas encendidas, no
+   dos trozos de filo sueltos.
+
+   La caída es más rápida que lineal a propósito: a mitad de camino del centro
+   ya sólo queda el 18%. Así en una píldora ancha el brillo vive en las dos
+   tapas y su entorno, y el largo del canto está oscuro; en un círculo es un
+   arco que recorre el cuadrante y se apaga.
+
+   Un apunte de geometría que conviene no olvidar: un `linear-gradient` mide
+   sobre la CAJA, no sobre la forma. En un círculo la diagonal de la caja es
+   1.414·d y el círculo sólo ocupa el tramo central — su punto más
+   «arriba-izquierda» cae en el 14.6% del degradado y el opuesto en el 85.4%.
+   Por eso el perfil no puede desplomarse antes del 15%: si lo hace, el anillo
+   del círculo sólo ve las colas y el botón sale apagado. Con el máximo en el
+   borde y una caída suave, a 14.6% todavía queda el 78%.               */
+
+.av-glass__spec::after{
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  opacity: var(--lg-frame);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+}
+
+/* LOS PICOS VAN AL 16% Y AL 84%, NO A LOS EXTREMOS, y esto es lo único de todo
+   el bloque que no es gusto sino geometría.
+
+   Un `linear-gradient` mide sobre la caja, no sobre la forma. En un CÍRCULO la
+   diagonal de la caja es 1.414·d y el círculo sólo ocupa el tramo central: su
+   punto más «arriba-izquierda» cae en el 14.6% del degradado y el opuesto en el
+   85.4%. O sea que con los picos en 0% y 100% el brillo se queda ENTERO en las
+   esquinas de una caja que no se pinta, y el anillo sólo ve las colas. Es
+   exactamente lo que pasaba: los botones redondos salían apagados.
+
+   En una píldora ancha el reparto es otro —la forma arranca en el 2% y acaba en
+   el 98%—, así que 16/84 cae poco después de cada tapa y el lóbulo se extiende
+   un tramo por el canto antes de apagarse. Que es lo pedido: las esquinas y un
+   poco más, nunca la barra entera.
+
+   Un solo perfil para las dos formas, y el CORTE al 24% es el que las concilia.
+   Se probaron tres sobre fondo oscuro:
+
+     12/88 corte 30 → el canto de la píldora seguía encendido más de medio ancho
+     14/86 corte 26 → mejor, pero aún llegaba a la mitad
+     16/84 corte 24 → el lóbulo muere en el primer tercio y el círculo conserva
+                      su arco entero
+
+   Por debajo del 14.6% el círculo deja de ver el pico, así que 16 es casi el
+   suelo; y cuanto más tarde llegue el pico, más se mete el brillo hacia el
+   centro de la barra. La ventana es estrecha y 16/84 está dentro. */
+
+.av-glass__spec::after{
+  padding: 1.5px;
+  background: linear-gradient(var(--lg-ang),
+    rgba(255,255,255, calc(var(--lg-spec) * 1))     0%,
+    rgba(255,255,255, calc(var(--lg-spec) * .86))   8%,
+    rgba(255,255,255, calc(var(--lg-spec) * .62))  18%,
+    rgba(255,255,255, calc(var(--lg-spec) * .36))  30%,
+    rgba(255,255,255, calc(var(--lg-spec) * .21))  42%,
+    rgba(255,255,255, calc(var(--lg-spec) * .17))  50%,
+    rgba(255,255,255, calc(var(--lg-spec) * .21))  58%,
+    rgba(255,255,255, calc(var(--lg-spec) * .36))  70%,
+    rgba(255,255,255, calc(var(--lg-spec) * .62))  82%,
+    rgba(255,255,255, calc(var(--lg-spec) * .86))  92%,
+    rgba(255,255,255, calc(var(--lg-spec) * 1))   100%);
 }
 
 .av-glass__body{ position: relative; z-index: 3 }
@@ -168,16 +289,13 @@
      elevación proyecta sombra sobre lo que hay al lado —y aquí no hay lado—, y
      el especular dibuja un filo de 1.4 px pegado al perímetro que, sin esquina
      donde doblar, se lee exactamente como lo que no es: el borde de una
-     ventana.
+     ventana. El velo, la lente y el desenfoque siguen intactos: lo que se va es
+     el marco, no el material.
 
-     Se apaga en la VARIANTE y no en cada panel, porque es una consecuencia del
-     tamaño de la pieza y no una decisión de dos componentes sueltos. El velo,
-     la lente y el desenfoque siguen intactos: lo que se va es el marco, no el
-     material. */
-  box-shadow: none;
+     Quien use `panel` en una caja que SÍ tiene esquina —el buscador de
+     escritorio, que es un desplegable— lo devuelve con `--lg-frame: 1`. */
+  --lg-frame: 0;
 }
-.av-glass--panel > .av-glass__spec{ box-shadow: none }
-.av-glass--panel > .av-glass__spec::after{ display: none }
 
 /* ── LIGHT ─ velo BLANCO en vez de negro ─────────────────────────────────
    Para piezas que tienen que leerse como luz y no como sombra — botones sobre
@@ -191,9 +309,23 @@
    filo necesita más para despegarse, y sigue siendo LUZ, que es lo que es. */
 .av-glass--light{
   --lg-veil:   255,255,255;
+  /* 0.16. Si algún día una pieza `light` lleva TEXTO y no sólo un glifo, esto
+     se queda corto: medido sobre la ficha del buscador, la tinta al 72%
+     —`--av-on-glass`— daba 3.9:1, por debajo del 4.5 de AA; a 0.42 sube a 5.2.
+     Hoy no hace falta porque ninguna pieza `light` lleva texto corrido. */
   --lg-veil-a: 0.16;
   --lg-bri:    1.10;
-  --lg-spec:   1;
+  /* 0.72, y el número no es libre: es el 0.60 de la base con el mismo +20% que
+     tenía cuando la base estaba en 0.85 y esto en 1. Sobre un velo claro el
+     filo necesita algo más para despegarse, pero SÓLO algo más — si se queda
+     clavado mientras la base baja, las piezas `light` acaban siendo las únicas
+     con el contorno marcado. Pasó: al suavizar el especular general, la ficha
+     del buscador se quedó atrás con el suyo a tope.
+
+     No puede escribirse como `calc(var(--lg-spec) * 1.2)` porque sería una
+     referencia cíclica: se está redefiniendo la misma propiedad. Si la base
+     cambia, este número se mueve con ella a mano. */
+  --lg-spec:   0.72;
   --lg-halo:   255,255,255;   /* el halo se invierte con el velo */
   --lg-glow:   0,0,0;
 
@@ -238,10 +370,14 @@
   -webkit-backdrop-filter: blur(2px) brightness(1.45) saturate(1.04);
           backdrop-filter: blur(2px) brightness(1.45) saturate(1.04);
   background: rgba(var(--sel-tint), var(--sel-a));
+  /* SÓLO luz. Llevaba además un filo negro abajo (`inset 0 -1px 0 rgba(0,0,0,
+     .16)`) y una sombra exterior (`0 1px 3px rgba(0,0,0,.18)`), y las dos
+     juntas dibujaban un contorno oscuro alrededor de la selección: pegado justo
+     al filo encendido, se leía como un negro asomando por debajo de la luz.
+     La selección se distingue por ser MÁS CLARA que el velo; no necesita que la
+     recorten en negro. */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255, calc(var(--lg-spec) * .30)),
-    inset 0 -1px 0 rgba(0,0,0, .16),
-    0 1px 3px rgba(0,0,0, .18);
+    inset 0 1px 0 rgba(255,255,255, calc(var(--lg-spec) * .30));
 }
 
 /* La burbuja del contador. Aqui SI va el amarillo de marca, y es el unico sitio
