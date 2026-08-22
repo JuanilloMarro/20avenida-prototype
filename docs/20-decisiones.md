@@ -591,3 +591,61 @@ una columna `minmax(0, 1fr)`, así que al no caber no se encogen: se salen.
 Medido, sin recorte en ningún ancho: 1024 → 29 px libres · 1100 → 75 · 1280 →
 179 · 1440 → 284.
 
+**2026-08-22 · Los paneles van a sangre DE VERDAD: fuera marco y fuera hueco.**
+Se veía «un leve borde» alrededor del menú y del buscador. Eran tres cosas, y
+ninguna era un `border`:
+
+1. La **elevación** de `.av-glass` — una sombra pensada para despegar la pieza
+   de lo que tiene al lado. Un panel que se come la pantalla no tiene lado.
+2. El **filo especular**: `.av-glass__spec` pinta sombras internas en los cuatro
+   cantos y su `::after` un anillo de 1.4 px pegado al perímetro. Con una
+   esquina que doblar eso es el brillo del bisel; sin ella, es el marco de una
+   ventana.
+3. Un **hueco real de 15 px a la derecha** en escritorio: `inset: 0` mide contra
+   el bloque contenedor inicial, que no incluye la barra de scroll de la página,
+   así que asomaba una franja del fondo.
+
+Los dos primeros se apagan en la VARIANTE `panel`, no en cada componente: son
+consecuencia del tamaño de la pieza, no una decisión de dos paneles sueltos. El
+tercero se arregla con `width: 100vw`, que sí incluye la barra — y no provoca
+scroll horizontal porque un `fixed` no cuenta para el desbordamiento del
+documento. Medido a 1440×900: el panel mide 1440×900 clavados.
+
+**Velo, lente y desenfoque no se tocan.** Lo que se va es el marco, no el
+material.
+
+**2026-08-22 · La detección de respaldo miraba la MARCA y tenía que mirar el MOTOR.**
+Reportado que en el despliegue no se ve deformación, sólo transparencia. No es
+el despliegue: se compiló en producción y se sirvió el `.output` en local, y las
+nueve instancias construyen su filtro igual que en desarrollo — cinco
+primitivas, mapa `data:` completo, `is-lensed` puesto. El build no es el
+problema.
+
+Lo que había era esto, en `useGlassLens`:
+
+```js
+!/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent)
+```
+
+Excluía a Safari **y dejaba pasar a `crios` y `fxios`** — Chrome y Firefox en
+iPhone. Está al revés: en iOS y iPadOS todos los navegadores son WebKit, porque
+la plataforma no permite otro motor. Y colarse ahí es peor que quedarse fuera:
+WebKit acepta la GRAMÁTICA de `backdrop-filter: url(#f)` —`CSS.supports` dice
+que sí— pero no resuelve la referencia, y un `backdrop-filter` que apunta a algo
+irresoluble se lleva por delante la cadena entera. El que se colaba no perdía la
+lente: perdía el vidrio.
+
+Ahora se detecta el motor (`iPhone|iPad|iPod`, los sufijos `CriOS/FxiOS/EdgiOS/
+OPiOS`, el «Macintosh con táctil» de iPadOS 13+, y Safari de escritorio como
+«dice Safari y no dice ningún Chromium»). Verificado contra ocho UA reales:
+
+| | lente |
+|---|---|
+| Chrome / Edge / Opera / Samsung — escritorio y Android | **sí** |
+| Safari iOS · Chrome iOS · Firefox iOS · iPadOS · Safari macOS | no — desenfoque |
+| Firefox escritorio | no — desenfoque |
+
+**En iPhone no va a haber deformación en ningún navegador.** No es algo que se
+pueda arreglar desde aquí: es el motor. Allí el material es velo + desenfoque +
+saturación + el filo especular, sin refracción.
+

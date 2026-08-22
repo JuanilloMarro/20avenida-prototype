@@ -118,9 +118,18 @@ por decisión.
 - `prefers-reduced-transparency` → sin `backdrop-filter` y el velo pasa a
   `#14141A` sólido. Mismo radio, misma sombra, **nada de layout se mueve**.
 - `prefers-reduced-motion` → sin transiciones y la luz deja de seguir al ratón.
-- Safari y Firefox no soportan `backdrop-filter: url()`. `useGlassLens` lo
+- **WebKit y Firefox no resuelven `backdrop-filter: url()`.** `useGlassLens` lo
   detecta y ni siquiera pone la clase `is-lensed`: se queda en blur + saturate +
   specular. Se pierde la lente, el material se mantiene, no hay salto de layout.
+
+  «WebKit», no «Safari»: en iOS y iPadOS **todos** los navegadores son WebKit,
+  se llamen Chrome (`CriOS`) o Firefox (`FxiOS`), porque la plataforma no
+  permite otro motor. **En iPhone y iPad no hay deformación, en ningún
+  navegador** — es una limitación del sistema, no del código. Lo que se ve allí
+  es velo + desenfoque, que es lo que WebKit sabe pintar.
+
+  Dónde SÍ se ve: Chrome, Edge, Opera y Samsung Internet, en escritorio y en
+  Android.
 
 Lo que **falta**: medir contraste real (APCA) sobre los tres fondos, y foco
 visible en los interactivos de vidrio.

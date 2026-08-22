@@ -162,7 +162,22 @@
      sobra si alguna vez hay que volver a subir. */
   --lg-scale: 50;
   --lg-soft:  0.30;
+
+  /* A SANGRE DE VERDAD. Una superficie que se come la pantalla no tiene borde
+     que enseñar, y el material entero está construido para enseñarlo: la
+     elevación proyecta sombra sobre lo que hay al lado —y aquí no hay lado—, y
+     el especular dibuja un filo de 1.4 px pegado al perímetro que, sin esquina
+     donde doblar, se lee exactamente como lo que no es: el borde de una
+     ventana.
+
+     Se apaga en la VARIANTE y no en cada panel, porque es una consecuencia del
+     tamaño de la pieza y no una decisión de dos componentes sueltos. El velo,
+     la lente y el desenfoque siguen intactos: lo que se va es el marco, no el
+     material. */
+  box-shadow: none;
 }
+.av-glass--panel > .av-glass__spec{ box-shadow: none }
+.av-glass--panel > .av-glass__spec::after{ display: none }
 
 /* ── LIGHT ─ velo BLANCO en vez de negro ─────────────────────────────────
    Para piezas que tienen que leerse como luz y no como sombra — botones sobre

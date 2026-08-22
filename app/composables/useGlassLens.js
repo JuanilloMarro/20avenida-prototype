@@ -80,10 +80,39 @@ function defsRoot() {
   return defs
 }
 
+/**
+ * Detecta el MOTOR WebKit de Apple, no la marca «Safari».
+ *
+ * La versión anterior era `!/^((?!chrome|android|crios|fxios).)*safari/i` y
+ * dejaba pasar a `CriOS` y `FxiOS` — o sea Chrome y Firefox en iPhone. Y eso
+ * está justo al revés: en iOS y iPadOS **todos** los navegadores son WebKit,
+ * se llamen como se llamen, porque la plataforma no permite otro motor.
+ *
+ * Importa que la excepción sea exacta y no aproximada. WebKit acepta la
+ * GRAMÁTICA de `backdrop-filter: url(#f)` —así que `CSS.supports` dice que sí—
+ * pero no resuelve la referencia al filtro. Y un `backdrop-filter` que apunta a
+ * algo que el motor no resuelve no es «un filtro que no hace nada»: se lleva
+ * por delante la cadena entera, o sea también el `blur`, el `saturate` y el
+ * `brightness`. Es el mismo agujero de la nota 4 de arriba, por otra puerta:
+ * el que se cuela por aquí no pierde la lente, pierde el vidrio.
+ *
+ * Con esto, en iPhone el material cae limpio al desenfoque —velo, saturación y
+ * brillo intactos, sin refracción— que es lo que WebKit sabe pintar.
+ */
+function appleWebKit() {
+  const ua = navigator.userAgent
+  if (/(iPhone|iPad|iPod)/.test(ua)) return true
+  if (/(CriOS|FxiOS|EdgiOS|OPiOS)/.test(ua)) return true
+  /* iPadOS 13+ se anuncia como «Macintosh»; lo delata el táctil */
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return true
+  /* Safari de escritorio: dice Safari y no dice ningún Chromium */
+  return /Safari/.test(ua) && !/Chrom(e|ium)|Android|Edg\/|OPR\/|SamsungBrowser/.test(ua)
+}
+
 const SUPPORTED = () =>
   typeof CSS !== 'undefined' &&
   CSS.supports('backdrop-filter', 'url(#a)') &&
-  !/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent)
+  !appleWebKit()
 
 function displacementMap(w, h, r, edge) {
   const e = Math.max(1, Math.min(edge, Math.min(w, h) / 2 - 1))

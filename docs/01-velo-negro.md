@@ -258,10 +258,20 @@ function defsRoot () {
   return defs
 }
 
+/* El MOTOR WebKit, no la marca «Safari»: en iOS todos los navegadores son
+   WebKit, se llamen Chrome (CriOS) o Firefox (FxiOS). */
+function appleWebKit () {
+  const ua = navigator.userAgent
+  if (/(iPhone|iPad|iPod)/.test(ua)) return true
+  if (/(CriOS|FxiOS|EdgiOS|OPiOS)/.test(ua)) return true
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return true   // iPadOS 13+
+  return /Safari/.test(ua) && !/Chrom(e|ium)|Android|Edg\/|OPR\/|SamsungBrowser/.test(ua)
+}
+
 const SUPPORTED = () =>
   typeof CSS !== 'undefined' &&
   CSS.supports('backdrop-filter', 'url(#a)') &&
-  !/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent)
+  !appleWebKit()
 
 function displacementMap (w, h, r, edge) {
   const e  = Math.max(1, Math.min(edge, Math.min(w, h) / 2 - 1))

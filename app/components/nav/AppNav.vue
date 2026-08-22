@@ -1173,6 +1173,14 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 55;
   display: flex;
+  /* `inset: 0` deja fuera la barra de scroll de la página: un `fixed` se mide
+     contra el bloque contenedor inicial, que en escritorio es 15 px más
+     estrecho que la ventana, y esos 15 px de página asomando por la derecha son
+     el «margen» que se veía. `100vw` SÍ incluye la barra, así que el panel la
+     tapa y llega al borde físico. No provoca scroll horizontal: un `fixed` no
+     cuenta para el desbordamiento del documento. */
+  width: 100vw;
+
   /* La misma caja que el buscador. El material también, y ahora se ve que lo
      es: los dos piden `variant="panel"` en vez de repetir sus tokens. */
 }
@@ -1423,6 +1431,14 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 58;
   display: flex;
+  /* `inset: 0` deja fuera la barra de scroll de la página: un `fixed` se mide
+     contra el bloque contenedor inicial, que en escritorio es 15 px más
+     estrecho que la ventana, y esos 15 px de página asomando por la derecha son
+     el «margen» que se veía. `100vw` SÍ incluye la barra, así que el panel la
+     tapa y llega al borde físico. No provoca scroll horizontal: un `fixed` no
+     cuenta para el desbordamiento del documento. */
+  width: 100vw;
+
   /* A SANGRE: `inset: 0`, sin bordes, sin radio. Toda la pantalla.
 
      El MATERIAL de este panel ya no se escribe aquí: lo pide por nombre con
