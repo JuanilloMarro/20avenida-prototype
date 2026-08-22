@@ -231,3 +231,67 @@ desactualizadas.
 Hubo un rato en que la barra invertía velo y texto al cruzar el showcase claro
 (`data-surface` + `useNavSurface` + un prop `veil`). Fuera. El liquid es uno y
 estandarizado, y esa es justamente la propiedad que lo convierte en sistema.
+
+**2026-08-22 · El menú del ⋯ pasa a PANTALLA COMPLETA.**
+Colgaba de la esquina superior derecha, ceñido a su ítem más largo, con suelo de
+244 px. Cayó por el ancho: el recorrido de filtros mete sangría en cada nivel y
+«New Balance» dentro de Sneakers › Hombre ya no cabía en una línea. Ahora es la
+misma caja que el buscador — `inset: 0`, sangre, `--lg-r: 0` — y con ella se van
+el velo de fuera (ya no hay fuera) y el `height: calc(100dvh - ...)` que estaba
+para estirar un panel que no llegaba al suelo.
+
+**2026-08-22 · Sneakers, Ropa y Accesorios son filtros, no destinos.**
+Estuvieron un rato en `items`, como botones que abrían un desplegable de
+categoría a pantalla completa (`megaMenu`, `<div class="av-mega">`). Fuera los
+tres del menú de navegación y fuera el panel entero: son la RAÍZ del árbol de
+`filters`, donde reemplazan a Hombre / Mujer / Productos. Hombre y mujer no
+desaparecen — bajan un nivel, que es donde estaban en realidad: no son la
+primera pregunta que se le hace al catálogo, son cómo se corta cada categoría.
+
+**2026-08-22 · El recorrido de filtros se despliega DEBAJO, no reemplaza.**
+Antes la rama abierta se llevaba la lista entera y dejaba un título con un
+botón de volver. Ahora la rama abierta se queda en su sitio, sus hermanas
+desaparecen y sus hijos salen justo debajo, 15 px más adentro. El camino
+completo queda a la vista, fila a fila, y tocar cualquiera de esas filas la
+cierra y devuelve a su nivel — así que el botón de volver sobra: decía que se
+podía salir, pero no a dónde. Sigue sin ser un acordeón: un solo camino abierto.
+
+**2026-08-22 · REGLA · nunca versales.**
+Primera mayúscula y el resto minúsculas, sea un título, una etiqueta o una fila.
+Se fue `text-transform: uppercase` de los siete sitios que lo tenían — los dos
+títulos de sección de la barra, el eyebrow y las tres etiquetas del showcase, el
+kicker de la landing y el del panel de desarrollo — y con él el trazo ancho que
+lo acompañaba. `.42em` separaba mayúsculas; en minúscula descose la palabra.
+El texto gigante del showcase pasa de `ADIDAS` a `Adidas` por la misma regla.
+
+**2026-08-22 · REGLA · un solo cuerpo, y el peso hace de jerarquía.**
+13.5 px en la barra y en sus dos paneles, títulos incluidos. Lo que separa un
+título de una opción es 700 contra 500. La tarjeta de resultado tenía cuatro
+cuerpos distintos — 10.5, 12.5, 14 y 14.5 — y ahora tiene uno. Excepciones, y
+están escritas: el input del buscador a 16 (por debajo iOS hace zoom solo al
+enfocar) y las burbujas de contador, que son un número dentro de una píldora y
+no texto.
+
+**2026-08-22 · Los filtros del menú direccionan, no se marcan.**
+Una hoja del árbol era una casilla con check y burbuja de contador. Fuera las
+tres cosas: la hoja es el final del recorrido, y el final del recorrido es
+Tienda con ese corte hecho — `<a href="/tienda?f=…">`, cierra el menú y emite el
+camino entero. Marcar dentro del panel pedía un «ver resultados» que nadie
+había pedido y dejaba al usuario eligiendo en un menú en vez de en la tienda.
+Filtrar de verdad — varios cortes a la vez, sin salir — es cosa de Tienda, y
+está por ver.
+
+**2026-08-22 · «Limpiar» devuelve el árbol a su raíz.**
+Ya no hay aplicados que borrar; lo único que ensucia el panel es haber bajado.
+Sale sólo cuando se ha bajado, y va del mismo color que el título al que
+acompaña — en la misma línea, a dos tonos, uno de los dos parecía apagado.
+
+**2026-08-22 · Icono sólo en la raíz del árbol de filtros.**
+Sneakers, Ropa y Accesorios lo llevan. Más abajo son marcas y cortes: un icono
+ahí sería un logo, que no toca, o decoración repetida. La columna se reserva en
+todos los niveles y las etiquetas siguen alineadas.
+
+**2026-08-22 · Los dos títulos del menú arrancan en la misma vertical.**
+«Filtros» tenía 10 px de relleno lateral que «Menú» no tenía. Fuera: los dos
+cuelgan del padding de `__body`. Las filas sí van 13 px más adentro, porque una
+fila tiene fondo al pasar por encima y un título no tiene caja.

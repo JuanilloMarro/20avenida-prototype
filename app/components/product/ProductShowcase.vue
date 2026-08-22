@@ -42,8 +42,9 @@ const props = defineProps({
   hold: { type: Number, default: 55 },
   /** Sólo en frame="fixed": qué frame de la secuencia se pinta. */
   still: { type: Number, default: 0 },
-  /** El texto gigante del frame de atrás. */
-  word: { type: String, default: 'ADIDAS' },
+  /** El texto gigante del frame de atrás. Sin versales, como todo lo demás:
+      primera mayúscula y el resto minúsculas, aunque sea una marca. */
+  word: { type: String, default: 'Adidas' },
   /** Fila 1 — texto corto, centrado. */
   eyebrow: { type: String, default: '' },
 })
@@ -234,12 +235,14 @@ const trackStyle = computed(() => (scrolls.value
   place-items: center;
   padding: clamp(8px, 2vh, 26px) 0;
 }
+/* Sin versales. El .42em de trazo se va con ellas: ese aire estaba para que
+   una línea de mayúsculas no se leyera como un bloque, y en minúscula lo único
+   que hace es descoser la palabra. */
 .ps__eyebrow p {
   margin: 0;
   font-size: 14px;
   font-weight: 500;
-  letter-spacing: .42em;
-  text-transform: uppercase;
+  letter-spacing: .06em;
   color: var(--ps-ink-soft);
   text-align: center;
 }
@@ -326,8 +329,7 @@ const trackStyle = computed(() => (scrolls.value
 .ps__label {
   margin: 0;
   font-size: 10.5px;
-  letter-spacing: .2em;
-  text-transform: uppercase;
+  letter-spacing: .04em;
   color: var(--ps-ink-soft);
 }
 .ps__name { margin: 2px 0 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
@@ -340,8 +342,7 @@ const trackStyle = computed(() => (scrolls.value
   border: 1px solid var(--ps-hair);
   border-radius: 4px;
   font-size: 11.5px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  letter-spacing: .03em;
   color: var(--ps-ink-soft);
 }
 
@@ -356,8 +357,7 @@ const trackStyle = computed(() => (scrolls.value
 .ps__line {
   margin: 6px 0 0;
   font-size: 10.5px;
-  letter-spacing: .18em;
-  text-transform: uppercase;
+  letter-spacing: .04em;
   color: var(--ps-ink-soft);
   min-height: 1em;
 }

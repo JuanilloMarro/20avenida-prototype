@@ -68,7 +68,9 @@
 }
 
 .hero__deck { display: flex; flex-direction: column; gap: 18px; max-width: 30rem; }
-.hero__kicker { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; opacity: .55; }
+/* sin versales, y con ellas se va el trazo ancho: .2em era para separar
+   mayúsculas, y en minúscula deja la palabra desmontada */
+.hero__kicker { font-size: 11px; letter-spacing: .02em; opacity: .55; }
 .hero__title {
   font-size: clamp(38px, 5.4vw, 74px);
   font-weight: 800;

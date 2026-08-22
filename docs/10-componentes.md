@@ -45,11 +45,78 @@ Lo que el componente **no** puede hacer cumplir solo:
 
 | prop | tipo | default |
 |---|---|---|
-| `items` | Array | los seis de la referencia |
+| `items` | Array | sólo lo que NAVEGA: Inicio · Tienda · Ofertas · Próximamente · Nosotros · Cuenta |
 | `active` | String | `'home'` |
 | `bag` | Number | `0` — 0 esconde el badge |
+| `suggestions` | Array | tres literales (PLACEHOLDER) |
+| `catalog` | Array | `[]` — lo que el buscador encuentra |
+| `filters` | Array | el árbol: Sneakers · Ropa · Accesorios |
 
-Emite `select(id)` y `open(id)` (`bag` · `wishlist` · `account`).
+Emite `select(id)`, `open(id)` (`bag` · `wishlist` · `account`), `search` y
+`filter({ node, path, ids, to })` — el camino entero hasta la hoja elegida y a
+dónde lleva.
+
+#### El menú de móvil — el panel del ⋯
+
+**A pantalla completa**, la misma caja que el buscador: `inset: 0`, sangre,
+`--lg-r: 0` y el mismo padding que esquiva notch y barra de gestos. Cierra con
+la X de su cabecera; sin velo detrás, porque ya no hay fuera.
+
+Dentro, dos cosas y en este orden:
+
+1. **Lo que navega** — Inicio, Nosotros, Cuenta. Fuera del scroll y sin
+   encogerse: se ven siempre.
+2. **Los filtros** — el árbol, y se llevan el alto que sobra.
+
+**Sneakers, Ropa y Accesorios son FILTROS, no destinos.** Estuvieron un rato
+arriba, en `items`, como botones que abrían un desplegable de categoría propio
+a pantalla completa. Fuera: no son sitios a los que se va, son por dónde se
+corta el catálogo. En el árbol reemplazan a los antiguos Hombre / Mujer /
+Productos — hombre y mujer no desaparecieron, **bajaron un nivel**. Llevan
+icono, y sólo ellos: más abajo son marcas y cortes, y ahí un icono sería un
+logo o un adorno repetido. La columna del icono se reserva en todos los
+niveles, así que las etiquetas siguen alineadas.
+
+**Y no se marcan: DIRECCIONAN.** Una hoja del árbol es el final del recorrido, y
+el final del recorrido es Tienda con ese corte hecho — por eso una rama es
+`<button aria-expanded>` y una hoja es `<a href="/tienda?f=…">` de verdad, que se
+puede abrir en pestaña nueva y que un lector anuncia como enlace. Hubo un rato
+de casillas con check y contador; ese modelo pedía un «ver resultados» al final
+y dejaba al usuario eligiendo dentro de un panel en vez de dentro de la tienda.
+Filtrar de verdad — varios cortes a la vez, sin salir — es cosa de Tienda.
+
+**«Limpiar»** sale sólo cuando se ha bajado del primer nivel y devuelve el árbol
+a su raíz de una vez, en lugar de cerrar rama por rama. Va del MISMO color que
+el título que acompaña — están en la misma línea, y a dos tonos parecía que uno
+de los dos se había apagado; lo que los separa es el peso y el subrayado.
+
+**Los dos títulos del panel — «Menú» y «Filtros» — arrancan en la misma
+vertical.** Ninguno lleva relleno lateral propio: los dos cuelgan del padding de
+`__body`. Las filas sí van 13 px más adentro, y no es incoherencia — una fila
+tiene fondo al pasar por encima y ese fondo necesita respirar por dentro; un
+título no tiene caja.
+
+**El recorrido.** Al desplegar una rama sus hermanas **desaparecen** y sus hijos
+salen justo debajo de ella, un escalón más adentro (15 px por nivel). La rama
+abierta se queda arriba, y con ella las que llevaron hasta aquí: eso es lo que
+dice dónde está el usuario. Tocar una fila del recorrido la cierra y devuelve a
+su nivel — la misma fila abre y cierra, así que no hay botón de volver.
+
+No es un acordeón: nunca hay dos niveles abiertos a la vez.
+
+#### Tipografía — las dos reglas
+
+Valen para todo, no sólo para la barra:
+
+- **NUNCA versales.** Primera mayúscula y el resto minúsculas, sea un título,
+  una etiqueta o una fila. Ni con `text-transform` ni escritas a mano. Y con las
+  versales se va el trazo ancho que las acompañaba (`.2em`, `.42em`): ese aire
+  estaba para que un bloque de mayúsculas se leyera, y en minúscula lo único que
+  hace es descoser la palabra.
+- **Un solo cuerpo por panel** — 13.5 px en la barra y sus dos paneles. Lo que
+  separa un título de una opción es el **peso**: 700 contra 500. Única excepción
+  escrita: el input del buscador va a 16 px porque por debajo iOS hace zoom solo
+  al enfocar, y la burbuja de un contador, que es un número y no texto.
 
 **Cinco piezas separadas, no una barra:** marca · píldora de enlaces · tres
 botones. Cada una es su propia `GlassSurface`.
