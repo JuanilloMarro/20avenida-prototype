@@ -1872,15 +1872,18 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 10px 12px;
 }
+/* La foto va SUELTA, sin caja debajo. Tenía un recuadro redondeado con
+   `--av-on-glass-hair` de fondo y sumaba una tercera superficie a la pila
+   —panel de vidrio, ficha de vidrio y encima el recuadro—: tres velos apilados
+   para enmarcar un PNG que ya viene recortado. El recuadro no aportaba nada que
+   la ficha no hiciera ya, así que se cae y queda sólo el zapato. `place-items`
+   sigue centrándolo dentro de los 62 px. */
 .av-card__shot {
   display: grid;
   place-items: center;
   width: 62px;
   height: 62px;
   flex: none;
-  border-radius: var(--lg-r-base);
-  overflow: hidden;
-  background: var(--av-on-glass-hair);
 }
 .av-card__shot img { width: 100%; height: 100%; object-fit: contain; }
 
