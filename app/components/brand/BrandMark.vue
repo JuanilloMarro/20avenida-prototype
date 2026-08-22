@@ -31,7 +31,10 @@ const props = defineProps({
   wordmark: Boolean,
 })
 
-const style = computed(() => ({ height: `${props.size}px` }))
+/* El alto sale del prop, pero pasa por una custom property para que quien la
+   coloque pueda atarla a un token en vez de repetir el número. La barra lo usa
+   así: `--av-mark-h: var(--av-nav-h)`, y la marca sigue a la barra sola. */
+const style = computed(() => ({ '--av-mark-h': `${props.size}px` }))
 </script>
 
 <template>
@@ -51,6 +54,7 @@ const style = computed(() => ({ height: `${props.size}px` }))
 
 .av-mark__img {
   display: block;
+  height: var(--av-mark-h);
   width: auto;
   object-fit: contain;
   /* el mismo halo que los glifos: el vidrio limpio no garantiza contraste, y

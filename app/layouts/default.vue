@@ -10,8 +10,31 @@
  *   3. el contenido
  *   4. la capa que flota: nav, drawers, toasts
  */
+import { COLORWAYS } from '~/assets/js/colorways'
+
 const theme = useThemeStore()
 const isDev = import.meta.dev
+
+/**
+ * El catálogo que ve el buscador de la barra.
+ *
+ * Vive AQUÍ y no dentro de <AppNav> a propósito: la barra no tiene por qué
+ * saber qué se vende: se lo pasan. Cuando haya endpoint, lo que cambia es esta
+ * línea y nada más.
+ *
+ * Sale de `colorways.js`, o sea de producto REAL con sus fotos ya recortadas.
+ * Lo único inventado es el descuento del segundo, y está puesto para que se vea
+ * funcionar ese estado — en cuanto haya precios de verdad, fuera.
+ */
+const catalog = computed(() => Object.entries(COLORWAYS).map(([id, c], i) => ({
+  id,
+  name: c.name,
+  line: c.line,
+  price: c.price,
+  priceWas: i === 1 ? '150$' : undefined,   // PLACEHOLDER
+  discount: i === 1 ? '-20%' : undefined,   // PLACEHOLDER
+  image: c.frames?.[0]?.src,
+})))
 </script>
 
 <template>
@@ -22,7 +45,7 @@ const isDev = import.meta.dev
   >
     <div class="stage__grain" :style="theme.grainStyle" aria-hidden="true" />
 
-    <AppNav :bag="1" />
+    <AppNav :bag="1" :catalog="catalog" />
 
     <main class="stage__main">
       <slot />

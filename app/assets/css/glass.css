@@ -8,9 +8,15 @@
    lo convierte en un sistema y no en un efecto.
    ══════════════════════════════════════════════════════════════ */
 
+/* El radio del sistema. Vive en :root y no sólo dentro de `.av-glass` porque lo
+   necesitan también cosas que NO son vidrio — campos, tarjetas, ítems de lista
+   — y la regla es que lo redondeado sea siempre lo mismo. Es UN número: el
+   material lo lee de aquí igual que todo lo demás. */
+:root{ --lg-r-base: 18px }
+
 .av-glass{
   /* ── geometría ────────────────────────────────────────────── */
-  --lg-r:        18px;   /* radio                                */
+  --lg-r:        var(--lg-r-base);   /* radio                    */
   --lg-edge:     26px;   /* grosor de la lente                   */
   --lg-scale:    82;     /* compresión del filo (va negativo)    */
   --lg-aberr:    0;      /* aberración cromática en %            */

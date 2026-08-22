@@ -45,6 +45,7 @@
  */
 import {
   ShoppingBag, Heart, User, MoreHorizontal, Search, X,
+  ChevronRight, ArrowRight, Check,
   House, Store, Sparkles, LayoutGrid, Info, Mail,
 } from 'lucide-vue-next'
 
@@ -69,11 +70,31 @@ const props = defineProps({
   /** Cuál de las tres acciones está seleccionada en la barra. */
   activeAction: { type: String, default: 'bag' },
   /** Sugerencias del buscador. PLACEHOLDER: hoy son literales; cuando haya
-      catálogo salen de él o del historial del usuario. */
+      endpoint salen de él o del historial del usuario. */
   suggestions: { type: Array, default: () => ['Samba OG', 'Originals', 'Novedades'] },
+  /**
+   * Lo que el buscador puede encontrar. Vacío por defecto y a propósito: la
+   * barra no sabe nada del catálogo, se lo pasan. Hoy lo hace el escenario con
+   * lo que hay en `colorways.js`; mañana lo hará un endpoint y esto no cambia.
+   *
+   * `{ id, name, line, price, priceWas?, discount?, image }`
+   */
+  catalog: { type: Array, default: () => [] },
+  /**
+   * El segundo nivel del menú. Son las familias por las que se filtra, y llevan
+   * `chevron` porque cada una abrirá lo suyo cuando exista.
+   */
+  filters: {
+    type: Array,
+    default: () => ([
+      { id: 'hombre', label: 'Hombre' },
+      { id: 'mujer', label: 'Mujer' },
+      { id: 'productos', label: 'Productos' },
+    ]),
+  },
 })
 
-const emit = defineEmits(['select', 'open', 'search'])
+const emit = defineEmits(['select', 'open', 'search', 'filter'])
 
 const actions = [
   { id: 'bag', icon: ShoppingBag, label: 'Bolsa' },
@@ -98,6 +119,10 @@ function openAction(id) {
    nada que corregir al hidratar, y cerrado no cuesta una capa de vidrio. */
 const menuOpen = ref(false)
 const searchOpen = ref(false)
+/* Los filtros aplicados. Viven aquí y se emiten enteros: el prototipo tiene que
+   poder enseñar el estado sin que nadie de fuera lo gobierne, y quien quiera
+   gobernarlo escucha `filter` y recibe la lista completa. */
+const applied = ref([])
 const moreBtn = ref(null)
 const searchBtn = ref(null)
 const menuList = ref(null)
@@ -125,6 +150,23 @@ function closeMenu(refocus = true) {
 function pickLink(id) {
   emit('select', id)
   closeMenu()
+}
+
+/* Los filtros NO cierran el menú ni llevan a otro sitio: se marcan ahí mismo y
+   se siguen viendo los que ya hay puestos. Es la diferencia entre elegir y
+   navegar — elegir varios seguidos no puede costar cuatro aperturas. */
+function isApplied(id) { return applied.value.includes(id) }
+
+function toggleFilter(id) {
+  applied.value = isApplied(id)
+    ? applied.value.filter(x => x !== id)
+    : [...applied.value, id]
+  emit('filter', [...applied.value])
+}
+
+function clearFilters() {
+  applied.value = []
+  emit('filter', [])
 }
 
 /* ── el buscador ───────────────────────────────────────────────────────────
@@ -155,6 +197,24 @@ function closeSearch(refocus = true) {
   if (refocus) nextTick(() => searchBtn.value?.focus())
 }
 
+/* El filtrado es local y tonto — nombre y línea, sin acentos ni mayúsculas —
+   porque el catálogo de hoy son dos entradas que llegan por prop. Cuando haya
+   endpoint, lo que cambia es de dónde sale `catalog`, no esto. */
+function norm(v) {
+  return String(v || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
+const results = computed(() => {
+  const q = norm(query.value.trim())
+  if (!q) return []
+  return props.catalog.filter(p => norm(p.name + ' ' + p.line).includes(q))
+})
+
+function pickResult(p) {
+  emit('search', { query: query.value.trim(), product: p })
+  closeSearch()
+}
+
 function submitSearch() {
   const q = query.value.trim()
   if (!q) return
@@ -174,7 +234,9 @@ function closePanels() {
 }
 
 function onKey(e) {
-  if (e.key === 'Escape') { closeMenu(); closeSearch() }
+  if (e.key !== 'Escape') return
+  closeMenu()
+  closeSearch()
 }
 
 /* ── el teclado ─────────────────────────────────────────────
@@ -226,7 +288,7 @@ onBeforeUnmount(() => {
       aria-label="20 Avenida — inicio"
       @click.prevent="emit('select', 'home')"
     >
-      <BrandMark :size="70" />
+      <BrandMark :size="58" />
     </a>
 
     <GlassSurface :radius="999" tag="nav" class="av-nav__pill" aria-label="Principal">
@@ -277,12 +339,14 @@ onBeforeUnmount(() => {
        `display`: así sale del árbol de accesibilidad igual —no hay botones
        invisibles que un lector anuncie— pero el grupo conserva su ancho, que es
        de lo que cuelga el menú. -->
+  <!-- Con cualquiera de los dos paneles abiertos la barra desaparece: mientras
+       hay algo abierto no queda nada más que tocar, y el panel ocupa su sitio
+       en vez de convivir con ella. -->
   <div
     class="av-bar"
     :class="{ 'is-away': panelOpen }"
     :style="{ '--av-kb': kbInset + 'px', '--av-vv': vvTop + 'px' }"
   >
-    <div class="av-bar__group">
       <GlassSurface :radius="999" tag="nav" class="av-bar__panel" aria-label="Acciones">
         <ul class="av-bar__list">
           <!-- Buscar va primero, como en cualquier tienda: es lo que hace el
@@ -334,100 +398,6 @@ onBeforeUnmount(() => {
           </li>
         </ul>
       </GlassSurface>
-
-      <!-- ── el menú ─────────────────────────────────────────
-           Cuelga del borde derecho del panel y crece hacia abajo: sale de su
-           botón. Su ancho lo pone el ítem más largo — un menú de seis palabras no
-           necesita la pantalla entera, y ocupando menos deja ver dónde estabas. -->
-      <GlassSurface
-        v-if="menuOpen"
-        id="av-menu"
-        :radius="22"
-        tag="nav"
-        class="av-menu"
-        aria-label="Navegación"
-      >
-        <div class="av-menu__body">
-          <!-- la marca, arriba a la derecha. Va sin panel: dentro del menú
-               sería vidrio sobre vidrio. -->
-          <a
-            href="/"
-            class="av-menu__brand"
-            aria-label="20 Avenida — inicio"
-            @click.prevent="pickLink('home')"
-          >
-            <BrandMark :size="30" />
-          </a>
-
-          <ul ref="menuList" class="av-menu__list">
-            <li v-for="item in items" :key="item.id">
-              <a
-                :href="item.to"
-                class="av-menu__link"
-                :class="{ 'is-active': item.id === active }"
-                :aria-current="item.id === active ? 'page' : undefined"
-                @click.prevent="pickLink(item.id)"
-              >
-                <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
-                <span class="av-menu__icon av-glyph">
-                  <component :is="item.icon" v-if="item.icon" :stroke-width="1.7" />
-                </span>
-                {{ item.label }}
-              </a>
-            </li>
-          </ul>
-        </div>
-      </GlassSurface>
-
-      <!-- ── el buscador ────────────────────────────────────────
-           Mismo sitio y mismo material que el menú, pero ocupa el ancho entero
-           del panel: un campo de texto necesita sitio y el menú no.
-           `v-show` y no `v-if` — ver la nota del script: es lo que hace que el
-           teclado suba en iOS. -->
-      <GlassSurface
-        v-show="searchOpen"
-        id="av-search"
-        :radius="22"
-        class="av-search"
-        role="search"
-      >
-        <div class="av-search__body">
-          <form class="av-search__field" @submit.prevent="submitSearch">
-            <span class="av-glyph av-search__icon"><Search :stroke-width="1.8" /></span>
-            <input
-              ref="searchInput"
-              v-model="query"
-              type="search"
-              name="q"
-              placeholder="Buscar"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-              enterkeyhint="search"
-              aria-label="Buscar en la tienda"
-            >
-            <button
-              v-if="query"
-              type="button"
-              class="av-search__clear"
-              aria-label="Borrar"
-              @click="query = ''; searchInput?.focus()"
-            >
-              <span class="av-glyph"><X :stroke-width="2" /></span>
-            </button>
-          </form>
-
-          <ul v-if="suggestions.length" class="av-search__list">
-            <li v-for="q in suggestions" :key="q">
-              <button type="button" class="av-search__sug" @click="pickSuggestion(q)">
-                <span class="av-glyph av-search__icon"><Search :stroke-width="1.6" /></span>
-                {{ q }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </GlassSurface>
-    </div>
   </div>
 
   <!-- El velo recoge el clic de fuera y va TRANSPARENTE: oscurecer sería
@@ -438,7 +408,189 @@ onBeforeUnmount(() => {
        detrás. NO se toca `overflow` de nadie: un `overflow: hidden` en el body
        convertiría al escenario en contenedor de scroll y rompería el `sticky`
        del showcase, que es el bug que ya se pagó una vez. -->
-  <div v-if="panelOpen" class="av-menu__scrim" aria-hidden="true" @click="closePanels" />
+  <!-- ── el menú ────────────────────────────────────────────────
+       Se pega a la esquina superior derecha de la PANTALLA, no al borde del
+       panel de la barra: atándolo al margen de la pantalla gana todo el ancho
+       que la barra dejaba libre a su derecha.
+
+       Y el margen es el MISMO por arriba que por la derecha — los dos son
+       `--av-nav-gap`, el hueco donde se posaba la barra que acaba de
+       esconderse. El panel no aparece en otro sitio: aparece en el suyo. -->
+  <GlassSurface
+    v-if="menuOpen"
+    id="av-menu"
+    tag="nav"
+    class="av-menu"
+    aria-label="Navegación"
+    :style="{ '--av-vv': vvTop + 'px' }"
+  >
+    <div class="av-menu__body">
+      <div class="av-menu__scroll">
+        <ul ref="menuList" class="av-menu__list">
+          <li v-for="item in items" :key="item.id">
+            <a
+              :href="item.to"
+              class="av-menu__link"
+              :class="{ 'is-active': item.id === active }"
+              :aria-current="item.id === active ? 'page' : undefined"
+              @click.prevent="pickLink(item.id)"
+            >
+              <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
+              <span class="av-menu__icon av-glyph">
+                <component :is="item.icon" v-if="item.icon" :stroke-width="1.7" />
+              </span>
+              {{ item.label }}
+            </a>
+          </li>
+        </ul>
+
+        <!-- Los filtros van EXPLÍCITOS, en el mismo panel y a la vista: son
+             una sección más, no un sitio al que ir. Un botón que lleva a
+             otro panel cobra una apertura por cada filtro que quieras
+             poner, y encima esconde los que ya tienes puestos. -->
+        <div v-if="filters.length" class="av-menu__section">
+          <p class="av-menu__title">Filtros</p>
+          <!-- La misma burbuja del contador de la bolsa: el amarillo de
+               marca como acento corto, que es para lo único que sirve. -->
+          <span v-if="applied.length" class="av-menu__count av-glass-bubble">{{ applied.length }}</span>
+          <button
+            v-if="applied.length"
+            type="button"
+            class="av-menu__clear"
+            @click="clearFilters"
+          >Limpiar</button>
+        </div>
+
+        <ul v-if="filters.length" class="av-menu__list">
+          <li v-for="f in filters" :key="f.id">
+            <button
+              type="button"
+              class="av-menu__link"
+              :class="{ 'is-active': isApplied(f.id) }"
+              :aria-pressed="isApplied(f.id)"
+              @click="toggleFilter(f.id)"
+            >
+              <span v-if="isApplied(f.id)" class="av-glass-sel" aria-hidden="true" />
+              <span class="av-menu__icon av-glyph">
+                <Check v-if="isApplied(f.id)" :stroke-width="2.2" />
+              </span>
+              {{ f.label }}
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </GlassSurface>
+
+  <div v-if="menuOpen" class="av-menu__scrim" aria-hidden="true" @click="closeMenu" />
+
+  <!-- ── el buscador ────────────────────────────────────────────
+       A pantalla completa y no colgando de la barra: buscar no es elegir de una
+       lista corta, es una tarea con su propio sitio — se escribe, se mira, se
+       compara. Un panel de 320 px no da para ver producto con foto.
+
+       A SANGRE, sin bordes ni radio. Es la excepción del sistema y por eso se
+       escribe: el resto de superficies dejan hueco para enseñar su esquina y su
+       filo, pero buscar es una tarea que se come la pantalla — aquí el filo no
+       tendría contra qué recortarse. El velo, la lente y el especular interior
+       siguen siendo los mismos.
+
+       Las TARJETAS de resultado van SÓLIDAS. No es una excepción ni una
+       elección estética: es el §6 — el vidrio es de la capa que flota, y una
+       lista de producto es capa de contenido. Encima, que el precio se lea no
+       puede depender de la foto que pase por detrás.
+
+       `v-show` y no `v-if` — ver la nota del script: es lo que hace que el
+       teclado suba en iOS. -->
+  <GlassSurface
+    v-show="searchOpen"
+    id="av-search"
+    class="av-search"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Buscar"
+    :style="{ '--av-kb': kbInset + 'px', '--av-vv': vvTop + 'px' }"
+  >
+    <div class="av-search__body">
+      <div class="av-search__head">
+        <form class="av-search__field" @submit.prevent="submitSearch">
+          <span class="av-glyph av-search__icon"><Search :stroke-width="1.8" /></span>
+          <input
+            ref="searchInput"
+            v-model="query"
+            type="search"
+            name="q"
+            placeholder="Buscar"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            enterkeyhint="search"
+            aria-label="Buscar en la tienda"
+          >
+          <button
+            v-if="query"
+            type="button"
+            class="av-search__clear"
+            aria-label="Borrar"
+            @click="query = ''; searchInput?.focus()"
+          >
+            <span class="av-glyph"><X :stroke-width="2" /></span>
+          </button>
+        </form>
+
+        <button type="button" class="av-search__close" aria-label="Cerrar" @click="closeSearch">
+          <span class="av-glyph"><X :stroke-width="1.9" /></span>
+        </button>
+      </div>
+
+      <div class="av-search__scroll">
+        <!-- sin escribir nada: las sugerencias. PLACEHOLDER hasta que haya
+             endpoint — hoy son literales que llegan por prop. -->
+        <template v-if="!query.trim()">
+          <p v-if="suggestions.length" class="av-search__title">Sugerencias</p>
+          <ul v-if="suggestions.length" class="av-search__sugs">
+            <li v-for="q in suggestions" :key="q">
+              <button type="button" class="av-search__sug" @click="pickSuggestion(q)">
+                <span class="av-glyph av-search__icon"><Search :stroke-width="1.6" /></span>
+                {{ q }}
+              </button>
+            </li>
+          </ul>
+        </template>
+
+        <template v-else>
+          <p class="av-search__title">Resultados</p>
+
+          <ul v-if="results.length" class="av-search__results">
+            <li v-for="p in results" :key="p.id">
+              <button type="button" class="av-card" @click="pickResult(p)">
+                <span class="av-card__shot">
+                  <img v-if="p.image" :src="p.image" :alt="p.name" loading="lazy" decoding="async">
+                </span>
+                <span class="av-card__text">
+                  <span class="av-card__line">{{ p.line }}</span>
+                  <span class="av-card__name">{{ p.name }}</span>
+                  <span class="av-card__prices">
+                    <b>{{ p.price }}</b>
+                    <s v-if="p.priceWas">{{ p.priceWas }}</s>
+                    <em v-if="p.discount">{{ p.discount }}</em>
+                  </span>
+                </span>
+                <ChevronRight class="av-card__chev" :stroke-width="1.7" />
+              </button>
+            </li>
+          </ul>
+
+          <p v-else class="av-search__empty">Nada para «{{ query.trim() }}».</p>
+
+          <button v-if="results.length" type="button" class="av-search__all" @click="submitSearch">
+            Ver todos los resultados
+            <ArrowRight :stroke-width="1.8" />
+          </button>
+        </template>
+      </div>
+    </div>
+  </GlassSurface>
 </template>
 
 <style scoped>
@@ -470,6 +622,9 @@ onBeforeUnmount(() => {
   place-items: center;
   height: var(--av-nav-h);
   flex: none;
+  /* la marca es la pieza más alta de la barra y mide lo mismo que ella: un
+     número, no dos que haya que acordarse de mover a la vez */
+  --av-mark-h: var(--av-nav-h);
 }
 .av-nav__pill {
   height: var(--av-nav-h);
@@ -572,7 +727,6 @@ onBeforeUnmount(() => {
    a 375 px si uno se centra y el otro se ancla a la derecha. */
 .av-bar,
 .av-menu,
-.av-search,
 .av-menu__scrim { display: none; }
 .av-bar__list {
   display: flex;
@@ -622,27 +776,13 @@ onBeforeUnmount(() => {
        que el usuario ve, porque un `fixed` no se entera de ese desplazamiento. */
     top: calc(var(--av-nav-top) + var(--av-vv, 0px));
     height: var(--av-nav-h);
-    pointer-events: none;
+    pointer-events: none;    /* el hueco a los lados deja pasar el cursor */
   }
-  /* con el menú abierto el grupo sube por encima del velo: el velo es 50 y el
-     menú vive DENTRO de este contenedor, así que sube todo junto */
-  .av-bar.is-away { z-index: 51; }
-
-  /* El ancla del menú. Sin `transform` ni `z-index` a propósito: los dos crean
-     contexto de apilado y el de arriba además puede dejar al `backdrop-filter`
-     de dentro sin nada que refractar. `position: relative` sin más no crea
-     ninguno de los dos. */
-  .av-bar__group {
-    position: relative;
-    display: flex;
-    height: 100%;
-    pointer-events: auto;
-  }
-  .av-bar.is-away .av-bar__panel { visibility: hidden; }
-  /* el hueco que deja el panel invisible no puede comerse el clic de fuera */
-  .av-bar.is-away .av-bar__group { pointer-events: none; }
-  .av-bar.is-away .av-menu,
-  .av-bar.is-away .av-search { pointer-events: auto; }
+  .av-bar > * { pointer-events: auto; }
+  /* Con `visibility` y no `display` porque sale igual del árbol de
+     accesibilidad — nada de botones invisibles que un lector siga anunciando —
+     y no obliga a recalcular el hueco que la barra reserva. */
+  .av-bar.is-away { visibility: hidden; }
 
   .av-bar__panel { height: 100%; }
 
@@ -657,23 +797,28 @@ onBeforeUnmount(() => {
   }
 
   .av-menu {
-    position: absolute;
-    right: 0;   /* al borde derecho del panel, que es donde está el ⋯ */
-    top: 0;     /* apoyado en la barra, creciendo hacia abajo */
-    z-index: 51;
+    position: fixed;
+    /* Ocupa el sitio de la barra, que con el menú abierto ya no está:
+       `--av-nav-top` es exactamente donde ella se posaba. */
+    top: calc(var(--av-nav-top) + var(--av-vv, 0px));
+    /* Al margen de la PANTALLA, no al borde del panel: así gana el ancho que la
+       barra dejaba libre a su derecha en vez de morir en su borde.
 
-    /* El ancho lo pone el contenido — lo marca «New Arrivals» — con un suelo
-       para que no salga apretado y un techo para que nunca toque los bordes.
-       Un menú de seis palabras no necesita la pantalla entera: ocupando menos
-       se sigue viendo dónde estabas, que es la mitad de para qué sirve. */
+       Y es el MISMO número que el de arriba — los dos salen de `--av-nav-gap`.
+       Una esquina con dos márgenes distintos se ve torcida aunque nadie sepa
+       decir por qué. */
+    right: var(--av-nav-gap);
+    z-index: 52;
+
+    /* El ancho lo pone el contenido, con un suelo para aprovechar el sitio que
+       ahora hay y un techo para que nunca toque el margen contrario. */
     width: max-content;
-    min-width: 224px;
+    min-width: 244px;
     max-width: calc(100vw - var(--av-nav-gap) * 2);
 
-    /* Nunca más alto que la pantalla. Un teléfono en horizontal tiene 390 px de
-       alto y los seis ítems piden más: el panel se salía por arriba y lo primero
-       que se comía era la marca. Aquí el panel se para y la LISTA scrollea por
-       dentro — la marca se queda quieta arriba, que es donde tiene que estar.
+    /* Nunca más abajo del borde. Descuenta lo que ya se llevó la barra, el
+       teclado si estuviera, y deja el hueco de siempre al final. La LISTA
+       scrollea por dentro; el panel no se deforma.
 
        `display: flex` sobre `.av-glass` es seguro: las tres capas del material
        son `position: absolute`, así que no son ítems de flex y no se enteran. El
@@ -694,12 +839,17 @@ onBeforeUnmount(() => {
     padding: 8px;
   }
 
-  /* la marca, arriba a la derecha */
-  .av-menu__brand {
+  /* Scrollea el CONTENEDOR y no cada lista: enlaces y filtros son un solo
+     recorrido. Sólo entra en juego cuando el panel ya tocó su techo. */
+  .av-menu__scroll {
     display: flex;
-    justify-content: flex-end;
-    padding: 2px 8px 8px;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;   /* el scroll no se contagia a la página */
+    scrollbar-width: none;
   }
+  .av-menu__scroll::-webkit-scrollbar { display: none; }
 
   .av-menu__list {
     display: flex;
@@ -708,13 +858,7 @@ onBeforeUnmount(() => {
     margin: 0;
     padding: 0;
     list-style: none;
-    /* sólo entra en juego cuando el panel ya tocó su techo */
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;   /* el scroll no se contagia a la página */
-    scrollbar-width: none;
   }
-  .av-menu__list::-webkit-scrollbar { display: none; }
 
   /* Mismo 72% que el glifo y que los enlaces de escritorio: sobre el velo el
      texto no cambia de tono por estar en otro sitio.
@@ -726,7 +870,7 @@ onBeforeUnmount(() => {
     gap: 13px;
     min-height: 48px;
     padding: 0 14px;
-    border-radius: 13px;
+    border-radius: var(--lg-r-base);
     font-size: 15.5px;
     font-weight: 500;
     letter-spacing: -.01em;
@@ -744,113 +888,295 @@ onBeforeUnmount(() => {
      la misma excepción de 01-velo-negro.md §7 aplicada al mismo caso — el ítem
      activo de una navegación. */
   .av-menu__link.is-active { color: var(--av-on-glass); }
-}
 
-  /* ── el buscador ─────────────────────────────────────────────
-     Ocupa el ancho entero del panel del que sale — `left: 0; right: 0` — y no
-     el ancho de su contenido como el menú: un campo de texto necesita sitio
-     donde escribir, una lista de seis palabras no. */
-  .av-search {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    z-index: 51;
-    display: flex;
-    max-height: calc(100dvh - var(--av-nav-top) - var(--av-kb, 0px) - var(--av-nav-gap));
-  }
-  .av-search :deep(.av-glass__body) {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
-  .av-search__body {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    padding: 8px;
-  }
-
-  /* El campo lleva relleno SÓLIDO, no otra capa de vidrio: es exactamente lo
-     que manda el §6 para lo que va encima del material. Un `rgba` plano no
-     refracta nada, así que no compite con el panel que lo sostiene. */
-  .av-search__field {
+  /* ── la sección de filtros ────────────────────────────────────
+     Un filo de luz la separa de los enlaces — no una caja: encajonarla dentro
+     del panel sería dibujar una superficie sobre otra, y aquí no hay dos
+     superficies, hay dos cosas dentro de la misma. */
+  .av-menu__section {
     display: flex;
     align-items: center;
-    gap: 10px;
-    height: 46px;
-    padding: 0 12px;
-    border-radius: 13px;
-    background: var(--av-on-glass-hover);
+    gap: 8px;
+    margin: 10px 0 6px;
+    padding: 12px 14px 0;
+    border-top: 1px solid var(--av-on-glass-hair);
   }
-  .av-search__icon { flex: none; }
-  .av-search__icon :deep(svg) { width: 18px; height: 18px; }
-
-  /* El texto que el usuario escribe sube a blanco puro: es lo único de todo el
-     panel que él ha puesto ahí, y tiene que despegarse del marcador de
-     posición, que se queda en el 72% de siempre. */
-  .av-search__field input {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    border: 0;
-    background: none;
-    outline: none;
-    font-family: inherit;
-    font-size: 16px;   /* por debajo de 16 iOS hace zoom solo al enfocar */
-    font-weight: 500;
-    letter-spacing: -.01em;
-    color: var(--av-on-glass-strong);
+  .av-menu__title {
+    margin: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--av-on-glass);
   }
-  .av-search__field input::placeholder { color: var(--av-on-glass); }
-  /* la X nativa de `type=search` sobra: ya hay una, y la de Chrome es negra */
-  .av-search__field input::-webkit-search-cancel-button { display: none; }
-
-  .av-search__clear {
+  /* la misma pieza que la burbuja de la bolsa, con las mismas medidas */
+  .av-menu__count {
     display: grid;
     place-items: center;
-    width: 26px;
-    height: 26px;
-    flex: none;
-    border: 0;
-    border-radius: 50%;
-    background: none;
-    padding: 0;
-    cursor: pointer;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    color: var(--av-ink);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
-  .av-search__clear :deep(svg) { width: 16px; height: 16px; }
-
-  .av-search__list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    margin: 8px 0 0;
-    padding: 0;
-    list-style: none;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
-  .av-search__list::-webkit-scrollbar { display: none; }
-
-  .av-search__sug {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 44px;
-    padding: 0 12px;
+  .av-menu__clear {
+    margin-left: auto;
     border: 0;
-    border-radius: 12px;
     background: none;
+    padding: 2px 0;
     font-family: inherit;
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 11.5px;
+    font-weight: 600;
     letter-spacing: -.01em;
-    text-align: left;
     color: var(--av-on-glass);
+    text-decoration: underline;
+    text-underline-offset: 3px;
     cursor: pointer;
   }
+
+  /* Un filtro puesto se marca con `.av-glass-sel` y un check en la columna del
+     icono — la misma selección que el ítem activo de la barra, y el texto
+     tampoco cambia. Lo que marca la selección es el panel, y sólo el panel. */
+  .av-menu__link[aria-pressed='true'] { color: var(--av-on-glass); }
+}
+
+/* ══ el buscador ─ ventana emergente a sangre ════════════════════════
+   Fuera del `@media` a propósito: quien decide si se ve es `v-show`, no el
+   ancho. Cuando el escritorio tenga su botón de buscar, esto ya funciona.
+
+   PANTALLA COMPLETA, sin bordes ni radio, y es la única superficie del sistema
+   que lo hace. El resto dejan hueco para enseñar su esquina y su filo; buscar
+   se come la pantalla y ahí el filo no tendría contra qué recortarse. Velo,
+   lente y especular interior siguen siendo los mismos — lo único que cambia es
+   el radio, que es justo lo que el material expone.
+
+   Como la caja llega al borde físico, lo que esquiva el notch, la barra de
+   gestos, el teclado y el desplazamiento del viewport visual es el PADDING. */
+.av-search {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  display: flex;
+  --lg-r: 0px;
+}
+.av-search :deep(.av-glass__body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.av-search__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding:
+    calc(var(--av-nav-top) + var(--av-vv, 0px))
+    var(--av-nav-gap)
+    calc(var(--av-nav-gap) + env(safe-area-inset-bottom, 0px) + var(--av-kb, 0px));
+}
+
+.av-search__head { display: flex; align-items: center; gap: 10px; }
+
+/* El campo lleva relleno SÓLIDO, no otra capa de vidrio: es exactamente lo que
+   manda el §6 para lo que va encima del material. Un `rgba` plano no refracta
+   nada, así que no compite con el panel que lo sostiene. */
+.av-search__field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 12px;
+  /* El mismo radio que el material — `--lg-r`, la base. La regla del sistema
+     es que lo redondeado sea siempre lo mismo, y esto es lo primero que se
+     compara con el vidrio porque va encima de él. */
+  border-radius: var(--lg-r-base);
+  background: var(--av-on-glass-hover);
+}
+.av-search__icon { flex: none; }
+.av-search__icon :deep(svg) { width: 18px; height: 18px; }
+
+/* El texto que el usuario escribe sube a blanco puro: es lo único del diálogo
+   que ha puesto él, y tiene que despegarse del marcador de posición, que se
+   queda en el 72% de siempre. */
+.av-search__field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 16px;   /* por debajo de 16 iOS hace zoom solo al enfocar */
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--av-on-glass-strong);
+}
+.av-search__field input::placeholder { color: var(--av-on-glass); }
+/* la X nativa de `type=search` sobra: ya hay una, y la de Chrome es negra */
+.av-search__field input::-webkit-search-cancel-button { display: none; }
+
+.av-search__clear,
+.av-search__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.av-search__clear { width: 26px; height: 26px; border-radius: 50%; }
+.av-search__clear :deep(svg) { width: 16px; height: 16px; }
+.av-search__close { width: 40px; height: 40px; }
+.av-search__close :deep(svg) { width: 22px; height: 22px; }
+
+/* lo único que scrollea es la lista; la cabecera se queda */
+.av-search__scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding-top: 18px;
+}
+.av-search__scroll::-webkit-scrollbar { display: none; }
+
+.av-search__title {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--av-on-glass);
+}
+
+.av-search__sugs,
+.av-search__results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.av-search__sugs { gap: 1px; }
+
+.av-search__sug {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--lg-r-base);
+  background: none;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  text-align: left;
+  color: var(--av-on-glass);
+  cursor: pointer;
+}
+
+.av-search__empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--av-on-glass);
+}
+
+.av-search__all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 6px 2px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--av-on-glass-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.av-search__all :deep(svg) { width: 16px; height: 16px; }
+
+/* ── la tarjeta de resultado ──────────────────────────────────────
+   SÓLIDA, y no es una elección estética: el §6 dice que el vidrio es de la capa
+   que flota y que las tarjetas de una lista son contenido. Además el precio no
+   puede depender de la foto que pase por detrás. Sobre papel manda
+   `--av-solid-*`, nunca los tonos de encima del velo. */
+.av-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--lg-r-base);
+  background: var(--av-solid-bg);
+  color: var(--av-solid-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.av-card__shot {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: var(--lg-r-base);
+  overflow: hidden;
+  background: var(--av-solid-hair);
+}
+.av-card__shot img { width: 100%; height: 100%; object-fit: contain; }
+
+.av-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.av-card__line {
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--av-solid-fg-soft);
+  /* una línea y con puntos suspensivos: el nombre largo no puede empujar al
+     precio fuera de la tarjeta */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-card__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-card__prices { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.av-card__prices b { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.av-card__prices s { font-size: 12.5px; color: var(--av-solid-fg-soft); }
+/* El amarillo de marca como acento corto, que es para lo que sirve — el mismo
+   papel que la burbuja del contador en la barra. */
+.av-card__prices em {
+  font-style: normal;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--av-y-400);
+  color: var(--av-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.av-card__chev { width: 18px; height: 18px; flex: none; color: var(--av-solid-fg-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .av-search__scroll { scroll-behavior: auto; }
+}
 </style>
