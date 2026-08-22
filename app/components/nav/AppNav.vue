@@ -68,9 +68,10 @@ const props = defineProps({
   items: {
     type: Array,
     default: () => ([
-      /* El icono es para el menú de móvil — la píldora de escritorio es sólo
-         texto y lo ignora. Es opcional: unos `items` de fuera sin icono siguen
-         funcionando, el menú deja el hueco y alinea igual.
+      /* El icono se usa en LAS DOS disposiciones: en las filas del menú de
+         teléfono y, desde ahora, también en la píldora de escritorio. Sigue
+         siendo opcional — unos `items` de fuera sin icono funcionan igual: el
+         menú deja el hueco y alinea, y la píldora no pinta el `<span>`.
 
          Aquí SÓLO va lo que NAVEGA. Sneakers, Ropa y Accesorios estuvieron un
          rato en esta lista como botones que abrían un desplegable propio, y era
@@ -208,10 +209,20 @@ function openAction(id) {
 }
 
 /* ── el menú ───────────────────────────────────────────────────────────────
-   Este SÍ va con `v-if` y no duplicado en CSS, al revés que las dos
-   disposiciones: aquí lo que decide no es el ancho de la ventana —que el
-   servidor no sabe— sino un estado que arranca cerrado en los dos lados. No hay
-   nada que corregir al hidratar, y cerrado no cuesta una capa de vidrio. */
+   Va con `v-show`, igual que el buscador, y no duplicado en CSS: lo que decide
+   no es el ancho de la ventana —que el servidor no sabe— sino un estado que
+   arranca cerrado en los dos lados. No hay nada que corregir al hidratar.
+
+   Estuvo con `v-if`, que ahorraba una capa de vidrio mientras el menú estaba
+   cerrado, y salió caro: era la ÚNICA diferencia estructural que quedaba con el
+   buscador, y era justo la que hacía que su lente no se viera. Con `v-if` el
+   panel se monta y se destruye en cada apertura, así que su `<filter>` se crea
+   y se borra cada vez — y el navegador no llega a resolver la referencia del
+   `backdrop-filter` contra un nodo que acaba de aparecer.
+
+   El coste —una instancia de vidrio de más en el árbol— es el mismo que ya paga
+   el buscador, y oculta no compone nada: `display: none` no pinta
+   `backdrop-filter` y el ResizeObserver de la lente se sale solo al medir 0. */
 const menuOpen = ref(false)
 const searchOpen = ref(false)
 
@@ -263,29 +274,48 @@ function collapseTo(i) {
 function backFilters() {
   filterPath.value = filterPath.value.slice(0, -1)
 }
-const moreBtn = ref(null)
-const searchBtn = ref(null)
+/* Quien ABRIÓ el panel, para devolverle el foco al cerrarlo. Se guarda el
+   elemento del evento y no una `ref` del template a propósito: desde que el
+   menú y el buscador se abren también desde la barra de escritorio hay DOS
+   botones para cada panel, y dos elementos con la misma `ref` dejan en la
+   variable al último que se montó — que es justo el que está oculto por media
+   query. El evento sí sabe cuál se tocó. */
+const menuTrigger = ref(null)
+const searchTrigger = ref(null)
 const menuList = ref(null)
 const searchInput = ref(null)
+/* Los dos paneles de vidrio, para pedirles que rehagan su lente en el momento
+   exacto en que se muestran — ver `openSearch` y `openMenu`. El buscador lo
+   necesita de verdad (vive con `v-show` y nace sin medir); el menú se monta ya
+   visible y se sincroniza solo, pero lleva la misma llamada A PROPÓSITO: son la
+   misma pieza haciendo lo mismo, y en cuanto uno de los dos se abre por un
+   camino distinto empieza a divergir el comportamiento del material. */
+const searchGlass = ref(null)
+const menuGlass = ref(null)
 const query = ref('')
 
 /* Uno cada vez. Abrir uno cierra los otros sin devolver el foco — el foco se lo
    queda el que acaba de abrirse. */
 const panelOpen = computed(() => menuOpen.value || searchOpen.value)
 
-function openMenu() {
+function openMenu(evt) {
   closeSearch(false)
+  menuTrigger.value = evt?.currentTarget || null
   filterPath.value = []   // el menú siempre se abre por la raíz del árbol
   menuOpen.value = true
-  /* el foco entra al panel: con la barra oculta no queda nada detrás que tocar,
-     y dejarlo en un botón que acaba de desaparecer lo mandaba al body */
-  nextTick(() => menuList.value?.querySelector('a')?.focus())
+  nextTick(() => {
+    /* el foco entra al panel: con la barra oculta no queda nada detrás que
+       tocar, y dejarlo en un botón que acaba de desaparecer lo mandaba al body */
+    menuList.value?.querySelector('a')?.focus()
+    /* y la lente, igual que en `openSearch` — ver la nota junto a `menuGlass` */
+    menuGlass.value?.sync()
+  })
 }
 
 function closeMenu(refocus = true) {
   if (!menuOpen.value) return
   menuOpen.value = false
-  if (refocus) nextTick(() => moreBtn.value?.focus())
+  if (refocus) nextTick(() => menuTrigger.value?.focus())
 }
 
 function pickLink(id) {
@@ -331,10 +361,24 @@ function clearFilters() {
    Cuesta una instancia de vidrio de más en el árbol. Oculta no compone nada:
    `display: none` no pinta `backdrop-filter` y el ResizeObserver de la lente se
    sale solo al medir 0. */
-function openSearch() {
+function openSearch(evt) {
   closeMenu(false)
+  searchTrigger.value = evt?.currentTarget || null
   searchOpen.value = true
-  nextTick(() => searchInput.value?.focus())
+  nextTick(() => {
+    searchInput.value?.focus()
+    /* Y la lente. Este panel vive con `v-show`, o sea que nace en
+       `display: none` y ahi no hay nada que medir: su filtro se queda sin
+       construir. Los observadores de la lente no lo rescatan de forma fiable
+       —el de tamano y el de interseccion entregan dentro del ciclo de render—,
+       asi que el unico que sabe con certeza que el panel acaba de mostrarse es
+       quien lo muestra. Es aqui.
+
+       Sintoma exacto cuando falta: el buscador se abre con velo y desenfoque
+       pero SIN refraccion —se lee como cristal limpio— y la lente no aparece
+       hasta que algo redimensiona la ventana y despierta al ResizeObserver. */
+    searchGlass.value?.sync()
+  })
 }
 
 function closeSearch(refocus = true) {
@@ -345,7 +389,7 @@ function closeSearch(refocus = true) {
   searchInput.value?.blur()
   kbInset.value = 0
   vvTop.value = 0
-  if (refocus) nextTick(() => searchBtn.value?.focus())
+  if (refocus) nextTick(() => searchTrigger.value?.focus())
 }
 
 /* El filtrado es local y tonto — nombre y línea, sin acentos ni mayúsculas —
@@ -430,7 +474,13 @@ onBeforeUnmount(() => {
 
 <template>
   <!-- ── barra superior ──────────────────────────────────────────────────── -->
-  <header class="av-nav">
+  <!-- Con un panel abierto desaparece, exactamente igual que la barra de
+       teléfono y por dos motivos. El de siempre: mientras hay algo abierto no
+       queda nada más que tocar. Y uno del material: el panel es `backdrop-filter`
+       sobre todo lo que tiene debajo, así que una barra que siguiera ahí se
+       vería refractada dentro del panel — vidrio detrás de vidrio, que es
+       justo lo que el sistema no hace. -->
+  <header class="av-nav" :class="{ 'is-away': panelOpen }">
     <!-- la marca, SIN panel: a la altura de la barra y suelta sobre el fondo.
          Se lee sola porque el recorte tiene alfa de verdad y el halo la despega
          de cualquier fondo — ya no depende de tener vidrio oscuro detrás. -->
@@ -455,6 +505,15 @@ onBeforeUnmount(() => {
               @click.prevent="emit('select', item.id)"
             >
               <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
+              <!-- El icono va en su propio `<span class="av-glyph">`, NUNCA en
+                   el `<a>`: `.av-glyph` lleva `filter: drop-shadow(...)` y un
+                   ancestro con `filter` crea un backdrop root — la selección de
+                   al lado se quedaría sin nada que refractar y dejaría de ser
+                   vidrio. Como es HERMANO de `.av-glass-sel` y no su padre, no
+                   la toca. -->
+              <span v-if="item.icon" class="av-nav__icon av-glyph" aria-hidden="true">
+                <component :is="item.icon" :stroke-width="1.7" />
+              </span>
               {{ item.label }}
             </a>
           </li>
@@ -462,8 +521,32 @@ onBeforeUnmount(() => {
       </div>
     </GlassSurface>
 
-    <!-- las tres acciones sueltas: sólo escritorio -->
+    <!-- Las acciones sueltas: sólo escritorio. Buscar · bolsa · favoritos ·
+         cuenta, todas iconos y todas su propia `GlassSurface`.
+
+         Buscar abre el panel a pantalla completa — el `variant="panel"`, con
+         la lente de 80 px sin recortar. Es lo que trae ese material por encima
+         de 900 px: hasta ahora sólo existía en teléfono, y arriba se quedaba
+         todo en píldoras, donde el tope de seguridad deja la lente en 19.7.
+
+         El ⋯ NO está aquí, y es a propósito: el menú de tres puntos es una
+         pieza de TELÉFONO. En escritorio los enlaces ya se ven enteros en la
+         píldora del centro, así que un botón que los volviera a esconder
+         sobraría. -->
     <div class="av-nav__actions">
+      <GlassSurface :radius="999" class="av-nav__action">
+        <button
+          type="button"
+          aria-label="Buscar"
+          aria-haspopup="true"
+          aria-controls="av-search"
+          :aria-expanded="searchOpen"
+          @click="searchOpen ? closeSearch() : openSearch($event)"
+        >
+          <span class="av-glyph"><Search :stroke-width="1.7" /></span>
+        </button>
+      </GlassSurface>
+
       <GlassSurface
         v-for="a in actions"
         :key="a.id"
@@ -475,6 +558,7 @@ onBeforeUnmount(() => {
           <span v-if="a.id === 'bag' && bag > 0" class="av-nav__badge av-glass-bubble">{{ bag }}</span>
         </button>
       </GlassSurface>
+
     </div>
   </header>
 
@@ -499,6 +583,10 @@ onBeforeUnmount(() => {
     :class="{ 'is-away': panelOpen }"
     :style="{ '--av-kb': kbInset + 'px', '--av-vv': vvTop + 'px' }"
   >
+      <!-- Velo NEGRO, el de siempre. Se probó `variant="light"` aquí — velo
+           blanco y glifos a tinta — y se descartó: la barra dejaba de leerse
+           como parte del sistema. La variante se queda en `glass.css` para
+           cuando haya botones que sí la quieran; ver docs/10-componentes.md. -->
       <GlassSurface :radius="999" tag="nav" class="av-bar__panel" aria-label="Acciones">
         <ul class="av-bar__list">
           <!-- Buscar va primero, como en cualquier tienda: es lo que hace el
@@ -506,14 +594,13 @@ onBeforeUnmount(() => {
                `open` — abre su propio panel, igual que el ⋯. -->
           <li>
             <button
-              ref="searchBtn"
               type="button"
               class="av-bar__btn"
               aria-label="Buscar"
               aria-haspopup="true"
               aria-controls="av-search"
               :aria-expanded="searchOpen"
-              @click="searchOpen ? closeSearch() : openSearch()"
+              @click="searchOpen ? closeSearch() : openSearch($event)"
             >
               <span class="av-glyph"><Search :stroke-width="1.7" /></span>
             </button>
@@ -536,14 +623,13 @@ onBeforeUnmount(() => {
 
           <li>
             <button
-              ref="moreBtn"
               type="button"
               class="av-bar__btn"
               aria-label="Menú"
               aria-haspopup="true"
               aria-controls="av-menu"
               :aria-expanded="menuOpen"
-              @click="menuOpen ? closeMenu() : openMenu()"
+              @click="menuOpen ? closeMenu() : openMenu($event)"
             >
               <span class="av-glyph"><MoreHorizontal :stroke-width="2" /></span>
             </button>
@@ -565,9 +651,11 @@ onBeforeUnmount(() => {
        Sin velo detrás que recoja el clic de fuera, porque ya no hay fuera. El
        cierre es la X de la cabecera — explícita y siempre en el mismo sitio. -->
   <GlassSurface
-    v-if="menuOpen"
+    v-show="menuOpen"
+    ref="menuGlass"
     id="av-menu"
     class="av-menu"
+    variant="panel"
     role="dialog"
     aria-modal="true"
     aria-label="Menú"
@@ -711,9 +799,11 @@ onBeforeUnmount(() => {
        `v-show` y no `v-if` — ver la nota del script: es lo que hace que el
        teclado suba en iOS. -->
   <GlassSurface
+    ref="searchGlass"
     v-show="searchOpen"
     id="av-search"
     class="av-search"
+    variant="panel"
     role="dialog"
     aria-modal="true"
     aria-label="Buscar"
@@ -813,11 +903,22 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
+  /* Fluido y atado a los dos extremos, igual que el relleno de los enlaces:
+     16 a 1440, 10 a 1024. Son seis píxeles que la píldora necesita justo en el
+     corte y que arriba no se echan de menos.
+
+     NO es `--av-nav-gap` — ese token también fija dónde se posa la barra y el
+     padding de los paneles, y ahí no se toca nada. */
+  gap: clamp(10px, 1.44vw - 4.8px, 16px);
   padding: var(--av-nav-gap) clamp(16px, 3vw, 34px);
   pointer-events: none;    /* el hueco entre piezas deja pasar el cursor */
 }
 .av-nav > * { pointer-events: auto; }
+/* La MISMA regla que `.av-bar.is-away`, hasta la propiedad: `visibility` y no
+   `display`, porque sale igual del árbol de accesibilidad —nada de botones
+   invisibles que un lector siga anunciando— y no obliga a rehacer el layout de
+   la cabecera al abrir y cerrar. */
+.av-nav.is-away { visibility: hidden; }
 
 .av-nav__action {
   width: var(--av-nav-h);
@@ -862,8 +963,23 @@ onBeforeUnmount(() => {
    botón sí, y que no le hacen nada a un enlace por tenerlos de más. */
 .av-nav__link {
   position: relative;
-  display: block;
-  padding: 13px 20px;
+  display: flex;
+  align-items: center;
+  /* Relleno y hueco FLUIDOS, lo único de la píldora que lo es, y con la recta
+     ATADA A LOS DOS EXTREMOS en vez de a un `vw` suelto:
+
+       1440 → 20 px de relleno y 8 de hueco   (el ancho de referencia, intacto)
+       1024 → 10 px y 6                       (el corte, donde justo cabe)
+
+     De ahí los `2.4vw - 14.6px` y `1.2vw - 7.3px`: son la recta que pasa por
+     esos dos puntos. Con un `1.4vw` limpio el relleno valía 14.3 a 1024 y la
+     píldora se pasaba 27 px — el `clamp` mide el ANCHO DE LA VENTANA, no el
+     hueco que le queda a la píldora, así que hay que apuntarlo a mano.
+
+     Sin esto se recorta «Cuenta»: los enlaces son `nowrap` y la píldora vive en
+     una columna `minmax(0, 1fr)`, así que al no caber no se encogen — se salen. */
+  gap: clamp(6px, 1.2vw - 7.3px, 8px);
+  padding: 13px clamp(10px, 2.4vw - 14.6px, 20px);
   border: 0;
   border-radius: 999px;
   background: none;
@@ -879,6 +995,13 @@ onBeforeUnmount(() => {
 }
 .av-nav__link:hover { color: var(--av-on-glass-strong); background: var(--av-on-glass-hover); }
 
+/* 16 y no los 21 del glifo de un botón de acción: allí el icono ES el botón,
+   aquí acompaña a una letra de 13.5 y tiene que pesar menos que ella. `flex:
+   none` porque un icono que se encoge dentro de un flex apretado deja de ser el
+   mismo icono en cada enlace. */
+.av-nav__icon { flex: none; }
+.av-nav__icon :deep(svg) { width: 16px; height: 16px; }
+
 /* El activo NO es un relleno sólido: lleva `.av-glass-sel`, que vuelve a
    frostar lo que hay detrás — ahora con el amarillo de marca — y queda como un
    panel cálido más claro que el velo.
@@ -892,7 +1015,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  /* La misma recta: 10 a 1440, 6 a 1024. */
+  gap: clamp(6px, .96vw - 3.9px, 10px);
 }
 /* `.av-glyph` va en un span alrededor del icono, NUNCA en el botón: la clase
    lleva `filter: drop-shadow(...)` y un ancestro con `filter` crea un backdrop
@@ -942,8 +1066,9 @@ onBeforeUnmount(() => {
    El posicionamiento lo lleva el CONTENEDOR y no cada pieza — así el ⋯ no
    puede pisar al panel cuando la pantalla se estrecha, que es justo lo que pasa
    a 375 px si uno se centra y el otro se ancla a la derecha. */
-.av-bar,
-.av-menu { display: none; }
+/* Sólo la BARRA se apaga en escritorio. El menú NO: es la misma pieza en los
+   dos anchos y quien decide si se ve es `v-show`, igual que en el buscador. */
+.av-bar { display: none; }
 .av-bar__list {
   display: flex;
   align-items: center;
@@ -970,7 +1095,17 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-@media (max-width: 900px) {
+/* El corte entre las dos disposiciones. Estuvo en 900 y sube a 1023 al meter
+   los iconos en la píldora: seis etiquetas MÁS seis iconos no caben con la
+   marca y los cuatro botones por debajo de eso — medido, el mínimo de la
+   píldora es 591 px y a 920 sólo quedan 498 libres. No es un número elegido a
+   ojo: es dónde deja de caber.
+
+   1023 y no 1010, que es el mínimo exacto, para que la tableta en horizontal
+   (1024) entre en la disposición de escritorio con margen y no justo en el
+   filo. Por debajo queda la barra de teléfono, que es una disposición completa
+   y ya aprobada — no un escritorio recortado. */
+@media (max-width: 1023px) {
   /* La barra de arriba desaparece ENTERA — marca, píldora y acciones. En
      teléfono hay una sola barra, arriba igual que en escritorio. Los enlaces y
      los filtros se van al menú del ⋯. */
@@ -1001,260 +1136,274 @@ onBeforeUnmount(() => {
   .av-bar.is-away { visibility: hidden; }
 
   .av-bar__panel { height: 100%; }
+}
 
-  /* ── el menú ────────────────────────
-     A PANTALLA COMPLETA — la misma caja que el buscador, y por eso repite sus
-     tres líneas exactas: `inset: 0`, la sangre y `--lg-r: 0`. No se juntan en
-     un selector compartido a propósito: son dos paneles que hoy coinciden, no
-     uno con dos nombres, y el día que uno cambie el otro no tiene por qué
-     enterarse.
+/* ── el menú ────────────────────────
+   FUERA del `@media`, igual que el buscador y por el mismo motivo: quien
+   decide si se ve es `v-show`, no el ancho de la ventana.
 
-     Antes colgaba de la esquina superior derecha, con `width: max-content` y un
-     suelo de 244 px. Cayó por el ancho: con el recorrido de filtros cada nivel
-     mete sangría, y «New Balance» dentro de Sneakers › Hombre ya no cabía en
-     una línea.
+   Estuvo dentro del bloque de teléfono, y eso hacía que el material de PANEL
+   —el de la lente ancha, el que de verdad se dobla— existiera sólo por debajo
+   de 900 px. Escritorio y tableta se quedaban con las píldoras de la barra,
+   donde el tope recorta la lente al 34% del lado corto y de los 80 px de la
+   variante no queda nada. No era una diferencia de tamaño: era otro material.
+   Sacándolo de aquí los tres anchos abren la MISMA superficie, con la misma
+   deformación, porque es literalmente el mismo elemento.
 
-     Con `inset: 0` se va también todo el cálculo de altura que vivía aquí: el
-     `height: calc(100dvh - ...)` estaba para estirar un panel que no llegaba al
-     suelo. Uno que sí llega no lo necesita.
+   A PANTALLA COMPLETA — la misma caja que el buscador. La CAJA se repite
+   aquí (`inset`, `z-index`, `display`) porque son dos paneles que hoy
+   coinciden, no uno con dos nombres. El MATERIAL no: ése lo piden los dos por
+   nombre con `variant="panel"` y vive en `glass.css`, porque un material
+   copiado a mano en dos sitios deja de estar estandarizado en cuanto alguien
+   toca uno solo.
 
-     Y se va el velo de fuera: ya no hay fuera. El cierre es la X de la
-     cabecera. */
-  .av-menu {
-    position: fixed;
-    inset: 0;
-    z-index: 55;
-    display: flex;
-    --lg-r: 0px;
-  }
-  .av-menu :deep(.av-glass__body) {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;   /* sin esto un hijo con scroll no deja encoger al padre */
-  }
-  /* `flex: 1` es lo que le falta a un hijo único de un flex column para
-     estirarse a la altura del padre — sin esto el panel medía 812 px pero el
-     cuerpo se quedaba en lo que sus hijos pidieran, y los filtros nunca veían
-     el alto que `.av-menu` les había dado. */
-  .av-menu__body {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    /* El MISMO padding del buscador, hasta la última variable: los dos llegan
-       al borde físico, así que lo que esquiva el notch, la barra de gestos y el
-       desplazamiento del viewport visual de iOS es esto y sólo esto. */
-    padding:
-      calc(var(--av-nav-top) + var(--av-vv, 0px))
-      var(--av-nav-gap)
-      calc(var(--av-nav-gap) + env(safe-area-inset-bottom, 0px));
-  }
+   Antes colgaba de la esquina superior derecha, con `width: max-content` y un
+   suelo de 244 px. Cayó por el ancho: con el recorrido de filtros cada nivel
+   mete sangría, y «New Balance» dentro de Sneakers › Hombre ya no cabía en
+   una línea.
 
-  /* La cabecera: el nombre y la X. Repite la del buscador en alto y en medidas
-     porque es la misma pieza haciendo lo mismo — dos paneles hermanos no pueden
-     cerrarse en sitios distintos. */
-  .av-menu__head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: none;
-    padding-bottom: 14px;
-  }
-  /* 13.5 como todo lo demás del panel, y en el MISMO peso — 500, el único que
-     hay en todo el sistema desde que se quitó la negrita de en medio. Lo que
-     lo separa de una fila es sólo el COLOR: blanco puro contra el 72% de una
-     opción. Y sin versales: primera mayúscula y el resto minúsculas. */
-  .av-menu__heading {
-    margin: 0;
-    font-size: 13.5px;
-    font-weight: 500;
-    letter-spacing: -.005em;
-    color: var(--av-on-glass-strong);
-  }
-  .av-menu__close {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    flex: none;
-    margin-left: auto;
-    border: 0;
-    background: none;
-    padding: 0;
-    cursor: pointer;
-  }
-  .av-menu__close :deep(svg) { width: 22px; height: 22px; }
+   Con `inset: 0` se va también todo el cálculo de altura que vivía aquí: el
+   `height: calc(100dvh - ...)` estaba para estirar un panel que no llegaba al
+   suelo. Uno que sí llega no lo necesita.
 
-  /* Lo que navega NO scrollea y NO se encoge: `flex: none` de sobra porque
-     nadie le pide que crezca, pero lo digo aquí porque es la regla — estas
-     filas tienen que verse enteras siempre, pase lo que pase con los filtros. */
-  .av-menu__nav { flex: none; }
+   Y se va el velo de fuera: ya no hay fuera. El cierre es la X de la
+   cabecera. */
+.av-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  /* La misma caja que el buscador. El material también, y ahora se ve que lo
+     es: los dos piden `variant="panel"` en vez de repetir sus tokens. */
+}
+.av-menu :deep(.av-glass__body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;   /* sin esto un hijo con scroll no deja encoger al padre */
+  min-width: 0;    /* y sin esto no encoge en el otro eje — ver `.av-search` */
+}
+/* `flex: 1` es lo que le falta a un hijo único de un flex column para
+   estirarse a la altura del padre — sin esto el panel medía 812 px pero el
+   cuerpo se quedaba en lo que sus hijos pidieran, y los filtros nunca veían
+   el alto que `.av-menu` les había dado. */
+.av-menu__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  /* El MISMO padding del buscador, hasta la última variable: los dos llegan
+     al borde físico, así que lo que esquiva el notch, la barra de gestos y el
+     desplazamiento del viewport visual de iOS es esto y sólo esto. */
+  padding:
+    calc(var(--av-nav-top) + var(--av-vv, 0px))
+    var(--av-nav-gap)
+    calc(var(--av-nav-gap) + env(safe-area-inset-bottom, 0px));
+}
 
-  /* Los filtros se llevan lo que sobra: `flex: 1` es lo que hace que tengan
-     «mayor proporción de altura» sin escribir un número fijo que se desajuste
-     en cada teléfono. Column para que la cabecera se quede quieta y sólo la
-     lista de debajo scrollee. */
-  .av-menu__filters {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
+/* La cabecera: el nombre y la X. Repite la del buscador en alto y en medidas
+   porque es la misma pieza haciendo lo mismo — dos paneles hermanos no pueden
+   cerrarse en sitios distintos. */
+.av-menu__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding-bottom: 14px;
+}
+/* 13.5 como todo lo demás del panel, y en el MISMO peso — 500, el único que
+   hay en todo el sistema desde que se quitó la negrita de en medio. Lo que
+   lo separa de una fila es sólo el COLOR: blanco puro contra el 72% de una
+   opción. Y sin versales: primera mayúscula y el resto minúsculas. */
+.av-menu__heading {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  color: var(--av-on-glass-strong);
+}
+.av-menu__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.av-menu__close :deep(svg) { width: 22px; height: 22px; }
 
-  .av-menu__list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
+/* Lo que navega NO scrollea y NO se encoge: `flex: none` de sobra porque
+   nadie le pide que crezca, pero lo digo aquí porque es la regla — estas
+   filas tienen que verse enteras siempre, pase lo que pase con los filtros. */
+.av-menu__nav { flex: none; }
 
-  /* Sólo la lista de filtros scrollea, y sólo cuando la rama actual no cabe
-     — con 3 o 4 hermanos no hace falta, pero un teléfono en horizontal tiene
-     poco alto y ahí sí entra en juego. */
-  .av-menu__scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;   /* el scroll no se contagia a la página */
-    scrollbar-width: none;
-  }
-  .av-menu__scroll::-webkit-scrollbar { display: none; }
+/* Los filtros se llevan lo que sobra: `flex: 1` es lo que hace que tengan
+   «mayor proporción de altura» sin escribir un número fijo que se desajuste
+   en cada teléfono. Column para que la cabecera se quede quieta y sólo la
+   lista de debajo scrollee. */
+.av-menu__filters {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
 
-  /* Mismo 72% que el glifo: sobre el velo el texto no cambia de tono por estar
-     en otro sitio.
+.av-menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
-     LA LETRA A 13.5 px — el tamaño único de todo el texto de menú, títulos
-     incluidos — y con ella lo demás a la misma proporción — icono, hueco y
-     relleno suben todos junto con el texto, porque una fila no puede tener una
-     letra grande y un icono que se quedó gritando el tamaño de antes.
+/* Sólo la lista de filtros scrollea, y sólo cuando la rama actual no cabe
+   — con 3 o 4 hermanos no hace falta, pero un teléfono en horizontal tiene
+   poco alto y ahí sí entra en juego. */
+.av-menu__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;   /* el scroll no se contagia a la página */
+  scrollbar-width: none;
+}
+.av-menu__scroll::-webkit-scrollbar { display: none; }
 
-     El ALTO no sube con lo demás, y es la única pieza que no escala: 44 px es
-     el mínimo de un objetivo táctil y ya sobraba de margen a 10.5 px, así que
-     a 13.5 sigue sobrando — no hace falta pedirle más al pulgar. Sirve también
-     para `<button>` (cada fila de filtro lo es), de ahí `border`, `background`,
-     `font` y `text-align`: cosas que un `<a>` no necesita pero un botón sí.
+/* Mismo 72% que el glifo: sobre el velo el texto no cambia de tono por estar
+   en otro sitio.
 
-     `--av-depth` es el nivel de la fila dentro del recorrido, y lo escribe la
-     plantilla. Sangra 15 px por nivel: bastante para que se lea de un vistazo
-     de quién cuelga cada fila, poco para que a tres niveles el texto no se haya
-     ido a la mitad de la pantalla. Va en el padding y no en un margen para que
-     el fondo del `:hover` y el panel del seleccionado sigan llegando al borde
-     de la fila — lo que se sangra es el texto, no la fila. */
-  .av-menu__link {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 44px;
-    padding: 0 13px 0 calc(13px + var(--av-depth, 0) * 15px);
-    border: 0;
-    border-radius: var(--lg-r-base);
-    background: none;
-    font: inherit;
-    font-size: 13.5px;
-    font-weight: 500;
-    letter-spacing: -.005em;
-    white-space: nowrap;
-    color: var(--av-on-glass);
-    text-decoration: none;
-    text-align: left;
-    cursor: pointer;
-  }
-  /* El icono reserva su hueco aunque no haya icono: así las etiquetas quedan en
-     la misma columna con `items` de fuera que no traigan ninguno. */
-  .av-menu__icon { width: 18px; flex: none; }
-  .av-menu__icon :deep(svg) { width: 18px; height: 18px; }
+   LA LETRA A 13.5 px — el tamaño único de todo el texto de menú, títulos
+   incluidos — y con ella lo demás a la misma proporción — icono, hueco y
+   relleno suben todos junto con el texto, porque una fila no puede tener una
+   letra grande y un icono que se quedó gritando el tamaño de antes.
 
-  /* El activo lleva `.av-glass-sel`, igual que la píldora de escritorio, y el
-     texto NO cambia: lo que marca la selección es el panel y sólo el panel. Es
-     la misma excepción de 01-velo-negro.md §7 aplicada al mismo caso — el ítem
-     activo de una navegación. */
-  .av-menu__link.is-active { color: var(--av-on-glass); }
+   El ALTO no sube con lo demás, y es la única pieza que no escala: 44 px es
+   el mínimo de un objetivo táctil y ya sobraba de margen a 10.5 px, así que
+   a 13.5 sigue sobrando — no hace falta pedirle más al pulgar. Sirve también
+   para `<button>` (cada fila de filtro lo es), de ahí `border`, `background`,
+   `font` y `text-align`: cosas que un `<a>` no necesita pero un botón sí.
 
-  /* Una rama ABIERTA — una fila del recorrido. Sin negrita, como todo lo
-     demás: se distingue por el CHEVRON mirando hacia abajo y por el COLOR —
-     blanco puro, porque es dónde está el usuario, no una opción más de la
-     lista — nunca por el peso ni por el cuerpo de la letra. */
-  .av-menu__link.is-open {
-    color: var(--av-on-glass-strong);
-  }
-  .av-menu__link.is-open .av-menu__chev { opacity: .8; }
+   `--av-depth` es el nivel de la fila dentro del recorrido, y lo escribe la
+   plantilla. Sangra 15 px por nivel: bastante para que se lea de un vistazo
+   de quién cuelga cada fila, poco para que a tres niveles el texto no se haya
+   ido a la mitad de la pantalla. Va en el padding y no en un margen para que
+   el fondo del `:hover` y el panel del seleccionado sigan llegando al borde
+   de la fila — lo que se sangra es el texto, no la fila. */
+.av-menu__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 13px 0 calc(13px + var(--av-depth, 0) * 15px);
+  border: 0;
+  border-radius: var(--lg-r-base);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  color: var(--av-on-glass);
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+/* El icono reserva su hueco aunque no haya icono: así las etiquetas quedan en
+   la misma columna con `items` de fuera que no traigan ninguno. */
+.av-menu__icon { width: 18px; flex: none; }
+.av-menu__icon :deep(svg) { width: 18px; height: 18px; }
 
-  /* la rama lleva el chevron pegado al borde derecho de su propia fila, no del
-     panel — el `margin-left: auto` empuja dentro del botón, no fuera de él */
-  .av-menu__chev {
-    margin-left: auto;
-    width: 15px;
-    height: 15px;
-    flex: none;
-    opacity: .5;
-  }
+/* El activo lleva `.av-glass-sel`, igual que la píldora de escritorio, y el
+   texto NO cambia: lo que marca la selección es el panel y sólo el panel. Es
+   la misma excepción de 01-velo-negro.md §7 aplicada al mismo caso — el ítem
+   activo de una navegación. */
+.av-menu__link.is-active { color: var(--av-on-glass); }
 
-  /* ── la sección de filtros ────────────────────────────────────
-     Un filo de luz la separa del menú — no una caja: encajonarla dentro del
-     panel sería dibujar una superficie sobre otra, y aquí no hay dos
-     superficies, hay dos cosas dentro de la misma. */
-  .av-menu__section {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    flex: none;
-    margin: 8px 0 5px;
-    /* Sin relleno lateral: «Filtros» tiene que arrancar EXACTAMENTE donde
-       arranca «Menú», y los dos cuelgan ya del padding de `__body`. Tenía 10 px
-       de más y se notaban — dos títulos del mismo panel con dos márgenes
-       distintos se ven torcidos aunque nadie sepa decir por qué.
+/* Una rama ABIERTA — una fila del recorrido. Sin negrita, como todo lo
+   demás: se distingue por el CHEVRON mirando hacia abajo y por el COLOR —
+   blanco puro, porque es dónde está el usuario, no una opción más de la
+   lista — nunca por el peso ni por el cuerpo de la letra. */
+.av-menu__link.is-open {
+  color: var(--av-on-glass-strong);
+}
+.av-menu__link.is-open .av-menu__chev { opacity: .8; }
 
-       Las FILAS sí van 13 px más adentro, y no es incoherencia: una fila tiene
-       fondo al pasar por encima y ese fondo necesita respirar por dentro. Un
-       título no tiene caja. */
-    padding: 10px 0 0;
-    border-top: 1px solid var(--av-on-glass-hair);
-  }
-  /* Ya no hay botón de volver: la fila del recorrido abre y cierra su propia
-     rama, así que el camino de vuelta está donde estaba el de ida. Un botón
-     aparte era una segunda forma de hacer lo mismo, y la peor de las dos — no
-     decía a qué nivel volvía.
+/* la rama lleva el chevron pegado al borde derecho de su propia fila, no del
+   panel — el `margin-left: auto` empuja dentro del botón, no fuera de él */
+.av-menu__chev {
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  opacity: .5;
+}
 
-     Y el título ya no cambia: dice «Filtros» siempre. Dónde estás lo dice el
-     recorrido de debajo, que es donde está pasando. */
-  .av-menu__title {
-    margin: 0;
-    /* MISMO tamaño y MISMO peso que `.av-menu__link` — 13.5 en 500, sin
-       excepción: nada de negrita en el sistema. Lo que lo distingue de una
-       fila es sólo el COLOR — blanco puro contra el 72%. */
-    font-size: 13.5px;
-    font-weight: 500;
-    letter-spacing: -.005em;
-    color: var(--av-on-glass-strong);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* MISMO color que el título al que acompaña — blanco puro, no el 72% de una
-     fila: están en la misma línea y a dos tonos parecía que uno de los dos se
-     había apagado. Ya no hay diferencia de peso con el título — los dos en 500,
-     como todo el panel —, así que lo que dice que «Limpiar» se puede tocar es
-     sólo el SUBRAYADO. */
-  .av-menu__clear {
-    margin-left: auto;
-    flex: none;
-    border: 0;
-    background: none;
-    padding: 2px 0;
-    font-family: inherit;
-    font-size: 13.5px;
-    font-weight: 500;
-    letter-spacing: -.005em;
-    color: var(--av-on-glass-strong);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
+/* ── la sección de filtros ────────────────────────────────────
+   Un filo de luz la separa del menú — no una caja: encajonarla dentro del
+   panel sería dibujar una superficie sobre otra, y aquí no hay dos
+   superficies, hay dos cosas dentro de la misma. */
+.av-menu__section {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  margin: 8px 0 5px;
+  /* Sin relleno lateral: «Filtros» tiene que arrancar EXACTAMENTE donde
+     arranca «Menú», y los dos cuelgan ya del padding de `__body`. Tenía 10 px
+     de más y se notaban — dos títulos del mismo panel con dos márgenes
+     distintos se ven torcidos aunque nadie sepa decir por qué.
+
+     Las FILAS sí van 13 px más adentro, y no es incoherencia: una fila tiene
+     fondo al pasar por encima y ese fondo necesita respirar por dentro. Un
+     título no tiene caja. */
+  padding: 10px 0 0;
+  border-top: 1px solid var(--av-on-glass-hair);
+}
+/* Ya no hay botón de volver: la fila del recorrido abre y cierra su propia
+   rama, así que el camino de vuelta está donde estaba el de ida. Un botón
+   aparte era una segunda forma de hacer lo mismo, y la peor de las dos — no
+   decía a qué nivel volvía.
+
+   Y el título ya no cambia: dice «Filtros» siempre. Dónde estás lo dice el
+   recorrido de debajo, que es donde está pasando. */
+.av-menu__title {
+  margin: 0;
+  /* MISMO tamaño y MISMO peso que `.av-menu__link` — 13.5 en 500, sin
+     excepción: nada de negrita en el sistema. Lo que lo distingue de una
+     fila es sólo el COLOR — blanco puro contra el 72%. */
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  color: var(--av-on-glass-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* MISMO color que el título al que acompaña — blanco puro, no el 72% de una
+   fila: están en la misma línea y a dos tonos parecía que uno de los dos se
+   había apagado. Ya no hay diferencia de peso con el título — los dos en 500,
+   como todo el panel —, así que lo que dice que «Limpiar» se puede tocar es
+   sólo el SUBRAYADO. */
+.av-menu__clear {
+  margin-left: auto;
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  color: var(--av-on-glass-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 /* ══ el buscador ─ ventana emergente a sangre ════════════════════════
@@ -1274,18 +1423,34 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 58;
   display: flex;
-  --lg-r: 0px;
+  /* A SANGRE: `inset: 0`, sin bordes, sin radio. Toda la pantalla.
+
+     El MATERIAL de este panel ya no se escribe aquí: lo pide por nombre con
+     `variant="panel"` y vive en `glass.css`. Estuvieron los tres tokens
+     copiados a mano en este bloque Y en el del menú, con la única garantía de
+     que alguien se acordara de tocar los dos a la vez. */
 }
 .av-search :deep(.av-glass__body) {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* `min-width: 0` por lo mismo que el `min-height`, pero en el otro eje: el
+     panel es un flex en FILA y su cuerpo es el ítem, así que con el `auto` de
+     por defecto no puede encoger por debajo del contenido más ancho que tenga
+     dentro. Con el panel a sangre (375) nunca se notó porque sobraba sitio; al
+     flotar (343) el cuerpo se quedaba en 370 y las tarjetas de resultado
+     sobresalían por el filo derecho. */
+  min-width: 0;
 }
 .av-search__body {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
+  /* La caja llega al borde FÍSICO, así que lo que esquiva el notch, la barra de
+     gestos, el teclado y el desplazamiento del viewport visual de iOS es este
+     padding y sólo él. */
   padding:
     calc(var(--av-nav-top) + var(--av-vv, 0px))
     var(--av-nav-gap)

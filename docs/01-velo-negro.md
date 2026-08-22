@@ -15,11 +15,12 @@ Preset cerrado, listo para copiar. Valores exactos del panel.
 | Radio | `18px` |
 | Grosor de la lente | `26px` |
 | Compresión del filo | `82` |
+| Suavizado del mapa | `0.30` × la lente |
 | Aberración cromática | `0%` (un solo pase) |
 | Desenfoque | `3px` |
 | Saturación | `1.12` |
 | Brillo | `0.85` |
-| Velo | `#0E0E0F` · opacidad `0.35` · cobertura `100%` |
+| Velo | `#0E0E0F` · opacidad `0.45` · cobertura `100%` |
 | Filo especular | `0.85` |
 | Elevación | `0.80` |
 | Color del glifo | blanco fijo, al `72%` (activo al `100%`) |
@@ -174,7 +175,7 @@ El mapa de desplazamiento: una rampa roja en X y una verde en Y con el centro
 neutralizado (`#808080`), de modo que **sólo el filo refracta**. Se regenera por
 instancia con un `ResizeObserver` porque depende de ancho, alto, radio y grosor.
 
-Tres cosas que **no** son opcionales, verificadas en Chromium:
+Cinco cosas que **no** son opcionales, verificadas en Chromium:
 
 1. **`scale` va NEGATIVO.** Con positivo el filo muestrea fuera del recorte del
    elemento, Chromium devuelve transparente y aparece una banda sin filtrar del
@@ -185,6 +186,59 @@ Tres cosas que **no** son opcionales, verificadas en Chromium:
    desplaza en diagonal.
 3. **Los dos topes.** `lente ≤ 34% del lado corto` y `compresión ≤ 3.2 × lente`.
    Sin ellos una píldora pequeña se deforma entera y su contenido deja de leerse.
+4. **La lente se enchufa DESPUÉS de medir, nunca antes.** Un `<filter>` vacío
+   referenciado desde un `backdrop-filter` no es «un filtro que no hace nada»: la
+   spec dice que el resultado es transparente, y Chromium tira la cadena entera
+   — se pierden la lente, el desenfoque, la saturación y el brillo, y la pieza
+   pasa a ser cristal limpio. Por eso `--lg-lens` y la clase `is-lensed` sólo se
+   ponen cuando el filtro ya tiene sus tres primitivas dentro; hasta entonces la
+   pieza se queda en el desenfoque de respaldo, que se ve bien.
+
+   Hace falta porque el primer `sync()` puede no medir nada: un panel montado
+   con `v-show` nace en `display: none` y ahí `offsetWidth` es 0. De ahí los
+   **tres** observadores: `ResizeObserver` para el tamaño, `IntersectionObserver`
+   para cuando la pieza pasa a verse, y `MutationObserver` sobre `style`/`class`
+   — este último porque los dos primeros entregan sus callbacks dentro del ciclo
+   de render, y con la pestaña en segundo plano ese ciclo no corre y no disparan
+   ninguno de los dos. El de mutaciones va por microtarea y no depende de que se
+   pinte, que es justo lo que necesita un `v-show`.
+5. **El mapa desenfocado va compuesto SOBRE un gris neutro opaco.** El mapa
+   codifica el desplazamiento en el canal: `128` es «no muevas nada», `0` empuja
+   a un lado y `255` al otro. El `feGaussianBlur` difumina también hacia FUERA
+   del mapa, y fuera no hay nada — y «nada» en SVG es negro transparente, o sea
+   `0`. **No `128`.**
+
+   Consecuencia, y se ve a simple vista: el borde izquierdo ya vale `0` y el
+   desenfoque no lo cambia, mientras el derecho vale `255` y el desenfoque lo
+   arrastra hacia `0`. Con una lente ancha eso daba **45 px de deformación a la
+   izquierda contra 0.2 a la derecha** — la pieza parecía doblar sólo por un
+   lado. Lo mismo entre arriba y abajo, en el canal verde.
+
+   `feFlood` + `feComposite operator="over"` rellenan ese «fuera» con `128`, que
+   es lo que siempre debió ser. La cadena queda:
+   `feImage → feGaussianBlur → feFlood → feComposite → feDisplacementMap`.
+
+   El bug estuvo desde el primer commit, pero era invisible: con la lente de
+   26 px el desenfoque es de 18 y la franja contaminada, estrecha.
+
+### El grosor de la lente tiene un techo práctico, además del tope 1
+
+El mapa se suaviza con un desenfoque de `edge × 0.70`, cuyo alcance real son
+unos 3σ. Para que el **núcleo** de la pieza siga siendo neutro — o sea, para que
+el fondo se vea a escala 1:1 en el centro — ese alcance tiene que caber en el
+hueco que la banda deja libre. Si no cabe, la rampa deja de ser un efecto de
+borde y recorre toda la superficie: eso ya no es refracción, es una
+**magnificación global**, y se ve como que el fondo está ampliado en vez de
+deformado.
+
+En un panel de 375×812:
+
+| `--lg-edge` | desenfoque | alcance 3σ | núcleo libre | |
+|---|---|---|---|---|
+| 26 (preset) | 18 | 55 | 162 | núcleo intacto · refracta 19% |
+| **56** | 39 | 118 | 132 | **núcleo intacto · refracta 40%** |
+| 80 | 56 | 168 | 108 | invadido → zoom global |
+| 132 | 89 | 268 | 60 | invadido → zoom 1.32× |
 
 ```js
 // composables/useGlassLens.js

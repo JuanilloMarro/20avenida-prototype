@@ -22,6 +22,44 @@
  *     Sin ellos una píldora pequeña se deforma entera y su contenido deja de
  *     leerse.
  *
+ * Y dos más, que costaron sendos bugs de los caros:
+ *
+ *  4. `--lg-lens` y la clase `is-lensed` NO se ponen hasta que el filtro tiene
+ *     primitivas dentro. Un `<filter>` VACÍO referenciado desde un
+ *     `backdrop-filter` no es «un filtro que no hace nada»: la spec dice que el
+ *     resultado es transparente, así que Chromium tira por la borda la cadena
+ *     ENTERA — se pierde la lente y con ella el blur, el saturate y el
+ *     brightness. La superficie deja de ser vidrio y pasa a ser un cristal
+ *     limpio. Poner la clase antes de medir era justo eso.
+ *
+ *     Y hace falta porque el primer `sync()` puede no medir nada: un panel
+ *     montado con `v-show` nace en `display: none`, y ahí `offsetWidth` es 0.
+ *     El ResizeObserver NO rescata ese caso — comprobado en Chromium: con el
+ *     elemento oculto no emite, y al volver a `display: flex` TAMPOCO. De ahí
+ *     el IntersectionObserver de abajo, que es el que sí se entera de que la
+ *     pieza pasó a verse.
+ *
+ *  5. El mapa desenfocado va compuesto SOBRE un gris neutro opaco, no suelto.
+ *     El mapa codifica el desplazamiento en el canal: 128 es «no muevas nada»,
+ *     0 empuja a un lado y 255 al otro. El `feGaussianBlur` difumina también
+ *     hacia FUERA del mapa, y fuera no hay nada — y «nada» en SVG es negro
+ *     transparente, o sea 0. No 128.
+ *
+ *     Consecuencia, y se ve a simple vista: el borde izquierdo vale 0 y el
+ *     desenfoque no lo cambia, mientras el derecho vale 255 y el desenfoque lo
+ *     arrastra hacia 0. Con `--lg-edge: 132` y `--lg-scale: 90` eso daba 45 px
+ *     de deformación a la izquierda contra 0.2 px a la derecha: la pieza
+ *     parecía doblar sólo por un lado. Lo mismo entre arriba y abajo, en el
+ *     canal verde.
+ *
+ *     El `feFlood` + `feComposite operator="over"` rellenan ese «fuera» con
+ *     128, que es lo que siempre debió ser: fuera de la pieza no hay
+ *     desplazamiento. Los dos extremos se suavizan por igual.
+ *
+ *     El bug estuvo desde el principio, pero era invisible: con la lente de
+ *     26 px el desenfoque es de 18 y la franja contaminada, estrecha. A 132 el
+ *     desenfoque es de 89 y se come un lado entero.
+ *
  * Aberración cromática (aquí en 0): si algún día sube, son tres
  * feDisplacementMap con scale × (1±k), uno por canal, un feColorMatrix que deje
  * sólo R, G o B, y recomponer con dos feBlend mode="screen". Cuesta 3× el
@@ -79,13 +117,21 @@ export function useGlassLens(elRef) {
   const id = 'av-lens-' + (++uid)
   let node = null
   let ro = null
+  let io = null
+  let mo = null
+  let lensed = false
+  let sig = ''   // firma de la última construcción, para no rehacer el mapa en balde
 
+  /** Devuelve `true` si consiguió medir y escribir el filtro. */
   const sync = () => {
     const el = unref(elRef)
-    if (!el || !node) return
+    if (!el || !node) return false
     const w = Math.round(el.offsetWidth)
     const h = Math.round(el.offsetHeight)
-    if (!w || !h) return
+    /* Oculto o sin medir todavía: NO se toca nada. Si aún no hay lente puesta,
+       la pieza se queda en el fallback de desenfoque, que se ve bien; lo que no
+       puede pasar es que apunte a un filtro vacío. */
+    if (!w || !h) return false
 
     const cs = getComputedStyle(el)
     const r = Math.min(token(cs, '--lg-r', 18), Math.min(w, h) / 2)
@@ -93,7 +139,24 @@ export function useGlassLens(elRef) {
     const edge = Math.min(token(cs, '--lg-edge', 26), Math.min(w, h) * 0.34)
     // tope 2: la compresión nunca supera a la lente que la produce
     const scale = -Math.min(token(cs, '--lg-scale', 82), edge * 3.2)
-    const soft = Math.max(edge * 0.70, 2).toFixed(2)
+
+    /* Nada ha cambiado → no se rehace el mapa. Importa porque los tres
+       observadores de abajo se pisan entre ellos: uno solo de los tres basta
+       para que se reconstruya, y sin esta guarda el `data:` URI del mapa se
+       regeneraba varias veces por gesto. */
+    const signature = w + 'x' + h + ':' + r + ':' + edge + ':' + scale +
+      ':' + token(cs, '--lg-soft', 0.30)
+    if (signature === sig) return true
+    sig = signature
+
+    /* Cuánto se suaviza el mapa, en proporción al grosor de la lente. Era 0.70
+       fijo y ese número se estaba comiendo el efecto: el desenfoque promedia la
+       rampa con el gris neutro de los dos lados, así que los valores fuertes no
+       sobreviven. Medido sobre el mapa ya desenfocado, en un panel de 375 con
+       lente de 56: a 0.70 el desplazamiento real era de 21 px cuando el mapa
+       crudo prometía 45. Bajarlo conserva la pendiente y con ella la
+       refracción. Ver la tabla en docs/01-velo-negro.md. */
+    const soft = Math.max(edge * token(cs, '--lg-soft', 0.30), 2).toFixed(2)
     const uri = displacementMap(w, h, r, edge)
 
     node.setAttribute('filterUnits', 'userSpaceOnUse')
@@ -104,9 +167,20 @@ export function useGlassLens(elRef) {
     node.innerHTML =
       '<feImage href="' + uri + '" x="0" y="0" width="' + w + '" height="' + h + '" ' +
         'preserveAspectRatio="none" result="map"/>' +
-      '<feGaussianBlur in="map" stdDeviation="' + soft + '" result="mapSoft"/>' +
+      '<feGaussianBlur in="map" stdDeviation="' + soft + '" result="mapBlur"/>' +
+      /* el «fuera» del mapa, en neutro — ver la nota 5 de arriba */
+      '<feFlood flood-color="#808080" flood-opacity="1" result="neutral"/>' +
+      '<feComposite in="mapBlur" in2="neutral" operator="over" result="mapSoft"/>' +
       '<feDisplacementMap in="SourceGraphic" in2="mapSoft" scale="' + scale + '" ' +
         'xChannelSelector="R" yChannelSelector="G"/>'
+
+    /* Sólo AHORA, con el filtro ya lleno, se enchufa. Ver la nota 4 de arriba. */
+    if (!lensed) {
+      el.style.setProperty('--lg-lens', 'url(#' + id + ')')
+      el.classList.add('is-lensed')
+      lensed = true
+    }
+    return true
   }
 
   onMounted(() => {
@@ -115,15 +189,54 @@ export function useGlassLens(elRef) {
     node = document.createElementNS(NS, 'filter')
     node.setAttribute('id', id)
     defsRoot().appendChild(node)
-    el.style.setProperty('--lg-lens', 'url(#' + id + ')')
-    el.classList.add('is-lensed')
+
+    /* El de siempre: ancho, alto y radio cambian → el mapa se rehace. */
     ro = new ResizeObserver(sync)
     ro.observe(el)
+
+    /* El que rescata a los paneles de `v-show`. Un elemento en `display: none`
+       no interseca con nada; en cuanto se muestra, interseca, y ahí es cuando
+       por fin se puede medir. Es el único observador que se entera de ese
+       cambio — el ResizeObserver no emite ni al ocultarse ni al volver. */
+    if (typeof IntersectionObserver !== 'undefined') {
+      io = new IntersectionObserver(entries => {
+        if (entries.some(e => e.isIntersecting)) sync()
+      })
+      io.observe(el)
+    }
+
+    /* Y el cinturón, además de los tirantes. Los dos observadores de arriba
+       entregan sus callbacks dentro del ciclo de render del navegador: si la
+       pestaña está en segundo plano ese ciclo no corre y ninguno de los dos
+       dispara — comprobado. El MutationObserver no depende de eso, va por
+       microtarea, y `v-show` es exactamente una mutación del atributo `style`.
+       Con esto un panel de `v-show` recibe su lente en el mismo turno en que
+       se muestra, pinte el navegador o no. */
+    if (typeof MutationObserver !== 'undefined') {
+      mo = new MutationObserver(() => sync())
+      mo.observe(el, { attributes: true, attributeFilter: ['style', 'class'] })
+    }
+
+    /* Y el cuarto, para las piezas que aparecen por MEDIA QUERY.
+       La barra de escritorio nace en `display: none` cuando la página carga en
+       ancho de teléfono, así que su primer `sync()` no mide nada. Cuando la
+       ventana se ensancha y la media query la muestra, no hay mutación de
+       atributo que ver — el `display` lo cambia una regla CSS, no el DOM —, y
+       los otros dos observadores entregan dentro del ciclo de render. El evento
+       `resize` no depende de nada de eso y siempre acompaña al cambio de media
+       query, que es exactamente cuando hay algo nuevo que medir.
+
+       Es barato: la guarda de firma corta en seco si nada cambió. */
+    window.addEventListener('resize', sync)
+
     sync()
   })
 
   onBeforeUnmount(() => {
     ro && ro.disconnect()
+    io && io.disconnect()
+    mo && mo.disconnect()
+    window.removeEventListener('resize', sync)
     node && node.remove()
   })
 

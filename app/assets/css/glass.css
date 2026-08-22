@@ -19,6 +19,11 @@
   --lg-r:        var(--lg-r-base);   /* radio                    */
   --lg-edge:     26px;   /* grosor de la lente                   */
   --lg-scale:    82;     /* compresión del filo (va negativo)    */
+  /* Cuánto se suaviza el mapa, en proporción a la lente. NO es cosmético: el
+     desenfoque promedia la rampa con el neutro de los lados, así que un valor
+     alto se come la refracción. Estuvo en 0.70 y con él un panel que prometía
+     45 px de desplazamiento entregaba 21. Ver docs/01-velo-negro.md. */
+  --lg-soft:     0.30;
   --lg-aberr:    0;      /* aberración cromática en %            */
 
   /* ── materia ──────────────────────────────────────────────── */
@@ -28,11 +33,17 @@
 
   /* ── velo ─────────────────────────────────────────────────── */
   --lg-veil:     14, 14, 15;   /* #0E0E0F                        */
-  --lg-veil-a:   0.35;         /* opacidad                       */
+  /* 0.45, subido desde el 0.35 original. Con 0.35 y el brillo en 0.85 pasaba
+     el 55% del fondo y las superficies leían claras — y el velo no está para
+     dejar ver el fondo, está para que se lea lo que va ENCIMA. A 0.45 pasa el
+     47%. */
+  --lg-veil-a:   0.45;         /* opacidad                       */
   --lg-veil-c:   1;            /* cobertura: 0 filos · 1 uniforme */
 
   /* ── luz ──────────────────────────────────────────────────── */
   --lg-spec:     0.85;   /* filo especular                       */
+  --lg-halo:     0,0,0;         /* el halo que despega al glifo  */
+  --lg-glow:     255,255,255;   /* el brillo bajo el glifo       */
   --lg-elev:     0.80;   /* elevación → sombra exterior          */
   --lg-ang:      135deg; /* lo reescribe el ratón en runtime     */
 
@@ -111,6 +122,81 @@
 
 .av-glass__body{ position: relative; z-index: 3 }
 
+/* ══ VARIANTES ═══════════════════════════════════════════════════════════
+   Conjunto CERRADO. Viven AQUÍ, junto al material, y no en el CSS de cada
+   componente — que es de donde venían y por eso había dos paneles repitiendo
+   los mismos tres números a mano, con el riesgo de que se separaran.
+
+   Una variante NO es un material nuevo: es el mismo Velo negro con unos pocos
+   tokens movidos. Lo que no se nombra, se hereda — esa es toda la herencia que
+   hace falta, porque el material ya está escrito entero en custom properties.
+
+   LA REGLA para crear una: una variante existe cuando VARIOS tokens tienen que
+   moverse JUNTOS y quedarse sincronizados. Si sólo cambia uno — el radio de una
+   píldora, por ejemplo — eso es el prop `radius` o una línea de CSS, no una
+   variante. Dos formas de hacer lo mismo es justo el desorden que esto viene a
+   quitar.
+
+   Se combinan: `class="av-glass--panel av-glass--light"` es un panel claro. */
+
+/* ── PANEL ─ superficie que se come la pantalla ──────────────────────────
+   El menú y el buscador. Tres tokens que se mueven juntos y por el mismo
+   motivo: el tamaño de la pieza.
+
+   `--lg-r: 0` porque va a sangre y no tiene esquina que enseñar. Y con radio 0
+   la lente se queda en una banda RECTA pegada al borde físico, así que hay que
+   ensancharla o no se ve: a 26 px es el 19% de un panel de este tamaño, a 56 es
+   el 40%. Más de 56 tampoco — el desenfoque del mapa (`edge × 0.70`) invade el
+   núcleo neutro y la refracción de borde se convierte en un zoom global. La
+   cuenta está en docs/01-velo-negro.md. */
+.av-glass--panel{
+  --lg-r:     0px;
+  --lg-edge:  80px;
+  /* El recorrido completo, porque costó y conviene no repetirlo: 145 daba 54 px
+     de desplazamiento y PLEGABA la imagen sobre sí misma en un 11.5% del ancho;
+     80 daba 30 px sin pliegue; 50 da 19 px. Cada bajada se pidió mirando el
+     resultado, no calculando. Aquí la deformación es un acento del filo, no el
+     tema — el centro tiene que quedar limpio y el fondo reconocible.
+
+     El pliegue aparece por encima de 126. Muy por debajo, así que hay sitio de
+     sobra si alguna vez hay que volver a subir. */
+  --lg-scale: 50;
+  --lg-soft:  0.30;
+}
+
+/* ── LIGHT ─ velo BLANCO en vez de negro ─────────────────────────────────
+   Para piezas que tienen que leerse como luz y no como sombra — botones sobre
+   fondo oscuro, por ejemplo.
+
+   No basta con cambiar el velo: lo que va ENCIMA tiene que invertirse a la vez
+   o queda texto blanco sobre vidrio blanco. Por eso la variante mueve las dos
+   cosas en el mismo bloque, y por eso es una variante y no una línea suelta.
+
+   El especular se queda blanco a propósito y sube a 1: sobre un velo claro el
+   filo necesita más para despegarse, y sigue siendo LUZ, que es lo que es. */
+.av-glass--light{
+  --lg-veil:   255,255,255;
+  --lg-veil-a: 0.16;
+  --lg-bri:    1.10;
+  --lg-spec:   1;
+  --lg-halo:   255,255,255;   /* el halo se invierte con el velo */
+  --lg-glow:   0,0,0;
+
+  /* y el contenido, a tinta */
+  --av-on-glass:        rgba(14,14,15,.72);
+  --av-on-glass-strong: var(--av-ink);
+  --av-on-glass-hover:  rgba(14,14,15,.10);
+  --av-on-glass-hair:   rgba(14,14,15,.14);
+}
+/* La selección sobre velo claro no puede ser «más luz»: no hay hacia dónde
+   subir. Se marca oscureciendo, que es la misma idea al revés. */
+.av-glass--light .av-glass-sel{
+  --sel-tint: 14,14,15;
+  --sel-a:    0.10;
+  -webkit-backdrop-filter: blur(2px) brightness(.88) saturate(1.04);
+          backdrop-filter: blur(2px) brightness(.88) saturate(1.04);
+}
+
 /* ── la seleccion ──────────────────────────────────────────────────────────
    El item activo de una barra. La regla general del material dice que lo que
    va encima del vidrio se resuelve con relleno solido — esta es la UNICA
@@ -171,11 +257,14 @@
    100%. El halo oscuro es lo que los salva cuando por detrás
    pasa algo claro — el vidrio limpio no garantiza contraste.    */
 .av-glyph{
-  color: #FFFFFF;
+  /* Sigue al token del contenido en vez de a un blanco fijo: así una variante
+     de velo claro invierte glifo y texto con la misma línea. El halo también
+     va por token — sobre velo blanco un halo negro ensucia. */
+  color: var(--av-on-glass-strong);
   opacity: .72;
   filter:
-    drop-shadow(0 0 3px rgba(0,0,0,.80))
-    drop-shadow(0 1px 1px rgba(255,255,255,.22));
+    drop-shadow(0 0 3px rgba(var(--lg-halo, 0,0,0), .80))
+    drop-shadow(0 1px 1px rgba(var(--lg-glow, 255,255,255), .22));
   transition: opacity .25s ease, color .28s ease;
 }
 .av-glyph.is-active{ opacity: 1 }

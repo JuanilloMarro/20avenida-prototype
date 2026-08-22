@@ -295,3 +295,299 @@ todos los niveles y las etiquetas siguen alineadas.
 «Filtros» tenía 10 px de relleno lateral que «Menú» no tenía. Fuera: los dos
 cuelgan del padding de `__body`. Las filas sí van 13 px más adentro, porque una
 fila tiene fondo al pasar por encima y un título no tiene caja.
+
+**2026-08-22 · REVERTIDO · los paneles vuelven a ir a sangre.**
+Hubo un rato en que flotaban con margen y radio del sistema, para devolverles el
+filo curvo por donde la lente pudiera doblar. Se descartó: los paneles tienen que
+abarcar la pantalla entera, sin bordes. La deformación se resuelve por otro
+lado — ver la entrada de abajo.
+
+**2026-08-22 · `--lg-edge: 132` en los dos paneles a pantalla completa.**
+Única desviación del preset, escrita en el CSS y aquí. Con los 26 px oficiales
+el mapa sólo refractaba el **19%** de la superficie — una franja recta pegada al
+bisel — contra el 72% de la barra y el 90% de un botón; se leía como pura
+transparencia, que es lo que se reportó dos veces. 132 pide la lente más ancha
+que el material permite y el tope 1 la recorta a `34% del lado corto` (127.5 en
+un 375): cubre el **78%**, y con el suavizado del mapa a 89 px la deformación
+recorre el panel entero en vez de morir en el filo. El tope NO se toca — está
+para que ninguna pieza se deforme entera. La compresión tampoco: sigue en 82.
+
+**2026-08-22 · El panel de búsqueda nunca tuvo deformación de superficie.**
+Se buscó en el historial porque se recordaba haberla visto. No existe tal commit:
+`useGlassLens.js` nació en `1a78cf3` (el primero) y no se ha modificado nunca,
+`--lg-edge` vale 26 px desde ese mismo commit, y `.av-search` nació en `d2e8a40`
+ya con `inset: 0` y `--lg-r: 0`. Lo que se veía era la banda de 26 px del
+perímetro. Queda escrito para no volver a buscarlo.
+
+**2026-08-22 · La lente no se enchufa hasta haber medido.**
+`--lg-lens` y `is-lensed` sólo se ponen con el `<filter>` ya lleno. Un filter
+vacío referenciado desde `backdrop-filter` deja el backdrop transparente y tira
+la cadena entera — adiós lente, desenfoque, saturación y brillo. Y tres
+observadores en vez de uno: `ResizeObserver`, `IntersectionObserver` y
+`MutationObserver`. El tercero porque los dos primeros entregan dentro del ciclo
+de render, y con la pestaña en segundo plano ese ciclo no corre — un panel de
+`v-show` se quedaba sin lente hasta que se pintara.
+
+**2026-08-22 · `min-width: 0` en el cuerpo del panel.**
+El panel es un flex en fila y su cuerpo es el ítem: con el `auto` por defecto no
+podía encoger por debajo de su contenido más ancho. A sangre (375) sobraba
+sitio y no se veía; al flotar (343) el cuerpo se quedaba en 370 y las tarjetas
+de resultado salían por el filo derecho. Es el mismo motivo que el `min-height`
+que ya estaba, en el otro eje.
+
+**2026-08-22 · La lente del buscador no existía hasta que redimensionabas.**
+El síntoma que se reportó tres veces — «parece sólo transparencia» — no era de
+calibración: la lente **no se estaba aplicando**. Se resolvió comparando dos
+capturas del mismo panel: en una el texto del fondo salía deformado («Samba OG»
+se leía «wa the OG») y en la otra nítido. La pista fue que medían **351 y 383 px
+de ancho**: entre las dos hubo un resize, y el resize despertaba al
+`ResizeObserver` que construye el filtro.
+
+Causa: `.av-search` vive con `v-show`, o sea que nace en `display: none`, y ahí
+`offsetWidth` es 0 — el filtro no se llega a construir. Ninguno de los tres
+observadores lo rescata de forma fiable: el de tamaño y el de intersección
+entregan dentro del ciclo de render, y el de mutaciones depende de que el
+`style` cambie de una forma concreta.
+
+Arreglo: `<GlassSurface>` **expone `sync()`** y `openSearch()` lo llama en el
+`nextTick` de mostrarse. Quien abre el panel es el único que sabe con certeza
+cuándo hay algo que medir. Los observadores se quedan para el resto de casos.
+
+**2026-08-22 · `--lg-scale: 90` en los dos paneles, y la lección que deja.**
+`feDisplacementMap` mueve como mucho `scale / 2` píxeles: 45 px, apenas por
+encima de los 41 del preset oficial.
+
+El recorrido fue 82 → 240 → 180 → 90, y todo el tramo de subida se hizo a ciegas
+persiguiendo el síntoma equivocado. **La compresión nunca fue el problema.** En
+cuanto la lente se construyó de verdad (ver la entrada anterior), la
+deformación se vio igual de bien a 90 que a 240 — y se habría visto a 82. Regla
+para quien venga detrás: **si no se ve deformación, la lente no se está
+aplicando; no es que doble poco.** El sitio donde mirar es si el `<filter>`
+existe y tiene primitivas dentro, no este número.
+
+La desviación que sí hace falta es `--lg-edge`, por el tamaño del panel. La
+barra y los botones no se tocan: siguen en los 26 y 82 oficiales.
+
+**2026-08-22 · El mapa de la lente deformaba sólo por un lado.**
+Bug desde el primer commit, invisible hasta que la lente se ensanchó. El
+`feGaussianBlur` del mapa difumina hacia fuera, y fuera es negro transparente
+(`0`), no gris neutro (`128`). El borde izquierdo ya valía 0 y no cambiaba; el
+derecho valía 255 y se arrastraba hacia 0. Medido: **45 px de deformación a la
+izquierda contra 0.2 a la derecha.** Arreglo: `feFlood` + `feComposite over`
+antes del `feDisplacementMap`. Verificado sobre el mapa rasterizado — izquierda
++44.6, derecha −44.6, arriba +44.6, abajo −44.6, centro −0.2.
+
+**2026-08-22 · `--lg-edge: 56` — la lente ancha causaba zoom, no deformación.**
+A 132 el desenfoque del mapa (89, alcance 268) se comía el núcleo neutro del
+panel (60 libres). La rampa dejaba de ser un efecto de borde y recorría toda la
+superficie: el fondo se muestreaba de 45 a 330 px sobre 375 de ancho, o sea un
+**zoom de 1.32×**. Se leía como fondo ampliado, no deformado. 56 es el grosor
+mayor que deja el núcleo intacto en un 375 (alcance 118 contra 132 libres):
+centro a escala 1:1, deformación concentrada en el filo, 40% de la superficie.
+La cuenta queda en la tabla de 01-velo-negro.md.
+
+**2026-08-22 · El menú y el buscador comparten la MISMA configuración de vidrio.**
+Se compararon los once parámetros del material en los dos paneles y el único
+campo que difiere es el id del filtro, que es por instancia y tiene que ser
+distinto. Además el menú recibe ahora la misma llamada explícita a
+`glass.sync()` al abrirse que el buscador. No la necesita — se monta con `v-if`,
+ya visible, y se sincroniza solo — pero la lleva a propósito: en cuanto uno de
+los dos se abre por un camino distinto, el material empieza a divergir.
+
+**2026-08-22 · REVERTIDO · aligerar el velo en los paneles.**
+Se bajó el velo de 0.35 a 0.12 y el brillo de 0.85 a 0.95 en los dos paneles,
+buscando parecerse a la referencia de Apple — donde el vidrio está casi limpio
+y la barra azul se lee entera a través del centro. Fuera en el acto: **el velo
+no está para dejar ver el fondo, está para que se lean las OPCIONES que van
+encima.** Con 0.12 el menú dejaba de leerse.
+
+Queda la regla: de la referencia de Apple se copia **la deformación del filo y
+nada más**. El centro limpio de esa imagen es un lente flotando sobre contenido;
+esto es un panel de navegación a pantalla completa, y lo que va encima manda
+sobre lo que se ve detrás.
+
+**2026-08-22 · El material se hace POLIMÓRFICO, con variantes cerradas.**
+Hasta hoy no había variantes por principio — la nota decía que un prop de velo
+o de polaridad rompería la estandarización. Sigue siendo verdad de un prop
+LIBRE, pero lo que apareció en su lugar fue peor: `.av-menu` y `.av-search`
+repitiendo a mano `--lg-r`, `--lg-edge` y `--lg-scale` en su CSS scoped, con la
+única garantía de que alguien se acordara de tocar los dos a la vez.
+
+Ahora hay un conjunto **cerrado** en `glass.css` y un prop `variant` validado
+contra él: `panel` y `light`. Regla para añadir: sólo si VARIOS tokens tienen
+que moverse juntos. Un token suelto es el prop `radius` o una línea de CSS —
+dos formas de hacer lo mismo es el desorden que esto viene a quitar.
+
+Consecuencia técnica: `.av-glyph` deja de pintar `#FFFFFF` fijo y pasa a
+`var(--av-on-glass-strong)`, y su halo a `--lg-halo` / `--lg-glow`. Sin eso una
+variante de velo claro dejaba glifos blancos sobre vidrio blanco. Verificado:
+con `light` el glifo pasa de `rgb(255,255,255)` a `rgb(14,14,15)` y el halo se
+invierte.
+
+**2026-08-22 · Los botones de la barra llevan velo BLANCO (`variant="light"`).**
+La barra de móvil y los tres botones sueltos de escritorio — son los mismos
+botones, así que el mismo velo. Son la pieza con la que se interactúa y `light`
+los pone del lado de la luz en vez del de la sombra. Verificado: velo
+`255,255,255 @ 0.16`, glifos a `rgb(14,14,15)`, halo invertido a blanco, y la
+lente sigue viva. La burbuja amarilla del contador no se toca — ya iba con
+tinta encima.
+
+**2026-08-22 · Por qué el menú parece no tener liquid, y no es que no lo tenga.**
+Se comparó con el buscador hasta el fondo: mismas clases (`av-glass--panel`),
+mismos tokens, mismas tres capas con la misma caja y la misma `backdrop-filter`,
+mismo padre, cadena de ancestros idéntica y lo mismo pintado por encima. La
+única diferencia es el `z-index` y el id del filtro, que tiene que ser distinto.
+
+Lo que SÍ difiere es cuánto tapa el contenido el anillo que deforma. Medido, con
+un anillo de 56 px:
+
+| panel | piezas con tinta | pisando el anillo |
+|---|---|---|
+| menú | 11 | **11 (100%)** |
+| buscador · sugerencias | 4 | 4 (100%) |
+| buscador · resultados | 12 | 4 (**33%**) |
+
+Las filas del menú ocupan el ancho completo, así que el icono de cada una cae en
+la banda izquierda y su chevron en la derecha. El anillo está ahí y deforma,
+pero va lleno de contenido. En el buscador con resultados las tarjetas son
+sólidas y viven en el núcleo, que deja el anillo despejado.
+
+Si alguna vez hace falta que el menú lea como el buscador, la palanca es el
+relleno lateral de `.av-menu__body` (hoy 16, el anillo 56), no el material.
+
+**2026-08-22 · El coeficiente de desenfoque del mapa era lo que mataba la lente.**
+`soft = edge × 0.70`, fijo en el composable desde el primer commit. El
+desenfoque promedia la rampa con el gris neutro de los dos lados, así que los
+valores fuertes no sobreviven: **con lente de 56 el mapa crudo prometía 45 px de
+desplazamiento y el mapa ya desenfocado entregaba 21.** Durante días se midió el
+mapa CRUDO y se reportó una deformación que no existía.
+
+Ahora es un token, `--lg-soft`, y vale 0.30. Barrido medido sobre el mapa
+rasterizado y desenfocado de verdad, en un panel de 375×812:
+
+| lente | coef | desplazamiento real |
+|---|---|---|
+| 56 | 0.70 | 29 px |
+| 56 | 0.45 | 41 px |
+| 80 | 0.70 | 27 px |
+| **80** | **0.30** | **47 px** |
+| 127 | 0.70 | 22 px |
+
+**2026-08-22 · La variante `panel` queda en `edge 80 · scale 80 · soft 0.30`.**
+Pasó por `scale 145`, que daba 54 px y **plegaba** la imagen sobre sí misma en
+un 11.5% del ancho — un lente real hace eso en su bisel, pero leía como exceso.
+A 80 el desplazamiento baja a 30 px y el pliegue desaparece del todo. Sin
+pliegue mientras se quede por debajo de 126.
+
+**2026-08-22 · REVERTIDO · `variant="light"` en la barra.**
+Se probó y se descartó: la barra dejaba de leerse como parte del sistema. Vuelve
+al velo negro. La variante se queda en `glass.css` para cuando haya botones que
+sí la quieran.
+
+**2026-08-22 · El menú pasa a `v-show`, y era eso lo que le faltaba.**
+Se reportó cinco veces que el menú no tenía deformación cuando los demás sí.
+Todas las mediciones decían que su material era idéntico al del buscador — y lo
+era. La única diferencia estructural que quedaba era `v-if` contra `v-show`: con
+`v-if` el panel se monta y se destruye en cada apertura, así que su `<filter>`
+se crea y se borra cada vez y el navegador no llega a resolver la referencia del
+`backdrop-filter` contra un nodo recién aparecido. Con `v-show` el filtro se
+construye una vez y se queda, igual que en el buscador.
+
+Cuesta una instancia de vidrio de más en el árbol mientras el menú está
+cerrado. Es el mismo coste que ya pagaba el buscador, y oculta no compone nada.
+
+**2026-08-22 · El velo sube de 0.35 a 0.45.**
+Con 0.35 y el brillo en 0.85 pasaba el 55% del fondo y las superficies leían
+claras. A 0.45 pasa el 47%. Vale para todo el material, no sólo para los
+paneles: el velo no está para dejar ver el fondo, está para que se lea lo que va
+encima — la misma razón por la que se revirtió el intento de bajarlo a 0.12.
+
+**2026-08-22 · `--lg-scale` de la variante `panel`: 145 → 80 → 50.**
+Las tres bajadas se pidieron mirando el resultado, no calculando. Donde quedó:
+
+| scale | desplazamiento | pliegue |
+|---|---|---|
+| 145 | 54 px | 11.5% |
+| 80 | 30 px | 0% |
+| **50** | **19 px** | **0%** |
+
+En estos paneles la deformación es un acento del filo, no el tema: el centro
+tiene que quedar limpio y el fondo reconocible. El pliegue aparece por encima de
+126, muy lejos, así que hay sitio de sobra para volver a subir.
+
+**2026-08-22 · El material `panel` deja de ser exclusivo del teléfono.**
+El CSS de `.av-menu` vivía DENTRO de `@media (max-width: 900px)`, así que la
+variante `panel` —la de la lente de 80 px sin recortar— sólo existía por debajo
+de ese ancho. Escritorio y tableta se quedaban con las píldoras de la barra,
+donde el **tope 1** (`lente ≤ 34% del lado corto`) recorta 26 px a **19.7** sobre
+una pieza de 58 de alto. No era una diferencia de tamaño: era otro material.
+
+| pieza | alto | `--lg-edge` pedido | lente real | compresión real |
+|---|---|---|---|---|
+| píldora / botón / barra | 58 | 26 | **19.7** | −63.1 |
+| panel (menú, buscador) | 812–910 | 80 | **80** | −50 |
+
+Dos cambios, y ninguno toca el material:
+
+1. `.av-menu` sale del `@media`. Es la misma pieza en los tres anchos y quien
+   decide si se ve es `v-show`, igual que en el buscador.
+2. La barra de escritorio gana el icono de **Buscar**. Era el eslabón que
+   faltaba: el panel ya funcionaba a cualquier ancho, pero por encima de 900 px
+   no había ningún botón que lo abriera.
+
+El **⋯ NO** se añade a escritorio: el menú de tres puntos es una pieza de
+teléfono. Arriba los enlaces se ven enteros en la píldora del centro, así que un
+botón que los volviera a esconder sobraría. El menú sigue existiendo sólo en la
+barra de teléfono.
+
+Y `.av-nav` gana `.is-away`, la misma regla que ya tenía `.av-bar`: con un panel
+abierto la barra se esconde con `visibility`. Además del motivo de siempre —no
+queda nada más que tocar— hay uno del material: el panel es `backdrop-filter`
+sobre todo lo que tiene debajo, así que una barra que siguiera ahí se vería
+refractada DENTRO del panel, que es vidrio detrás de vidrio.
+
+**2026-08-22 · El relleno de `.av-nav__link` pasa a `clamp(12px, 1.4vw, 20px)`.**
+Con cuatro iconos en vez de tres, la barra de acciones creció 68 px y el punto
+en que la píldora dejaba de caber subió de ~924 a ~992 — justo dentro de la
+banda de tableta, donde se recortaba «Cuenta». Los enlaces son `nowrap` y la
+píldora vive en una columna `minmax(0, 1fr)`: al no caber no se encogen, se
+salen. A 1440 —el ancho de referencia— `1.4vw` da 20.2 y el tope de 20 manda, así
+que ahí no cambia nada.
+
+**2026-08-22 · Iconos en la píldora de escritorio, y el corte sube a 1023.**
+Los enlaces de la barra de arriba llevan ahora el mismo `item.icon` que las
+filas del menú de teléfono, a 16 px — menos que los 21 de un botón de acción,
+donde el icono ES el botón; aquí acompaña a una letra de 13.5 y tiene que pesar
+menos que ella.
+
+El icono cuesta 143 px de píldora (579 → 722 a 1440). Eso saca la disposición de
+escritorio de la banda 900–1023, donde ya no cabe: el mínimo de la píldora con
+iconos es 591 px y a 920 sólo quedan 498 libres. El corte pasa de 900 a **1023**,
+elegido para que la tableta en horizontal (1024) entre en escritorio con margen
+y no justo en el filo. Por debajo queda la barra de teléfono, que es una
+disposición completa y aprobada, no un escritorio recortado.
+
+El coste, escrito para que se vea: la banda 768–1023 —tableta en vertical—
+ahora enseña la barra de teléfono, una píldora de 320 px en medio de la
+pantalla. Si eso molesta, lo que hay que mover no es el corte sino la píldora:
+con seis etiquetas no hay más sitio del que hay.
+
+Para que quepa en 1024 hay cuatro medidas fluidas, y todas **atadas a los dos
+extremos** en vez de a un `vw` suelto — 1440 da el valor aprobado, 1024 el
+mínimo que cabe:
+
+| | 1440 | 1024 | expresión |
+|---|---|---|---|
+| relleno lateral del enlace | 20 | 10 | `clamp(10px, 2.4vw - 14.6px, 20px)` |
+| hueco icono ↔ texto | 8 | 6 | `clamp(6px, 1.2vw - 7.3px, 8px)` |
+| rejilla de la barra | 16 | 10 | `clamp(10px, 1.44vw - 4.8px, 16px)` |
+| entre botones de acción | 10 | 6 | `clamp(6px, .96vw - 3.9px, 10px)` |
+
+Un `1.4vw` limpio no vale: el `clamp` mide el ancho de la VENTANA, no el hueco
+que le queda a la píldora. A 1024 daba 14.3 px de relleno y la píldora se pasaba
+27 — recortando «Cuenta», porque los enlaces son `nowrap` y la píldora vive en
+una columna `minmax(0, 1fr)`, así que al no caber no se encogen: se salen.
+
+Medido, sin recorte en ningún ancho: 1024 → 29 px libres · 1100 → 75 · 1280 →
+179 · 1440 → 284.
+

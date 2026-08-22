@@ -18,14 +18,46 @@ La única superficie de vidrio del sistema. Todo lo que flota pasa por aquí.
 |---|---|---|---|
 | `radius` | Number | `0` | px. 0 = el token `--lg-r` (18). **999 = píldora** |
 | `tag` | String | `'div'` | la etiqueta que renderiza |
+| `variant` | String | `''` | una o varias variantes, separadas por espacio |
 
 ```vue
 <GlassSurface :radius="999" tag="nav"> … </GlassSurface>
+<GlassSurface variant="panel"> … </GlassSurface>
+<GlassSurface variant="panel light"> … </GlassSurface>
 ```
 
 Con `999` el composable lo recorta solo a `min(w, h) / 2`: no hay que calcular
-nada. Y **no hay prop de material** — si hiciera falta, el material dejaría de
-ser estandarizado.
+nada.
+
+Expone **`sync()`** por `defineExpose`: reconstruye la lente. Lo necesita quien
+muestre un panel con `v-show` — nace en `display: none`, no hay nada que medir,
+y ningún observador rescata ese caso de forma fiable.
+
+#### Variantes — conjunto CERRADO
+
+Viven en `glass.css`, junto al material, **no** en el CSS de cada componente. Es
+de ahí de donde venían, y por eso llegó a haber dos paneles repitiendo a mano
+los mismos tres tokens sin nada que los mantuviera sincronizados. Eso no es un
+material estandarizado, es uno copiado.
+
+| variante | qué mueve | para qué |
+|---|---|---|
+| `panel` | `--lg-r: 0` · `--lg-edge: 80` · `--lg-scale: 50` | superficie a pantalla completa — menú, buscador |
+| `light` | velo **blanco**, brillo, especular, halo y los cuatro `--av-on-glass-*` a tinta | piezas que deben leerse como luz — **los botones de la barra**, en las dos disposiciones |
+
+Una variante **no es un material nuevo**: es el mismo Velo negro con unos pocos
+tokens movidos. Lo que no se nombra, se hereda — y esa es toda la herencia que
+hace falta, porque el material ya está escrito entero en custom properties.
+
+**La regla para crear una:** existe cuando **varios** tokens tienen que moverse
+juntos y quedarse sincronizados. Si sólo cambia el radio, eso es el prop
+`radius` o una línea de CSS. Dos formas de hacer lo mismo es justo el desorden
+que esto viene a quitar.
+
+`light` es el ejemplo de por qué la regla importa: no basta con cambiar el velo,
+porque lo que va **encima** tiene que invertirse a la vez o queda texto blanco
+sobre vidrio blanco. Velo, halo del glifo y tokens de contenido se mueven en el
+mismo bloque.
 
 Cuatro capas: `__back` (refracción + desenfoque) · `__veil` (el velo negro) ·
 `__spec` (filo especular, sigue al ratón) · `__body` (el contenido).
@@ -56,11 +88,44 @@ Emite `select(id)`, `open(id)` (`bag` · `wishlist` · `account`), `search` y
 `filter({ node, path, ids, to })` — el camino entero hasta la hoja elegida y a
 dónde lleva.
 
-#### El menú de móvil — el panel del ⋯
+#### Qué pieza lleva qué material
 
-**A pantalla completa**, la misma caja que el buscador: `inset: 0`, sangre,
-`--lg-r: 0` y el mismo padding que esquiva notch y barra de gestos. Cierra con
-la X de su cabecera; sin velo detrás, porque ya no hay fuera.
+Uno solo, «Velo negro», y **dos cajas** que lo piden con distinto grosor de
+lente. La diferencia no la elige nadie: la impone el **tope 1** del material
+(`lente ≤ 34% del lado corto`), y por eso las piezas bajas nunca llegan a los 80.
+
+| pieza | caja | `--lg-edge` pedido | lente real | compresión real |
+|---|---|---|---|---|
+| píldora · botón de acción · barra de teléfono | 58 de alto | 26 (base) | **19.7** | −63.1 |
+| menú y buscador | pantalla completa | 80 (`variant="panel"`) | **80** | −50 |
+
+**Los mismos números en los tres anchos.** Un teléfono de 375 y un escritorio de
+1440 abren el MISMO elemento y obtienen la misma lente: nada del material
+depende de la media query, y nada debe hacerlo. Si alguna vez un panel se ve
+distinto arriba y abajo, el fallo está en dónde vive su CSS, no en el material —
+ver `20-decisiones.md`, 2026-08-22.
+
+#### El panel a pantalla completa — menú y buscador
+
+**A SANGRE** — `inset: 0`, sin bordes ni radio, y el mismo padding que esquiva
+notch, barra de gestos y teclado. Cierran con la X de su cabecera; sin velo
+detrás, porque no hay fuera. El CSS de los dos vive **fuera de todo `@media`**:
+quien decide si se ven es `v-show`.
+
+Con los 26 px de la base, la banda que refracta era el **19%** de una superficie
+de este tamaño, recta y pegada al bisel: sólo se leía velo y desenfoque. Los 80
+de la variante caben enteros aquí (el tope daría hasta 127 en un teléfono de
+375), y el suavizado del mapa los funde con el centro.
+
+**Quién los abre:** el buscador, desde la lupa — que está en las dos barras. El
+menú, sólo desde el ⋯ de la barra de teléfono; en escritorio los enlaces ya se
+ven enteros en la píldora, así que no hay ⋯ arriba.
+
+> Nota histórica, porque se buscó y no estaba: este panel **nunca** tuvo
+> deformación en toda su superficie. `useGlassLens.js` nació en el primer commit
+> y no se ha tocado desde entonces; `--lg-edge` vale 26 px desde ese mismo
+> commit; y `.av-search` nació ya con `inset: 0` y `--lg-r: 0`. Lo que se veía
+> antes era la banda de 26 px del perímetro.
 
 Dentro, dos cosas y en este orden:
 
@@ -118,17 +183,41 @@ Valen para todo, no sólo para la barra:
   escrita: el input del buscador va a 16 px porque por debajo iOS hace zoom solo
   al enfocar, y la burbuja de un contador, que es un número y no texto.
 
-**Cinco piezas separadas, no una barra:** marca · píldora de enlaces · tres
-botones. Cada una es su propia `GlassSurface`.
+**Seis piezas separadas, no una barra:** marca · píldora de enlaces · cuatro
+botones (buscar · bolsa · favoritos · cuenta). Cada una es su propia
+`GlassSurface`.
 
-- **La marca va FUERA de la píldora**, en su propio panel circular. Dentro sería
-  vidrio sobre vidrio.
-- **Las cinco miden `--av-nav-h` = 46 px.** Un solo token: cambiarlo mueve las
-  cinco a la vez. A 46 px los topes recortan la lente a 15.6 y la compresión a
-  50.0 — la regla del material actuando, no una excepción.
+- **La marca va FUERA de la píldora.** Dentro sería vidrio sobre vidrio.
+- **Todas miden `--av-nav-h` = 58 px.** Un solo token: cambiarlo las mueve a la
+  vez. A 58 los topes recortan la lente a 19.7 y la compresión a 63.1 — la regla
+  del material actuando, no una excepción.
 - **Una píldora de 900 px** obligaría a regenerar un mapa de desplazamiento de
-  900 px en cada resize. Tres piezas pequeñas son tres mapas pequeños.
-- **El ítem activo es sólido**, `--av-solid-*`.
+  900 px en cada resize. Piezas pequeñas son mapas pequeños.
+- **El ítem activo NO es sólido:** lleva `.av-glass-sel`, la única excepción
+  escrita del material (`01-velo-negro.md` §7). El texto no cambia.
+- **Cada enlace lleva su icono a 16 px**, el mismo `item.icon` que usan las filas
+  del menú de teléfono. Va en un `<span class="av-glyph">` propio y nunca en el
+  `<a>`: `.av-glyph` lleva `filter`, y un ancestro con `filter` es un backdrop
+  root — mataría el `backdrop-filter` de la selección que tiene al lado.
+
+**El corte entre disposiciones está en 1023 px**, no en 900. Seis etiquetas más
+seis iconos no caben con la marca y los cuatro botones por debajo de eso: el
+mínimo de la píldora es 591 px y a 920 sólo quedan 498 libres. A 1024 sobran 29
+en navegador de escritorio (44 en una tableta, que no gasta 15 en barra de
+scroll), y de ahí para arriba el margen sólo crece — 75 a 1100, 179 a 1280, 284
+a 1440.
+
+Para que quepa, tres medidas de la barra son **fluidas y atadas a los dos
+extremos** (1440 → el valor aprobado, 1024 → el mínimo que cabe), en vez de a un
+`vw` suelto: el `clamp` mide el ancho de la VENTANA, no el hueco que le queda a
+la píldora, así que la recta se apunta a mano.
+
+| | 1440 | 1024 |
+|---|---|---|
+| relleno lateral del enlace | 20 | 10 |
+| hueco icono ↔ texto | 8 | 6 |
+| hueco de la rejilla de la barra | 16 | 10 |
+| hueco entre botones de acción | 10 | 6 |
 
 Es **`fixed`**, no `sticky`: sticky depende de que ningún ancestro tenga
 `overflow`, y en una tienda ese ancestro aparece tarde o temprano. El contenido
