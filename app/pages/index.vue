@@ -11,11 +11,24 @@
  * aunque por debajo pase una sección clara y luego una oscura. Se borra en
  * cuanto la landing tenga contenido real.
  */
+
+/* La ruta de producto todavía no existe, así que de momento el acordeón sólo
+   dice a dónde iría. Cuando exista `/producto/:id`, esto es un `navigateTo`. */
+function onProducto(id) {
+  if (import.meta.dev) console.info('[acordeón] producto elegido:', id)
+}
 </script>
 
 <template>
   <div class="home">
     <ProductShowcase />
+
+    <!-- El acordeón entra JUSTO después del showcase, que se lleva 375vh de
+         carril: cuando esto aparece, su `sticky` ya soltó. -->
+    <ProductAccordion
+      :items="['jordan-pine', 'jordan-brood', 'jordan-ochre', 'jordan-chi']"
+      @select="onProducto"
+    />
 
     <!-- ── de aquí abajo, banco de pruebas del scroll ───────────────────── -->
     <div class="scrolltest">

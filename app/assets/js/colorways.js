@@ -37,9 +37,22 @@ const SAMBA_DETAILS = [
   '/products/samba/detail-2.webp',
 ]
 
+/**
+ * `short` — la palabra del texto gigante del acordeon.
+ *
+ * No vale `name` para eso: los cuatro paneles son el MISMO modelo, asi que los
+ * cuatro dirian «Samba OG» y el texto dejaria de distinguir nada. Lo que los
+ * separa es el colorway, y eso es lo que se pinta grande.
+ *
+ * En caja de frase, regla R1: ni `text-transform` ni escrito en versales.
+ *
+ * OJO con el nombre: el campo `word` de aqui abajo YA existe y es un COLOR —
+ * el del texto gigante del showcase. Por eso este se llama `short` y no `word`.
+ */
 export const COLORWAYS = {
   'samba-green': {
     name: 'Samba OG',
+    short: 'Verde',
     line: 'Collegiate Green · Off White · Gum',
     /* el color sólido del frame */
     surface: '#DCE5DA',
@@ -59,6 +72,7 @@ export const COLORWAYS = {
      plantilla y no un dibujo: cambia el colorway, no el template. */
   'samba-night': {
     name: 'Samba OG',
+    short: 'Noche',
     line: 'Collegiate Green · Night',
     surface: '#16261F',
     word: '#2B4A3B',
@@ -70,6 +84,87 @@ export const COLORWAYS = {
     frames: SAMBA_FRAMES,
     details: SAMBA_DETAILS,
     price: '120$',
+  },
+
+  /* ── Air Jordan 1 ─ los cuatro del acordeón ─────────────────────────
+     Cuatro colorways del MISMO modelo, que es lo que pide un acordeón: lo que
+     se compara es el color, no el zapato. Las fotos venían ya con alfa de
+     verdad — no hizo falta `cutout-bg.py` — y se recortaron a una CAJA UNIÓN de
+     647×636 para los cuatro (la tinta mayor más 46 px de margen por lado). Eso es lo que hace que los cuatro se lean a la
+     misma escala: recortar cada uno a su propia caja normalizaría cada zapato
+     al mismo tamaño aparente y el salto se notaría al pasar de panel a panel.
+
+     `surface` es el plano de color del panel y sale del tono dominante del
+     propio zapato, muestreado de la foto. `ink` se invierte con él: claro sobre
+     los tres oscuros, oscuro sobre el ocre — no es una excepción de estilo, es
+     que el contraste manda y el ocre es claro.
+
+     `frames` trae UNA sola entrada: el acordeón usa `frames[0]` y estos no
+     tienen secuencia de scrollover. Si algún día la tienen, se añaden aquí y
+     ningún componente se entera.
+
+     PLACEHOLDER: el precio. 180$ es el de calle del modelo, no un precio de
+     20 Avenida. */
+
+  'jordan-pine': {
+    name: 'Air Jordan 1',
+    short: 'Pino',
+    line: 'Gorge Green · White',
+    surface: '#1E5B3E',
+    word: '#2D7351',
+    wordShadow: 'rgba(0, 0, 0, .18)',
+    ink: '#F2F7F3',
+    inkSoft: 'rgba(242, 247, 243, .62)',
+    hair: 'rgba(242, 247, 243, .24)',
+    accent: '#E8C547',
+    frames: [{ src: '/products/jordan/jordan-pine.webp', label: 'Perfil exterior' }],
+    price: '180$',
+  },
+
+  'jordan-brood': {
+    name: 'Air Jordan 1',
+    short: 'Orquídea',
+    line: 'Brotherhood · Purple · Gold',
+    surface: '#A8478E',
+    word: '#BE5FA2',
+    wordShadow: 'rgba(0, 0, 0, .18)',
+    ink: '#FBF3F8',
+    inkSoft: 'rgba(251, 243, 248, .62)',
+    hair: 'rgba(251, 243, 248, .24)',
+    accent: '#F0A830',
+    frames: [{ src: '/products/jordan/jordan-brood.webp', label: 'Perfil exterior' }],
+    price: '180$',
+  },
+
+  'jordan-ochre': {
+    name: 'Air Jordan 1',
+    short: 'Ocre',
+    line: 'Yellow Ochre · Sail · Black',
+    surface: '#E9A825',
+    word: '#F5BE4E',
+    wordShadow: 'rgba(42, 28, 5, .14)',
+    /* tinta OSCURA: el ocre es el único plano claro de los cuatro */
+    ink: '#2A1C05',
+    inkSoft: 'rgba(42, 28, 5, .62)',
+    hair: 'rgba(42, 28, 5, .22)',
+    accent: '#1A1A1A',
+    frames: [{ src: '/products/jordan/jordan-ochre.webp', label: 'Perfil exterior' }],
+    price: '180$',
+  },
+
+  'jordan-chi': {
+    name: 'Air Jordan 1',
+    short: 'Chicago',
+    line: 'Varsity Red · White · Black',
+    surface: '#C0182C',
+    word: '#D63A4C',
+    wordShadow: 'rgba(0, 0, 0, .18)',
+    ink: '#FFF4F5',
+    inkSoft: 'rgba(255, 244, 245, .62)',
+    hair: 'rgba(255, 244, 245, .24)',
+    accent: '#F5D547',
+    frames: [{ src: '/products/jordan/jordan-chi.webp', label: 'Perfil exterior' }],
+    price: '180$',
   },
 }
 
