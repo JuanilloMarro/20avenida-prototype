@@ -15,7 +15,13 @@
 /* La ruta de producto todavía no existe, así que de momento el acordeón sólo
    dice a dónde iría. Cuando exista `/producto/:id`, esto es un `navigateTo`. */
 function onProducto(id) {
-  if (import.meta.dev) console.info('[acordeón] producto elegido:', id)
+  if (import.meta.dev) console.info('[acordeón] detalle abierto:', id)
+}
+
+/* Sin carrito todavía: de momento el acordeón sólo dice qué se compraría y en
+   qué talla. Cuando exista la bolsa, esto es un `cart.add()`. */
+function onComprar({ id, size }) {
+  if (import.meta.dev) console.info('[acordeón] comprar:', id, 'talla', size ?? '(sin elegir)')
 }
 </script>
 
@@ -28,6 +34,7 @@ function onProducto(id) {
     <ProductAccordion
       :items="['jordan-pine', 'jordan-brood', 'jordan-ochre', 'jordan-chi']"
       @select="onProducto"
+      @buy="onComprar"
     />
 
     <!-- ── de aquí abajo, banco de pruebas del scroll ───────────────────── -->

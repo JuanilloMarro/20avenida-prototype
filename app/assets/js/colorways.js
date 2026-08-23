@@ -49,6 +49,14 @@ const SAMBA_DETAILS = [
  * OJO con el nombre: el campo `word` de aqui abajo YA existe y es un COLOR —
  * el del texto gigante del showcase. Por eso este se llama `short` y no `word`.
  */
+/**
+ * Las tallas del Air Jordan 1. PLACEHOLDER: hoy es un array literal y todos los
+ * colorways comparten el mismo, porque el stock real no existe todavía. Cuando
+ * llegue el backend, cada producto traerá las suyas — y con disponibilidad, que
+ * es lo que de verdad falta: aquí todas se pintan como si hubiera de todo.
+ */
+const TALLAS_AJ1 = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5]
+
 export const COLORWAYS = {
   'samba-green': {
     name: 'Samba OG',
@@ -117,6 +125,9 @@ export const COLORWAYS = {
     inkSoft: 'rgba(242, 247, 243, .62)',
     hair: 'rgba(242, 247, 243, .24)',
     accent: '#E8C547',
+    /* PLACEHOLDER: copy de muestra, no definitivo. */
+    blurb: 'Camina con la leyenda. Verde bosque sobre piel blanca, la silueta que abrió el camino y sigue marcándolo. Comodidad de siempre, materiales de ahora.',
+    sizes: TALLAS_AJ1,
     frames: [{ src: '/products/jordan/jordan-pine.webp', label: 'Perfil exterior' }],
     price: '180$',
   },
@@ -132,6 +143,9 @@ export const COLORWAYS = {
     inkSoft: 'rgba(251, 243, 248, .62)',
     hair: 'rgba(251, 243, 248, .24)',
     accent: '#F0A830',
+    /* PLACEHOLDER: copy de muestra, no definitivo. */
+    blurb: 'Dos colores que no deberían funcionar juntos y llevan décadas haciendólo. Orquídea y oro sobre la silueta más reconocible del baloncesto.',
+    sizes: TALLAS_AJ1,
     frames: [{ src: '/products/jordan/jordan-brood.webp', label: 'Perfil exterior' }],
     price: '180$',
   },
@@ -148,6 +162,9 @@ export const COLORWAYS = {
     inkSoft: 'rgba(42, 28, 5, .62)',
     hair: 'rgba(42, 28, 5, .22)',
     accent: '#1A1A1A',
+    /* PLACEHOLDER: copy de muestra, no definitivo. */
+    blurb: 'Ocre, hueso y negro. La combinación más cálida de la serie, en la piel volumétrica que le dio nombre al modelo.',
+    sizes: TALLAS_AJ1,
     frames: [{ src: '/products/jordan/jordan-ochre.webp', label: 'Perfil exterior' }],
     price: '180$',
   },
@@ -163,6 +180,9 @@ export const COLORWAYS = {
     inkSoft: 'rgba(255, 244, 245, .62)',
     hair: 'rgba(255, 244, 245, .24)',
     accent: '#F5D547',
+    /* PLACEHOLDER: copy de muestra, no definitivo. */
+    blurb: 'El colorway que empezó todo. Rojo, blanco y negro en el orden exacto en que se vieron por primera vez en una cancha.',
+    sizes: TALLAS_AJ1,
     frames: [{ src: '/products/jordan/jordan-chi.webp', label: 'Perfil exterior' }],
     price: '180$',
   },

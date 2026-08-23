@@ -14,9 +14,10 @@
  * no una foto que crece. El recorte está en <ProductAccordionPanel>.
  *
  * Los planos son SÓLIDOS, como el showcase: son capa de contenido y ahí no va
- * vidrio. La única pieza de vidrio es el CTA de cada panel, que sí flota sobre
- * el plano de color — y va en variante `light`, porque sobre un color saturado
- * el velo tiene que leerse como luz. Está en <ProductAccordionPanel>.
+ * vidrio. Lo que SÍ es vidrio son los controles que flotan sobre el plano de
+ * color — el CTA de cada card, el botón de volver, el de comprar y las tallas —
+ * y todos con el material ESTÁNDAR, velo negro y sin variantes, en las dos
+ * disposiciones. Están en <ProductAccordionPanel>.
  *
  * Los datos son `colorways.js` tal cual — una entrada ya trae el color del
  * panel, la tinta, el acento, la foto, el nombre y el precio. Añadir un
@@ -54,7 +55,7 @@ const props = defineProps({
   height: { type: String, default: '100svh' },
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'buy'])
 
 /* Los ids que no existen se caen aquí y no revientan el render: un colorway mal
    escrito deja tres paneles, no una página en blanco. */
@@ -64,21 +65,77 @@ const activo = ref(props.initial)
 watch(() => props.initial, v => { activo.value = v })
 
 /**
+ * El DETALLE. No es otra página: es el mismo acordeón con un panel comiéndose
+ * el ancho entero y los otros tres plegados a cero.
+ *
+ * Se hace así y no navegando porque lo que se mira es lo mismo — el producto —
+ * sólo que más de cerca. Una página nueva rompe esa continuidad y obliga a
+ * volver a montarlo todo para enseñar una talla.
+ */
+const detalle = ref(null)
+
+/* El temporizador de la vuelta — ver `volver()`. Se declara aquí, junto al
+   estado que gobierna, porque `tocar()` también lo cancela. */
+let volviendo = null
+
+/**
  * TOCAR — el doble tap.
  *
  * Con puntero fino el hover ya expandió el panel, así que el usuario ya vio lo
- * que hay: el clic navega directo. En táctil no hay hover, así que el primer
- * toque EXPANDE y el segundo navega — si no, el primer toque dispararía la
- * navegación sin que se haya llegado a ver lo que se abrió.
+ * que hay: el clic abre el detalle directo. En táctil no hay hover, así que el
+ * primer toque EXPANDE y el segundo abre — si no, el primer toque dispararía el
+ * detalle sin que se haya llegado a ver lo que se abrió.
  *
  * La consulta se hace al tocar y no al montar: un portátil táctil tiene las dos
  * entradas y lo que manda es con cuál se acaba de tocar.
  */
 function tocar(id) {
   const fino = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-  if (fino || activo.value === id) { emit('select', id); return }
+  if (fino || activo.value === id) {
+    /* Se ESCRIBE el 40% antes de abrir. En escritorio el panel ya estaba a 40
+       por el hover, pero eso es CSS puro: si el detalle arranca sin que el
+       estado lo diga, el punto de partida de la animación depende de dónde
+       esté el ratón en ese instante. Escribiéndolo, el recorrido es siempre el
+       mismo — 40 → 100 — y al cerrar vuelve por donde vino. */
+    clearTimeout(volviendo)
+    activo.value = id
+    detalle.value = id
+    emit('select', id)
+    return
+  }
   activo.value = id
 }
+
+/* VOLVER — el camino de vuelta, y se hace en dos tiempos a propósito.
+ *
+ * Primero se suelta el detalle: el panel pasa de 100 a 40 y los otros tres de 0
+ * a 20, así que las cuatro opciones REAPARECEN mientras la que se estaba
+ * mirando sigue señalada. Es el mismo recorrido de la ida, al revés.
+ *
+ * Y cuando esa animación termina se suelta también la selección y los cuatro
+ * quedan al 25%. Si se soltaran los dos a la vez, el panel iría de 100 a 25 de
+ * un tirón y los otros de 0 a 25: se vería un salto, no una vuelta.
+ *
+ * El temporizador se cancela al abrir: si el usuario vuelve a entrar antes de
+ * que termine, la selección no puede borrarse a media apertura. */
+function volver() {
+  detalle.value = null
+  clearTimeout(volviendo)
+  volviendo = setTimeout(() => { activo.value = null }, 520)
+}
+
+/* `Escape` cierra el detalle. No sustituye al botón — es la salida que un
+   teclado espera encontrar, y de paso una segunda vía si el botón queda fuera
+   de vista. */
+function onKey(e) {
+  if (e.key === 'Escape' && detalle.value !== null) volver()
+}
+
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  clearTimeout(volviendo)
+})
 
 /**
  * La geometría, calculada aquí y consumida por CSS.
@@ -115,7 +172,7 @@ const geometria = computed(() => {
 <template>
   <section
     class="pa"
-    :class="{ 'is-picking': activo !== null }"
+    :class="{ 'is-picking': activo !== null, 'is-detail': detalle !== null }"
     :style="geometria"
   >
     <ProductAccordionPanel
@@ -123,9 +180,13 @@ const geometria = computed(() => {
       :key="id"
       :cw-id="id"
       :is-open="id === activo"
+      :is-detail="id === detalle"
+      :is-collapsed="detalle !== null && id !== detalle"
       :eager="i === 0"
       :style="toCss(id)"
       @pick="tocar"
+      @back="volver"
+      @buy="emit('buy', $event)"
     />
   </section>
 </template>
@@ -143,21 +204,14 @@ const geometria = computed(() => {
 
 /* ── el reparto ────────────────────────────────────────────
 
-   `--pa-w` va REGISTRADA, y esto costó encontrarlo. El reparto se puede escribir
-   de tres formas y dos no funcionan:
+   `--pa-w` va REGISTRADA con `@property`. Sin registrar, una custom property es
+   texto que se sustituye: el navegador no sabe que «del 25% al 40%» es un
+   recorrido y no puede interpolarlo, así que una transición sobre ella no tiene
+   nada que animar. Registrada pasa a ser una propiedad CON TIPO
+   (`<length-percentage>`), el navegador la interpola, y `flex-basis` se limita
+   a seguirla fotograma a fotograma.
 
-     `flex: 0 0 var(--pa-w)`   el atajo con var() dentro no se rehace
-     `flex-basis: <valor>`     transiciona, pero la transición se come el
-                               PRIMER cambio: el panel se quedaba clavado en 25%
-                               para siempre. Comprobado quitándola: al instante
-                               saltaba a 40%.
-     `--pa-w` registrada       ✅ lo que hay
-
-   Registrada con `@property`, la variable deja de ser texto que se sustituye y
-   pasa a ser una propiedad con tipo: el navegador sabe interpolar de 25% a 40%,
-   la transición va sobre ELLA, y `flex-basis` se limita a seguirla fotograma a
-   fotograma. La animación es la misma que se buscaba; lo que cambia es quién la
-   corre.
+   Por eso la transición va sobre `--pa-w` y no sobre `flex-basis`.
 
    El orden de estas reglas ES la lógica, así que no se pueden reordenar:
    primero se contraen todos, después se expande el señalado. Al tener la misma
@@ -204,6 +258,21 @@ const geometria = computed(() => {
 @media (hover: hover) and (pointer: fine) {
   .pa > *:hover { --pa-w: var(--pa-open); }
 }
+
+/* ── el detalle ────────────────────────────────────────────────
+   Uno se lo lleva todo y los otros se pliegan a cero. Va AL FINAL de la cascada
+   — después del hover — porque mientras hay un detalle abierto el ratón no debe
+   poder alterar nada: pasándolo por encima de un panel plegado, la regla de
+   hover intentaría devolverlo al 40%.
+
+   Los plegados no se ocultan con `visibility` ni con `display`: un ancho de cero
+   con `overflow: hidden` ya no enseña nada, y quitarlos del pintado sólo
+   serviría para que la animación de plegado no se viera. Para sacarlos del
+   teclado y de los lectores está `inert`, que es exactamente para eso y no
+   toca el pintado. */
+.pa.is-detail > *          { --pa-w: 0%; }
+.pa.is-detail > .is-detail { --pa-w: 100%; }
+.pa.is-detail > *:not(.is-detail) { pointer-events: none; }
 
 /* Fallback para navegadores sin container queries: `cqw` no resuelve y el
    cuerpo se queda sin ancho. Con `vw` funciona, a cambio de que la pieza tenga
