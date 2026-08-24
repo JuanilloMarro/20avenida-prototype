@@ -284,6 +284,34 @@ const menuTrigger = ref(null)
 const searchTrigger = ref(null)
 const menuList = ref(null)
 const searchInput = ref(null)
+/* El OTRO campo, el de la barra de escritorio — la que vive en la cabecera. No
+   son dos copias del mismo: `searchInput` es el del panel a pantalla completa,
+   el único que hay en teléfono, y éste no tiene allí equivalente. Por eso cada
+   uno lleva su `ref`, y por eso aquí no sirve el truco de arriba de guardar el
+   elemento del evento — a este campo hay que poder darle y quitarle el foco
+   desde fuera, sin que nadie lo acabe de tocar. */
+const deskInput = ref(null)
+
+/* Cuál de los dos campos manda AHORA MISMO. Se lo pregunta al DOM
+   —`offsetParent` se queda en `null` en cuanto algo por encima está en
+   `display: none`— y no a un `matchMedia('(min-width: 1280px)')`, que sería lo
+   obvio.
+
+   El motivo es que ese 1280 ya está escrito una vez, en el `@media` de abajo, y
+   es un número que se ha movido y puede volver a moverse — sale de cuántos
+   enlaces lleve la píldora, y ahí mismo queda anotado que con cuatro el corte
+   volvería a 1024. Con `matchMedia` habría dos sitios obligados a decir lo
+   mismo y nada que avise el día que dejen de decirlo, y el fallo además sería
+   mudo: ni error ni nada roto a la vista, sólo el foco yéndose a donde no debe.
+   Preguntando al elemento, quien decide sigue siendo el CSS — que es quien
+   decide TODO lo demás en este componente.
+
+   No es reactivo a propósito: con esto no se pinta nada, sólo se decide a dónde
+   va el foco en el instante exacto de abrir o de cerrar. */
+function isDeskSearch() {
+  return !!deskInput.value?.offsetParent
+}
+
 /* Los dos paneles de vidrio, para pedirles que rehagan su lente en el momento
    exacto en que se muestran — ver `openSearch` y `openMenu`. El buscador lo
    necesita de verdad (vive con `v-show` y nace sin medir); el menú se monta ya
