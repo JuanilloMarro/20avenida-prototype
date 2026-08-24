@@ -2,10 +2,9 @@
 /**
  * <ProductHoneycomb> — el panal.
  *
- * Celdas hexagonales de vidrio sobre la rampa oscura de marca, cada una con un
- * producto.
- * Las filas pares van desplazadas media celda, que es lo que convierte una
- * retícula en un panal.
+ * Celdas hexagonales de vidrio sobre negro sólido, cada una con un producto. Las
+ * filas pares van desplazadas media celda, que es lo que convierte una retícula
+ * en un panal.
  *
  *   fila 1   ⬡ ⬡ ⬡ ⬡ ⬡ ⬡ ⬡ ⬡ ⬡      9
  *   fila 2    ⬡ ⬡ ⬡ ⬡ ⬡ ⬡ ⬡ ⬡       8 · desplazada media celda
@@ -69,7 +68,7 @@ const props = defineProps({
    * El plano de detrás. SÓLIDO y negro fuerte: `#050506` es la primera parada de
    * la rampa `negro` de marca, no un negro inventado.
    *
-   * Sin degradado a propósito — se probó y la rampa competiía con el filo. Sobre
+   * Sin degradado a propósito — se probó y la rampa competía con el filo. Sobre
    * negro plano, la iluminación del vidrio es lo único que se ve, y es justo lo
    * que tiene que verse.
    */
@@ -135,11 +134,11 @@ const estilo = computed(() => ({
          dibuja con una máscara sobre el `border-radius`, así que con un
          `clip-path` de polígono NO seguiría al hexágono — quedaría un anillo
          rectangular recortado en diagonal por las esquinas. `sheet` apaga el
-         marco, así que el problema no se parchea: deja de existir.
+         marco, así que ese anillo no llega a pintarse encima del bueno.
 
-         Y con la rampa y el grano detrás no hace falta reponerlo: el velo y el
-         desenfoque ya tienen sobre qué trabajar, que es lo que hace que se lea
-         como vidrio. La celda no escribe ni una línea de material propio. -->
+         El filo SÍ hace falta — sobre negro plano es lo único que dibuja la
+         celda— y se reproduce en `.ph__cell::after` con los valores del material.
+         Ver el bloque de allí. -->
     <div class="ph__comb">
       <GlassSurface
         v-for="foto in fotos"
