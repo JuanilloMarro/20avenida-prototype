@@ -18,6 +18,13 @@ function onProducto(id) {
   if (import.meta.dev) console.info('[acordeón] detalle abierto:', id)
 }
 
+/* El panal aún no lleva ids reales — son 26 recortes sueltos, sin catálogo
+   detrás— así que de momento sólo dice cuál se tocó por su posición. Cuando el
+   backend mande ids, esto es el mismo `navigateTo` que el acordeón. */
+function onPanal(id) {
+  if (import.meta.dev) console.info('[panal] celda:', id)
+}
+
 /* Sin carrito todavía: de momento el acordeón sólo dice qué se compraría y en
    qué talla. Cuando exista la bolsa, esto es un `cart.add()`. */
 function onComprar({ id, size }) {
@@ -36,6 +43,11 @@ function onComprar({ id, size }) {
       @select="onProducto"
       @buy="onComprar"
     />
+
+    <!-- El panal entra después del acordeón: el acordeón enseña CUATRO productos
+         de cerca y el panal enseña que hay muchos más. En ese orden cuenta algo;
+         al revés son dos cuadrículas seguidas. -->
+    <ProductHoneycomb @pick="onPanal" />
 
     <!-- ── de aquí abajo, banco de pruebas del scroll ───────────────────── -->
     <div class="scrolltest">

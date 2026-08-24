@@ -15,46 +15,55 @@
  * en `glass.css`:
  *
  *   panel   superficie a pantalla completa — menú, buscador
- *   light   velo BLANCO y contenido a tinta — botones sobre fondo oscuro
+ *   light   velo BLANCO y contenido a tinta sólida — sobre fondo oscuro
+ *   sheet   de LISTA: sin lente ni marco — piezas que se repiten
+ *   dropdown  `panel` con esquina — el desplegable de escritorio
  *
  * Se combinan: `variant="panel light"`. Y la regla para añadir una nueva: sólo
  * si VARIOS tokens tienen que moverse juntos y quedarse sincronizados. Si sólo
  * cambia el radio, eso es el prop `radius`.
  *
  * Lo que este componente NO puede hacer cumplir solo, y hay que respetar:
- *   · Nada de vidrio sobre vidrio. Lo que va encima se resuelve con relleno
- *     sólido o sólo tipografía. El ítem activo de una barra va sólido.
- *   · Nada de vidrio en la capa de contenido. Tarjetas de grilla, filas de
- *     tabla, ítems de lista: sólidos. El vidrio es de la capa que flota.
+ *   · El vidrio se anida hasta DOS niveles: panel → ficha. Nunca tres.
+ *     (Esto SUSTITUYE a la vieja regla «nada de vidrio sobre vidrio», que se
+ *     retiró a propósito: las fichas de vidrio dentro del menú son el efecto
+ *     buscado, no un descuido.)
+ *   · A partir de la tercera instancia repetida en pantalla —listas, grillas,
+ *     un panal de celdas— se usa `sheet`, que conserva el material y quita la
+ *     lente, que es lo único que escala mal.
  *   · La acción principal no es de vidrio. El contraste AA de «Añadir a la
  *     bolsa» no puede depender de la foto que haya detrás ese día.
- *   · Coste: cada instancia es una capa compuesta con backdrop-filter. Con
- *     nav + barra + ficha (≈9 instancias) va fluido; nada de vidrio en una
- *     grilla larga de producto.
+ *   · Coste: cada instancia es una capa compuesta con backdrop-filter, y con
+ *     lente además un filtro SVG. Con nav + barra + ficha (≈9 instancias con
+ *     lente) va fluido. Por encima, `sheet`.
  *
- * Con velo 0.35 este material tapa bastante: sirve para barras y paneles sobre
- * foto, no para dejar ver el producto.
+ * Con velo 0.38 este material tapa bastante — deja pasar el 53% del fondo:
+ * sirve para barras y paneles sobre foto, no para dejar ver el producto. Para
+ * eso está `light`, con velo blanco al 0.24 y tinta sólida.
  */
 import { ref, computed } from 'vue'
 import { useGlassLens } from '~/composables/useGlassLens'
+import { VARIANTES_GLASS } from '~/lib/glass-variants'
 
 const props = defineProps({
   /** radio en px. 0 = usa el token --lg-r (18). 999 = píldora */
   radius: { type: Number, default: 0 },
   tag: { type: String, default: 'div' },
   /**
-   * Una o varias variantes separadas por espacio. Conjunto cerrado — ver la
-   * nota de arriba. Un nombre que no esté en la lista avisa en desarrollo en
+   * Una o varias variantes separadas por espacio, del conjunto cerrado de
+   * `VARIANTES_GLASS`. Un nombre que no esté en la lista avisa en desarrollo en
    * vez de fallar en silencio, que es como se cuelan los materiales nuevos.
    *
-   * La lista va INLINE y no en una constante de arriba: `defineProps()` se iza
-   * fuera del `setup()`, así que no puede leer nada declarado en este bloque.
+   * La lista vive en `~/lib/glass-variants`: `defineProps()` se iza fuera del
+   * `setup()` y no puede leer una constante declarada en este bloque, pero un
+   * IMPORT sí — que es justo lo que hace falta para no tenerla escrita a mano
+   * dentro de una expresión.
    */
   variant: {
     type: String,
     default: '',
     validator: v => v.split(/\s+/).filter(Boolean)
-      .every(n => ['panel', 'light'].includes(n)),
+      .every(n => VARIANTES_GLASS.includes(n)),
   },
 })
 

@@ -1,6 +1,13 @@
 # Paquete de componentes · 20 Avenida → e-commerce oficial
 
-**Qué es esto.** El prototipo `20avenida-prototype` no se va a migrar: se va a **reconstruir** dentro del repo oficial del front. Este paquete existe para que esa reconstrucción salga **exactamente igual** que el prototipo, sin tener que abrir el prototipo ni adivinar por qué un número es el que es.
+**Qué es esto.** El prototipo `20avenida-prototype` se lleva al repo oficial del
+front **copiando sus archivos**, no reescribiéndolos. Este paquete es lo que el
+código no puede contar por sí solo: de dónde sale cada número, qué se probó y se
+descartó, y qué trampas ya costaron una vez.
+
+**El código viaja como código.** Nadie tiene que reconstruir nada desde cero —
+son ~5 500 líneas y ningún documento las sustituye. Y desde ahora **los arreglos
+del doc 01 ya están aplicados en el prototipo**: se copia tal cual.
 
 **Para quién.** Para una sesión futura —humana o de agente— que no vivió ninguna de las decisiones. Todo lo que aquí se afirma está medido o citado del código, no recordado.
 
@@ -18,7 +25,8 @@ Los documentos están pensados para leerse **en orden**, y cada uno es autosufic
 | **03** | [`03-PRODUCT-SHOWCASE.md`](03-PRODUCT-SHOWCASE.md) | el zapato con scrollover |
 | **04** | [`04-ESCENARIO-Y-MARCA.md`](04-ESCENARIO-Y-MARCA.md) | fondos, grano, tokens de marca, BrandMark |
 | **05** | [`05-MANIFIESTO.md`](05-MANIFIESTO.md) | qué archivo copiar, dependencias, orden de import |
-| **06** | [`06-PRODUCT-ACCORDION.md`](06-PRODUCT-ACCORDION.md) | el acordeón de productos — ⚠️ **planificado, no construido** |
+| **06** | [`06-PRODUCT-ACCORDION.md`](06-PRODUCT-ACCORDION.md) | el acordeón de productos — con detalle en el sitio y **contrato de dependencias** |
+| **07** | [`07-PRODUCT-HONEYCOMB.md`](07-PRODUCT-HONEYCOMB.md) | el panal — hexágonos de vidrio, y **el filo reproducido sobre un polígono** |
 
 Y aparte, en la carpeta padre:
 
@@ -36,14 +44,16 @@ No copiar todo de golpe. Este orden hace que cada paso se pueda verificar solo:
 3. BrandMark            (doc 04)  →  se ve la marca sobre el fondo
 4. AppNav               (doc 02)  →  la tienda ya se navega
 5. ProductShowcase      (doc 03)  →  la landing ya cuenta algo
-6. ProductAccordion     (doc 06)  →  la landing enseña catálogo   ← A CONSTRUIR
+6. ProductAccordion     (doc 06)  →  la landing enseña catálogo
+7. ProductHoneycomb     (doc 07)  →  y enseña que hay muchos más
 ```
 
-El paso 6 es el único que **no existe todavía**: el doc 06 es su especificación,
-no su documentación. Va justo debajo del showcase en la landing y **reutiliza
-`colorways.js` sin cambios** — sólo pide dos entradas más de datos.
+Los seis pasos existen ya en el prototipo. El paso 6 va justo debajo del showcase
+y **reutiliza `colorways.js`**; el doc 06 trae su contrato de dependencias
+completo (§14) — son **tres imports, un componente, un token y una clase**, y
+nada más.
 
-El paso 2 es el que tiene deuda pendiente. **No copiarlo tal cual**: el doc 01 trae los cinco arreglos aplicados y explicados.
+El paso 2 ya no tiene deuda: los siete arreglos del doc 01 (§5, §6, §7 y los cinco menores de §8) están **aplicados**. El doc 01 los conserva explicados — y en el caso del §7, con la corrección de un cálculo que estaba mal.
 
 ---
 
@@ -97,9 +107,23 @@ Con `v-if` el panel se monta y se destruye en cada apertura, así que su `<filte
 
 ## Cómo entregarle esto a otra sesión
 
-Copiar la carpeta `PAQUETE-COMPONENTES/` completa al repo del e-commerce y dar esta instrucción:
+**Primero se arma la carga**, que mete el código dentro de la propia carpeta:
+
+```
+node PAQUETE-COMPONENTES/empaquetar.mjs
+```
+
+Eso crea `PAQUETE-COMPONENTES/codigo/` con los 27 archivos que el doc 05 manda
+copiar — componentes, composables, CSS y assets — con su estructura de carpetas
+intacta. Se genera y no se guarda en git a propósito: dos copias del mismo
+componente derivan en cuanto alguien toca una.
+
+Después se copia la carpeta `PAQUETE-COMPONENTES/` completa — que ya lleva
+documentos **y** código — al repo del e-commerce, y se da esta instrucción:
 
 > Lee `PAQUETE-COMPONENTES/00-LEEME-PRIMERO.md` y sigue el orden de adopción.
+> Los archivos están en `PAQUETE-COMPONENTES/codigo/` con la estructura que les
+> toca: **cópialos, no los reescribas.** El doc 05 dice cuáles y en qué orden.
 > Los números que aparecen en los documentos son decisiones tomadas mirando el
 > resultado, no valores por defecto: no los ajustes sin pedirlo.
 > Los hallazgos del doc 01 §3-§7 están sin aplicar en el prototipo — aplícalos
@@ -109,6 +133,26 @@ Copiar la carpeta `PAQUETE-COMPONENTES/` completa al repo del e-commerce y dar e
 
 ## Estado del prototipo en el momento de empacar
 
-- Último commit: `70f9217 Liquid Improvements and search bar`
-- Hay **un cambio sin commitear** en `AppNav.vue`: se quitó el recuadro de fondo de la foto en la ficha del buscador (quitaba una tercera superficie apilada). Está recogido en el doc 02.
-- `useGlassLight.js` fue **eliminado** en ese commit: la luz ya no sigue al ratón. Ver doc 01 §2.
+- Último commit: `8a4e7d5 details of the component`
+- `useGlassLight.js` fue **eliminado**: la luz ya no sigue al ratón. Ver doc 01 §2.
+
+Cambios sin commitear, todos recogidos ya en los documentos:
+
+| Archivo | Qué | Doc |
+|---|---|---|
+| `glass.css` | velo `0.45 → 0.38` y halo nuevo sobre el texto (`--lg-halo-a`) | 01 |
+| `ProductAccordionPanel.vue` | el `href` no se pinta hasta montar (arregla un 404 de servidor), `.stop.prevent` en los botones de dentro, `--av-nav-space` con fallback | 06 §14–§15 |
+
+### Lo que cambió respecto a la primera versión del paquete
+
+- **El acordeón ya no es una especificación.** Está construido, y se aparta de lo
+  planificado en dos cosas: **sí lleva liquid glass** (los controles que flotan
+  sobre el plano de color, no el plano) y el clic **no navega** — abre la ficha
+  completa en el sitio.
+- **El panal (doc 07) es nuevo.** Y trae un hallazgo que afecta al material, no
+  sólo a él: **el filo se dibuja con una máscara sobre el `border-radius`, así que
+  no puede seguir a una forma que no sea un rectángulo redondeado.** Cualquier
+  pieza futura con `clip-path` se encontrará lo mismo.
+- **El velo del material se aclaró.** El motivo y las medidas están en el doc 01;
+  lo esencial: velo y brillo son la misma palanca, así que aclarar el material
+  sólo es posible dando contraste local al texto.

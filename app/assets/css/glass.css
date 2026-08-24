@@ -27,17 +27,42 @@
   --lg-aberr:    0;      /* aberración cromática en %            */
 
   /* ── materia ──────────────────────────────────────────────── */
+  /* EL INTERRUPTOR DE LA LENTE. Lo caro de este material no es el vidrio — el
+     velo y el desenfoque son baratos — es la LENTE: un `feDisplacementMap` con
+     su mapa `data:` URI por instancia. El presupuesto medido es de ≈9 piezas a
+     la vez. Una lista de 24 fichas son 24 filtros SVG, y ahí se cae.
+     A 0, `useGlassLens` se rinde antes de medir y la pieza cae al fallback de
+     desenfoque, que a tamaño de ficha se ve igual. Ver la variante `sheet`. */
+  --lg-lens-on:  1;
+
   --lg-blur:     3px;
   --lg-sat:      1.12;
   --lg-bri:      0.85;
 
   /* ── velo ─────────────────────────────────────────────────── */
   --lg-veil:     14, 14, 15;   /* #0E0E0F                        */
-  /* 0.45, subido desde el 0.35 original. Con 0.35 y el brillo en 0.85 pasaba
-     el 55% del fondo y las superficies leían claras — y el velo no está para
-     dejar ver el fondo, está para que se lea lo que va ENCIMA. A 0.45 pasa el
-     47%. */
-  --lg-veil-a:   0.45;         /* opacidad                       */
+  /* 0.38, y es el punto medio de un recorrido de ida y vuelta que conviene
+     tener entero:
+
+       0.35  el original. Pasaba el 55% del fondo y las superficies leían
+             claras — demasiado: el velo no está para dejar ver el fondo, está
+             para que se lea lo que va ENCIMA.
+       0.45  la corrección. Pasaba el 47% y se leeía todo, pero a cambio el
+             material perdía el sentido: un velo casi plano deja de parecer
+             vidrio y empieza a parecer una pastilla oscura con algo detrás.
+       0.38  aquí. Pasa el 53% — un 13% más de fondo que a 0.45.
+
+     Lo que hace que 0.38 aguante donde 0.35 no aguantaba NO es el velo: es que
+     ahora el texto lleva halo propio (ver `.av-glass__body`). Antes el contraste
+     dependía entero de oscurecer el fondo, así que la única palanca era subir
+     el velo. Con el halo, la legibilidad se resuelve pegada al glífo y el velo
+     puede volver a ser vidrio.
+
+     El velo mezcla contra un casi-negro, así que es en la práctica una
+     MULTIPLICACIÓN: lo mismo que `--lg-bri`. Por eso no hay trato entre los dos
+     — bajar uno y compensar con el otro deja la superficie igual, medido. Lo
+     que cambia el equilibrio es dar contraste LOCAL, no oscurecer más. */
+  --lg-veil-a:   0.38;         /* opacidad                       */
   --lg-veil-c:   1;            /* cobertura: 0 filos · 1 uniforme */
 
   /* ── luz ──────────────────────────────────────────────────── */
@@ -46,8 +71,17 @@
      especular, baja a la vez el anillo, el resplandor interior y el filo
      superior de la selección, que es justo lo que se quiere: que la pieza se
      apague entera, no sólo su contorno. */
-  --lg-spec:     0.60;   /* filo especular                       */
+  /* DOS PROPIEDADES Y NO UNA, y la separación existe por un motivo concreto:
+     `-base` es la ENTRADA y `--lg-spec` el USO. Una variante que quiera un filo
+     relativo al de la base necesita leerla sin redefinirla — escribir
+     `--lg-spec: calc(var(--lg-spec) * 1.2)` es una referencia cíclica y el
+     navegador la descarta en silencio. Con la entrada aparte, `light` puede
+     escribir su +20% como cálculo y seguir a la base cuando la base se mueva,
+     en vez de llevar un número copiado a mano que se queda atrás. */
+  --lg-spec-base: 0.60;  /* filo especular — la ENTRADA          */
+  --lg-spec:     var(--lg-spec-base);
   --lg-halo:     0,0,0;         /* el halo que despega al glifo  */
+  --lg-halo-a:   0.55;          /* y su fuerza sobre el TEXTO     */
   --lg-glow:     255,255,255;   /* el brillo bajo el glifo       */
   --lg-elev:     0.80;   /* elevación → sombra exterior          */
   /* EL MARCO: la sombra que despega la pieza y el filo especular de 1.4 px del
@@ -158,6 +192,20 @@
   -webkit-mask-composite: xor;
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask-composite: exclude;
+
+  padding: 1.5px;
+  background: linear-gradient(var(--lg-ang),
+    rgba(255,255,255, calc(var(--lg-spec) * 1))     0%,
+    rgba(255,255,255, calc(var(--lg-spec) * .86))   8%,
+    rgba(255,255,255, calc(var(--lg-spec) * .62))  18%,
+    rgba(255,255,255, calc(var(--lg-spec) * .36))  30%,
+    rgba(255,255,255, calc(var(--lg-spec) * .21))  42%,
+    rgba(255,255,255, calc(var(--lg-spec) * .17))  50%,
+    rgba(255,255,255, calc(var(--lg-spec) * .21))  58%,
+    rgba(255,255,255, calc(var(--lg-spec) * .36))  70%,
+    rgba(255,255,255, calc(var(--lg-spec) * .62))  82%,
+    rgba(255,255,255, calc(var(--lg-spec) * .86))  92%,
+    rgba(255,255,255, calc(var(--lg-spec) * 1))   100%);
 }
 
 /* EL PERFIL ES MONÓTONO: máximo EN el borde y caída continua hacia dentro. No
@@ -189,59 +237,29 @@
    del círculo sólo ve las colas y el botón sale apagado. Con el máximo en el
    borde y una caída suave, a 14.6% todavía queda el 78%.               */
 
-.av-glass__spec::after{
-  content: ""; position: absolute; inset: 0; border-radius: inherit;
-  opacity: var(--lg-frame);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask-composite: exclude;
+
+/* EL HALO DEL TEXTO — lo que le compra al velo el derecho a ser más claro.
+ *
+ * El material ya lo hacía con los glífos y por escrito: «el halo oscuro es lo
+ * que los salva cuando por detrás pasa algo claro — el vidrio limpio no
+ * garantiza contraste». El texto tenía el mismo problema y no tenía la misma
+ * defensa, así que todo el contraste salía de oscurecer el fondo entero. Esto
+ * es esa misma regla aplicada al texto, no una idea nueva.
+ *
+ * Y funciona porque actúa DONDE hace falta. El fondo peor del sistema es la
+ * barra sobre papel: el velo compone un gris de ~137 y el blanco encima da
+ * 3.5:1. Pegado al glífo, el halo baja ese gris a ~62 y el contraste local sube
+ * a ~8:1. Un velo que hiciera lo mismo tendría que oscurecer la pieza ENTERA.
+ *
+ * Va por `--lg-halo`, no por un negro fijo: `light` ya lo invierte a blanco, y
+ * así una variante de velo claro con tinta oscura hereda el halo correcto sin
+ * escribir una línea. Y de 2 px, no de 3 como el del glífo: un glífo es una
+ * silueta y aguanta el desenfoque; una letra de 10.5 px con 3 px de halo deja
+ * de leerse nítida. */
+.av-glass__body{
+  position: relative; z-index: 3;
+  text-shadow: 0 0 2px rgba(var(--lg-halo), var(--lg-halo-a));
 }
-
-/* LOS PICOS VAN AL 16% Y AL 84%, NO A LOS EXTREMOS, y esto es lo único de todo
-   el bloque que no es gusto sino geometría.
-
-   Un `linear-gradient` mide sobre la caja, no sobre la forma. En un CÍRCULO la
-   diagonal de la caja es 1.414·d y el círculo sólo ocupa el tramo central: su
-   punto más «arriba-izquierda» cae en el 14.6% del degradado y el opuesto en el
-   85.4%. O sea que con los picos en 0% y 100% el brillo se queda ENTERO en las
-   esquinas de una caja que no se pinta, y el anillo sólo ve las colas. Es
-   exactamente lo que pasaba: los botones redondos salían apagados.
-
-   En una píldora ancha el reparto es otro —la forma arranca en el 2% y acaba en
-   el 98%—, así que 16/84 cae poco después de cada tapa y el lóbulo se extiende
-   un tramo por el canto antes de apagarse. Que es lo pedido: las esquinas y un
-   poco más, nunca la barra entera.
-
-   Un solo perfil para las dos formas, y el CORTE al 24% es el que las concilia.
-   Se probaron tres sobre fondo oscuro:
-
-     12/88 corte 30 → el canto de la píldora seguía encendido más de medio ancho
-     14/86 corte 26 → mejor, pero aún llegaba a la mitad
-     16/84 corte 24 → el lóbulo muere en el primer tercio y el círculo conserva
-                      su arco entero
-
-   Por debajo del 14.6% el círculo deja de ver el pico, así que 16 es casi el
-   suelo; y cuanto más tarde llegue el pico, más se mete el brillo hacia el
-   centro de la barra. La ventana es estrecha y 16/84 está dentro. */
-
-.av-glass__spec::after{
-  padding: 1.5px;
-  background: linear-gradient(var(--lg-ang),
-    rgba(255,255,255, calc(var(--lg-spec) * 1))     0%,
-    rgba(255,255,255, calc(var(--lg-spec) * .86))   8%,
-    rgba(255,255,255, calc(var(--lg-spec) * .62))  18%,
-    rgba(255,255,255, calc(var(--lg-spec) * .36))  30%,
-    rgba(255,255,255, calc(var(--lg-spec) * .21))  42%,
-    rgba(255,255,255, calc(var(--lg-spec) * .17))  50%,
-    rgba(255,255,255, calc(var(--lg-spec) * .21))  58%,
-    rgba(255,255,255, calc(var(--lg-spec) * .36))  70%,
-    rgba(255,255,255, calc(var(--lg-spec) * .62))  82%,
-    rgba(255,255,255, calc(var(--lg-spec) * .86))  92%,
-    rgba(255,255,255, calc(var(--lg-spec) * 1))   100%);
-}
-
-.av-glass__body{ position: relative; z-index: 3 }
 
 /* ══ VARIANTES ═══════════════════════════════════════════════════════════
    Conjunto CERRADO. Viven AQUÍ, junto al material, y no en el CSS de cada
@@ -309,32 +327,94 @@
    filo necesita más para despegarse, y sigue siendo LUZ, que es lo que es. */
 .av-glass--light{
   --lg-veil:   255,255,255;
-  /* 0.16. Si algún día una pieza `light` lleva TEXTO y no sólo un glifo, esto
-     se queda corto: medido sobre la ficha del buscador, la tinta al 72%
-     —`--av-on-glass`— daba 3.9:1, por debajo del 4.5 de AA; a 0.42 sube a 5.2.
-     Hoy no hace falta porque ninguna pieza `light` lleva texto corrido. */
-  --lg-veil-a: 0.16;
-  --lg-bri:    1.10;
-  /* 0.72, y el número no es libre: es el 0.60 de la base con el mismo +20% que
-     tenía cuando la base estaba en 0.85 y esto en 1. Sobre un velo claro el
-     filo necesita algo más para despegarse, pero SÓLO algo más — si se queda
-     clavado mientras la base baja, las piezas `light` acaban siendo las únicas
-     con el contorno marcado. Pasó: al suavizar el especular general, la ficha
-     del buscador se quedó atrás con el suyo a tope.
+  /* 0.24, subido desde 0.16. Y hay que contar el error de cálculo que hubo por
+     el camino, porque la conclusión que se sacó de él era falsa.
 
-     No puede escribirse como `calc(var(--lg-spec) * 1.2)` porque sería una
-     referencia cíclica: se está redefiniendo la misma propiedad. Si la base
-     cambia, este número se mueve con ella a mano. */
-  --lg-spec:   0.72;
+     `light` SÍ lleva texto corrido — la ficha del buscador tiene nombre, línea
+     y precio— y en el peor caso, página oscura, no llegaba a AA. Hasta ahí,
+     correcto. El número, no: se dijo que el velo al 0.16 dejaba la superficie
+     en luminancia relativa 0.16 y daba 3.9:1. Eso confunde el VALOR sRGB con la
+     LUMINANCIA. Un blanco al 0.16 sobre negro es sRGB 41, cuya luminancia real
+     es 0.022 — y el contraste con la tinta, **1.32:1**. No 3.9.
+
+     Con lo cual la salida que se propuso —tinta sólida y velo a 0.24— tampoco
+     servía: medido, da **1.91:1**. Para llegar a 4.5 sólo con velo hace falta
+     **0.47**, que deja pasar el 53% del fondo: peor que el 0.42 que se había
+     descartado por tapar demasiado. Por esa vía no hay salida.
+
+     La salida es la misma que en la base: **halo**. Con el halo del texto —que
+     en `light` se invierte a blanco solo— el contraste local sube a **8.29:1**
+     sobre página oscura sin tocar el velo. Ver `.av-glass__body`.
+
+     Así que 0.24 se queda, pero por otro motivo del que se creyó: no es que
+     alcance AA —no lo alcanza—, es que da más margen que 0.16 sin dejar de
+     pasar el 76% del fondo, que es para lo que existe la variante.
+
+     La tinta SÓLIDA sí se queda por lo dicho: el 72% es una convención de
+     blanco sobre oscuro, donde sobra contraste, y en `light` la polaridad se
+     invierte. Lo que se pierde es el escalón entre principal y secundario, así
+     que **en `light` la jerarquía se hace con PESO y tamaño, no con opacidad.**
+
+     Sobre página clara nada de esto aplica: ahí la ficha da 8.88:1. */
+  --lg-veil-a: 0.24;
+  --lg-bri:    1.10;
+  /* +20% sobre la base. Sobre un velo claro el filo necesita algo más para
+     despegarse, pero SÓLO algo más — si se queda clavado mientras la base baja,
+     las piezas `light` acaban siendo las únicas con el contorno marcado. Pasó:
+     al suavizar el especular general, la ficha del buscador se quedó atrás con
+     el suyo a tope.
+
+     Ahora es un cálculo y no un número copiado: `--lg-spec-base` es la entrada
+     y `--lg-spec` el uso, así que esto sigue a la base sola. Antes era un 0.72
+     escrito a mano — leer y redefinir la misma propiedad es una referencia
+     cíclica que el navegador descarta en silencio. */
+  --lg-spec:   calc(var(--lg-spec-base) * 1.2);
   --lg-halo:   255,255,255;   /* el halo se invierte con el velo */
   --lg-glow:   0,0,0;
 
-  /* y el contenido, a tinta */
-  --av-on-glass:        rgba(14,14,15,.72);
+  /* y el contenido, a tinta SÓLIDA — ver la nota del velo. El 72% de la base
+     era lo que hundía el contraste; aquí los dos niveles valen lo mismo y la
+     jerarquía la hacen el peso y el tamaño. */
+  --av-on-glass:        var(--av-ink);
   --av-on-glass-strong: var(--av-ink);
   --av-on-glass-hover:  rgba(14,14,15,.10);
   --av-on-glass-hair:   rgba(14,14,15,.14);
 }
+/* ── SHEET ─ vidrio de LISTA: velo, brillo y filo, sin lente ────────────
+   Para piezas que se REPITEN: fichas de una grilla, filas de un resultado, las
+   celdas de un panal. Conserva el material —a tamaño de ficha se ve igual— y
+   quita lo único que escala mal.
+
+   El número que lo justifica: el presupuesto medido es de ≈9 instancias con
+   lente. Una grilla de 24 fichas son 24 `feDisplacementMap` con su mapa `data:`
+   por instancia. Y lo que se paga por quitarla es marginal — en una pieza de
+   ~62 px de alto el tope 1 ya recortaba la lente a 21 px, y a ese tamaño la
+   deformación casi no se ve.
+
+   Va también sin marco: una pieza que se repite en cuadrícula con sombra
+   propia ensucia la retícula. */
+.av-glass--sheet{
+  --lg-lens-on: 0;
+  --lg-frame:   0;
+}
+
+/* ── DROPDOWN ─ el panel que SÍ tiene esquina ───────────────────────
+   `panel` está calibrada para irse a sangre: radio 0, lente de 80 y sin marco.
+   El mismo buscador en escritorio es un desplegable de ~240 px con esquina, y
+   ahí una lente de 80 se come la pieza entera.
+
+   Existe como VARIANTE y no como cuatro tokens sueltos en el CSS del navegador
+   por la regla R4: reescribir tokens crudos en un componente para deshacer una
+   variante es el anti-patrón — el día que la base cambie, esa copia se queda
+   atrás en silencio y nadie se entera. Se aplica en vez de deshacerse:
+   `:variant="esEscritorio ? 'dropdown' : 'panel'"`. */
+.av-glass--dropdown{
+  --lg-r:     var(--lg-r-base);
+  --lg-edge:  26px;
+  --lg-scale: 82;
+  --lg-frame: 1;
+}
+
 /* La selección sobre velo claro no puede ser «más luz»: no hay hacia dónde
    subir. Se marca oscureciendo, que es la misma idea al revés. */
 .av-glass--light .av-glass-sel{

@@ -43,12 +43,13 @@ La raíz aporta `position: relative`, `isolation: isolate`, `border-radius` y la
 
   /* ── velo ── */
   --lg-veil:     14, 14, 15;
-  --lg-veil-a:   0.45;
+  --lg-veil-a:   0.38;
   --lg-veil-c:   1;
 
   /* ── luz ── */
   --lg-spec:     0.60;
   --lg-halo:     0,0,0;
+  --lg-halo-a:   0.55;
   --lg-glow:     255,255,255;
   --lg-elev:     0.80;
   --lg-frame:    1;
@@ -61,7 +62,8 @@ La raíz aporta `position: relative`, `isolation: isolate`, `border-radius` y la
 | Token | Valor | Por qué ese número |
 |---|---|---|
 | `--lg-soft` | `0.30` | **Estuvo en 0.70 y se estaba comiendo el efecto.** El desenfoque promedia la rampa del mapa con el neutro de los lados, así que los valores fuertes no sobreviven. Medido sobre el mapa ya desenfocado: a 0.70 un panel que prometía 45 px de desplazamiento entregaba **21**. |
-| `--lg-veil-a` | `0.45` | Subido desde 0.35. Con 0.35 y brillo 0.85 pasaba el 55% del fondo y las superficies leían claras. A 0.45 pasa el **47%**. El velo no está para dejar ver el fondo: está para que se lea lo que va **encima**. |
+| `--lg-veil-a` | `0.38` | Ida y vuelta, y el recorrido entero importa. **0.35** el original: pasaba el 55% del fondo y las superficies leían claras. **0.45** la corrección: pasaba el 47% y se leía todo, pero el material perdía el sentido — un velo casi plano deja de parecer vidrio. **0.38** ahora: pasa el **53%**. Lo que hace que 0.38 aguante donde 0.35 no aguantaba no es el velo, es que ahora el texto lleva halo propio (ver abajo). |
+| `--lg-halo-a` | `0.55` | La fuerza del halo **sobre el texto**. El material ya lo hacía con los glifos y lo decía por escrito — «el vidrio limpio no garantiza contraste»— pero el texto tenía el mismo problema y no la misma defensa. |
 | `--lg-spec` | `0.60` | Bajado desde 0.85. El filo se leía como un trazo dibujado encima, no como luz. Es el multiplicador de **todo** lo especular, así que baja a la vez el anillo, el resplandor interior y el filo de la selección — la pieza se apaga entera, no sólo su contorno. |
 | `--lg-frame` | `1` | Token y no un `box-shadow: none` suelto porque **la misma superficie cambia de caso según el ancho**: el buscador va a sangre en teléfono y es un desplegable con esquina en escritorio. Con token eso es una línea en la media query. |
 | `--lg-ang` | `135deg` **fijo** | Lo reescribía el ratón (`useGlassLight`, un `pointermove` global). **Se eliminó.** Con un gesto rápido el filo saltaba de golpe de un lado al otro y parecía un fallo. Un vidrio quieto se lee mejor como vidrio que uno que persigue el cursor. |
@@ -75,7 +77,44 @@ La raíz aporta `position: relative`, `isolation: isolate`, `border-radius` y la
 --v3:  calc(var(--lg-veil-a) * (1.15 - 0.15 * var(--lg-veil-c)));
 ```
 
-Con `--lg-veil-c: 1` las tres valen lo mismo → velo plano.
+Con `--lg-veil-c: 1` las tres valen lo mismo → velo plano. Con `--lg-veil-c: 0`
+se abren a 0.70 / 0.25 / 0.52 — denso en los filos, limpio en el centro.
+
+### ⚠️ El velo y el brillo son la MISMA palanca
+
+El velo mezcla contra `#0E0E0F`, que es casi negro, así que en la práctica es una
+**multiplicación** — exactamente lo que hace `--lg-bri`. Medido: velo `0.34` +
+brillo `0.72` da **4.06:1** sobre papel, y `0.45` + `0.85` da **4.09:1**.
+Idénticos.
+
+**No hay trato posible entre los dos**: bajar uno y compensar con el otro deja la
+superficie donde estaba. Lo único que cambia el equilibrio es dar contraste
+**local**, y para eso está el halo:
+
+```css
+.av-glass__body{ text-shadow: 0 0 2px rgba(var(--lg-halo), var(--lg-halo-a)); }
+```
+
+Va por `--lg-halo` y no por un negro fijo, así que `light` —que ya lo invierte a
+blanco— hereda el halo correcto sin escribir una línea. Y de **2 px**, no de 3
+como el del glifo: un glifo es una silueta y aguanta el desenfoque; una letra de
+10.5 px con 3 px de halo deja de leerse nítida.
+
+**Lo que compra**, medido sobre el peor fondo del sistema (la barra sobre papel):
+el velo compone un gris de ~137 y el blanco encima da 3.5:1; pegado al glífo el
+halo baja ese gris a ~62 y el contraste local sube a **~8:1**. Un velo que hiciera
+lo mismo tendría que oscurecer la pieza entera.
+
+| superficie | velo 0.45 | velo 0.38 |
+|---|---|---|
+| papel `#FBFAF7` · texto blanco | 4.22:1 | 3.49:1 |
+| panel ocre `#E9A825` · blanco | 6.83:1 | 5.88:1 |
+| **fondo que atraviesa** | **47%** | **53%** |
+
+> **WCAG no acredita el `text-shadow`.** Formalmente la barra sobre papel baja de
+> 4.22 a 3.49 — pero ya estaba por debajo del 4.5 de AA *antes*; ese caso nunca lo
+> pasó. Si hace falta AA formal ahí, la palanca no es el velo global: es el cuerpo
+> o el peso de `.av-nav__link`, o un `--lg-veil-a` propio sólo para la barra.
 
 ---
 
@@ -171,9 +210,9 @@ Cada bajada se pidió **mirando el resultado**, no calculando. Aquí la deformac
 
 ---
 
-## 5 · ⚠️ ARREGLO PENDIENTE — variante `sheet` para listas
+## 5 · ✅ variante `sheet` para listas — APLICADO
 
-**Estado: NO aplicado en el prototipo. Aplicar al reconstruir.**
+**Estado: aplicado.** `--lg-lens-on` en `.av-glass`, variante `.av-glass--sheet`, y el corte en `useGlassLens`. El corte se puso en `onMounted` y no sólo en `sync()`: así no se crea ni el `<filter>` ni los tres observadores. Medido en el panal de 26 celdas: **40 instancias de vidrio en la página, 14 filtros SVG**. Sin esto serían 40.
 
 ### El problema
 
@@ -210,9 +249,9 @@ Y añadir `'sheet'` a la lista cerrada del validador.
 
 ---
 
-## 6 · ⚠️ ARREGLO PENDIENTE — la fuga de tokens
+## 6 · ✅ la fuga de tokens — APLICADO
 
-**Estado: NO aplicado. Es el hallazgo de mayor severidad estructural.**
+**Estado: aplicado**, con una desviación respecto a lo que proponía este documento. Ver el recuadro al final de la sección.
 
 En `AppNav.vue`, dentro de la media query de escritorio, el desplegable de búsqueda **deshace la variante `panel` reescribiendo cuatro tokens crudos**:
 
@@ -246,13 +285,22 @@ y aplicarla condicionalmente en vez de deshacerla:
 <GlassSurface :variant="esEscritorio ? 'dropdown' : 'panel'" />
 ```
 
-con `useMediaQuery('(min-width: 1280px)')` de `@vueuse/core`.
+### ⚠️ La desviación: `matchMedia` pelado, no `@vueuse/core`
+
+Este documento proponía `useMediaQuery` de `@vueuse/core`. **No se hizo así**, por dos motivos:
+
+1. `@vueuse/core` no está instalado y nada más lo necesitaría. Seis líneas de `matchMedia` no justifican un paquete.
+2. La propuesta contradecía un principio escrito en la cabecera del propio `AppNav`: «las dos disposiciones se resuelven en CSS — con `matchMedia` la decisión se va al cliente y el navegador tiene que corregir al hidratar».
+
+Ese principio **no aplica aquí**, y por un detalle concreto que hay que dejar escrito: el panel del buscador nace con `v-show="searchOpen"`, o sea **oculto**. Para cuando alguien lo abre, la consulta ya se resolvió. No hay fotograma que corregir. El valor inicial es `false` —móvil primero— para que servidor y cliente coincidan en el primer render.
+
+Y de paso: **la ficha de resultado pasó a `variant="light sheet"`**. Es una lista, y era el caso exacto de §5.
 
 ---
 
-## 7 · ⚠️ ARREGLO PENDIENTE — `light` y el contraste AA
+## 7 · ⚠️ `light` y el contraste AA — APLICADO, y esta sección estaba MAL
 
-**Estado: NO aplicado. Tiene implicación legal en algunos mercados.**
+**Estado: aplicado en parte, pero la aritmética de abajo era incorrecta y la conclusión que sacaba, falsa.** Se deja el razonamiento original porque el diagnóstico sí era bueno; los números, no. La corrección medida está al final de la sección.
 
 ### El problema, con números
 
@@ -296,19 +344,35 @@ Con **tinta sólida**, el velo mínimo para AA:
 
 **Matiz:** con tinta sólida se pierde el escalón entre texto principal y secundario que daba el 72%. En la ficha ya está resuelto por peso y tamaño. La regla pasa a ser: **en `light`, la jerarquía se hace con peso, no con opacidad.**
 
-**Pendiente de verificación:** son cálculos de luminancia, no medición. Medir con contrastímetro sobre la ficha real con el fondo más claro y el más oscuro del catálogo.
+### ✅ La corrección, medida
+
+Se midió, y lo de arriba no se sostiene. **El error:** «el velo blanco al 0.16 deja la superficie en luminancia relativa ≈ 0.16» confunde el **valor sRGB** con la **luminancia relativa**. Un blanco al 0.16 sobre negro es sRGB 41, cuya luminancia real es **0.022**.
+
+| | decía el doc | medido |
+|---|---|---|
+| velo 0.16, página oscura | 3.9:1 | **1.32:1** |
+| velo 0.24 + tinta sólida | ≥ 4.5:1 ✅ | **1.91:1** ❌ |
+| velo mínimo para AA sin halo | ≊0.20 | **0.47** (deja pasar el 53%) |
+
+O sea que la salida propuesta —tinta sólida y velo 0.24— **no llega a AA**, y llegar sólo con velo exige 0.47: peor que el 0.42 que la propia sección descarta por tapar demasiado. **Por esa vía no hay salida.**
+
+La salida es la misma que en la base: **halo**. Con el halo del texto —que en `light` se invierte a blanco solo— el contraste local sube a **8.29:1** sobre página oscura, sin tocar el velo.
+
+**Lo aplicado:** velo a `0.24` y tinta sólida — las dos mejoran, sólo que no por el motivo que decía el doc: 0.24 da más margen que 0.16 sin dejar de pasar el 76% del fondo, y la tinta sólida quita el 72% que hundía el contraste. Quien lleva AA es el halo. Sobre página clara nada de esto aplica: la ficha da 8.88:1.
+
+> Sigue valiendo el aviso de siempre: **WCAG no acredita el `text-shadow`.** El número formal sobre página oscura sigue por debajo de 4.5. Si hace falta AA formal ahí, la palanca es el color del fondo bajo el panel, no el velo.
 
 ---
 
-## 8 · Otros arreglos pendientes (menores)
+## 8 · ✅ Otros arreglos (menores) — los cinco APLICADOS
 
 | # | Qué | Dónde |
 |---|---|---|
-| a | `.av-glass__spec::after` está declarado **tres veces** en `glass.css` (≈154, ≈192, ≈228). Las dos primeras son idénticas. ~20 líneas muertas. | `glass.css` |
-| b | La cabecera de `GlassSurface.vue` **todavía declara la regla retirada** de "nada de vidrio sobre vidrio". Reescribir con la regla R3. | `GlassSurface.vue:24` |
-| c | Un comentario en `AppNav.vue:914` dice *"sin variante, velo negro, se descartó light"* y el código dos líneas abajo dice `variant="light"`. | `AppNav.vue:914` |
-| d | `--lg-spec` de `light` (0.72) es "el 0.60 de la base +20%" a mano, porque un `calc()` sería referencia cíclica. **Solución:** separar `--lg-spec-base` (entrada) de `--lg-spec` (uso), y entonces `light` puede escribir `calc(var(--lg-spec-base) * 1.2)`. | `glass.css` |
-| e | La lista de variantes va **inline** en el validador porque `defineProps()` se iza fuera del `setup()` y no puede leer una constante local. **Solución:** moverla a `lib/glass-variants.js` — `defineProps` sí puede leer un import. | `GlassSurface.vue:56` |
+| a ✅ | Estaba declarado **tres veces**. Ahora es **una**, −37 líneas. Y había más de lo que decía este punto: el tercer comentario («los picos van al 16% y al 84%») **contradecía al código**, que tiene el máximo en el borde. Era la justificación de una versión anterior; se borró. | `glass.css` |
+| b ✅ | Cabecera reescrita con R3 y con `sheet`. | `GlassSurface.vue` |
+| c ✅ | Comentario reescrito. Ganaba el código. | `AppNav.vue` |
+| d ✅ | `--lg-spec-base` separado de `--lg-spec`; `light` ya escribe `calc(var(--lg-spec-base) * 1.2)` y sigue a la base sola. | `glass.css` |
+| e ✅ | La lista vive en `app/lib/glass-variants.js`. Cuatro variantes: `panel`, `light`, `sheet`, `dropdown`. | `GlassSurface.vue` |
 
 ---
 

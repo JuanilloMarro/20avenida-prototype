@@ -65,6 +65,28 @@ useFitText(wordEl, body, props.fill)
 const focused = ref(false)
 const expanded = computed(() => props.isOpen || focused.value)
 
+/**
+ * EL `href` NO SE PINTA HASTA QUE HAY QUIEN LO CANCELE. Aquí estaba el 404.
+ *
+ * El panel es un <a> con destino real y el clic lo cancela — el detalle se abre
+ * aquí mismo. Pero entre que el servidor manda el HTML y que Vue engancha el
+ * manejador hay una ventana en la que el enlace ya está pintado y no lo cancela
+ * nadie: un clic ahí lo sigue el navegador, se va a /producto/<id>, que no es
+ * una ruta que exista, y el servidor devuelve `Page not found`. Por eso el error
+ * llegaba con traza de SERVIDOR y no de cliente: era una carga entera.
+ *
+ * En desarrollo esa ventana dura lo que tarde Vite en servir los módulos, que
+ * son segundos, y por eso aparecía a rat os y no siempre.
+ *
+ * Se arregla desde el HTML, no desde el manejador: sin `href`, un <a> no tiene
+ * comportamiento de activación y no hay nada que cancelar. Se le pone después
+ * de montar, cuando el `preventDefault` ya está puesto. El primer render del
+ * cliente coincide con el del servidor — los dos sin `href` — así que no hay
+ * desajuste de hidratación.
+ */
+const montado = ref(false)
+onMounted(() => { montado.value = true })
+
 /* Sólo cuenta el foco que el navegador considera VISIBLE — el de teclado. Un
    clic con el ratón también enfoca el enlace, pero ahí el panel no se abre, y
    `aria-expanded` tiene que decir lo que se ve, no lo que pasó. */
@@ -72,12 +94,13 @@ function onFocus(e) {
   focused.value = e.target.matches(':focus-visible')
 }
 
-/* Con el detalle abierto el panel ya no es un enlace — se está mirando lo que
-   el enlace llevaba — así que no hace nada. Y cuando sí lo es, el `preventDefault`
-   es de prototipo: el detalle se abre aquí mismo, no en otra página. */
+/* El `preventDefault` va PRIMERO, antes de cualquier salida: el detalle se abre
+   aquí mismo, no en otra página, y con el detalle ya abierto tampoco hay a dónde
+   ir. Cancelar de entrada cuesta nada — sin `href` no cancela nada — y ahorra
+   tener que acordarse de que la salida de arriba deja el enlace vivo. */
 function onClick(e) {
-  if (props.isDetail) return
   e.preventDefault()
+  if (props.isDetail) return
   emit('pick', props.cwId)
 }
 </script>
@@ -102,7 +125,7 @@ function onClick(e) {
     class="pa__panel"
     :class="{ 'is-open': isOpen, 'is-detail': isDetail }"
     :inert="isCollapsed || undefined"
-    :href="isDetail ? undefined : '/producto/' + cwId"
+    :href="isDetail || !montado ? undefined : '/producto/' + cwId"
     :aria-expanded="isDetail ? undefined : expanded"
     @click="onClick"
     @focus="onFocus"
@@ -171,11 +194,20 @@ function onClick(e) {
          mirando lo mismo, sólo que de cerca. -->
     <div v-if="isDetail" class="pa__detail">
       <GlassSurface :radius="999" tag="div" class="pa__back">
-        <!-- `.stop`: el clic no sigue subiendo hasta el <a> del panel. Hoy el
-             manejador de arriba ya se protege solo, pero dejar que un botón de
-             cerrar burbujee hasta el elemento que abre es pedirle a dos piezas
-             que se pongan de acuerdo para siempre. -->
-        <button type="button" @click.stop="emit('back')">
+        <!-- `.stop.prevent`, y las DOS hacen falta — aquí estaba el 404.
+             `.stop` corta la subida hasta el <a> del panel, que es lo que se
+             quiere: un botón de cerrar no debe pasar por el elemento que abre.
+             Pero al cortarla, el `preventDefault` del panel YA NO CORRE, y el
+             botón vive dentro del <a>: quien cancela la navegación tiene que ser
+             él mismo.
+
+             Y no basta con que en detalle el <a> no tenga `href`. Este clic
+             borra el detalle, Vue repinta en el microtask siguiente — antes de
+             que el navegador decida qué hacer con el clic — y le devuelve el
+             `href` al <a>. Para cuando toca la acción por defecto, el enlace
+             existe otra vez y el navegador se iba a /producto/<id>, que no es
+             una ruta: 404. `.prevent` lo mata en el sitio. -->
+        <button type="button" @click.stop.prevent="emit('back')">
           <ArrowLeft :stroke-width="2" /> Regresar
         </button>
       </GlassSurface>
@@ -197,7 +229,10 @@ function onClick(e) {
             tag="span"
             class="pa__dsize"
           >
-            <button type="button" :aria-pressed="t === talla" @click.stop="talla = t">
+            <!-- `.stop.prevent` por lo mismo que el de volver: dentro del <a>,
+                 quien corta la burbuja se queda sin el `preventDefault` de
+                 arriba y tiene que cancelar por su cuenta. -->
+            <button type="button" :aria-pressed="t === talla" @click.stop.prevent="talla = t">
               <!-- la selección del sistema, la misma que el ítem activo de la
                    barra: sobre el velo negro es LUZ, el mismo vidrio un poco
                    más encendido. -->
@@ -208,7 +243,7 @@ function onClick(e) {
         </div>
 
         <GlassSurface :radius="999" tag="div" class="pa__buy">
-          <button type="button" @click.stop="emit('buy', { id: cwId, size: talla })">
+          <button type="button" @click.stop.prevent="emit('buy', { id: cwId, size: talla })">
             Comprar ahora
           </button>
         </GlassSurface>
@@ -243,7 +278,14 @@ function onClick(e) {
      esquivar, pero un texto pegado al borde inferior contra otro que arranca 90
      px más abajo se lee torcido. Simétrico se lee como un encuadre. */
   --pa-pad-x: clamp(16px, 3cqw, 34px);
-  --pa-pad-y: var(--av-nav-space);
+  /* Con FALLBACK, y es lo unico que este componente le pide al anfitrion. Una
+     custom property que no existe no resuelve, y una declaracion que no resuelve
+     se cae al valor inicial: el hueco de la barra pasaba a 0 y el titulo se iba
+     debajo de ella. Con el respaldo, la pieza se monta sola en cualquier repo y
+     sigue reservando un hueco razonable; donde SI exista el token, manda el del
+     anfitrion. 87px = 16 de aire + 55 de barra + 16 de aire, que es lo que vale
+     hoy resuelto. */
+  --pa-pad-y: var(--av-nav-space, 87px);
 
   position: relative;
   overflow: hidden;           /* ← el recorte */
@@ -710,7 +752,7 @@ function onClick(e) {
   .pa__detail {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto 1fr;
-    padding: var(--av-nav-space) clamp(14px, 4vw, 24px);
+    padding: var(--av-nav-space, 87px) clamp(14px, 4vw, 24px);
   }
   .pa__dcol--r { grid-column: 1; align-items: flex-start; text-align: left; }
   .pa__dsizes { justify-content: flex-start; }

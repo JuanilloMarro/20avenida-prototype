@@ -163,6 +163,18 @@ export function useGlassLens(elRef) {
     if (!w || !h) return false
 
     const cs = getComputedStyle(el)
+
+    /* LA LENTE APAGADA A PROPÓSITO — la variante `sheet` y cualquiera que la
+       herede. Se sale ANTES de construir el mapa, que es lo caro: un
+       `feDisplacementMap` con su `data:` URI por instancia, contra un
+       presupuesto medido de ≈9 piezas a la vez.
+
+       `false` no es un error: es la señal de «no hay lente» que esta función ya
+       devuelve cuando la pieza está oculta o sin medir, y quien la recibe deja
+       la pieza en el fallback de desenfoque — que a tamaño de ficha se ve
+       igual. Por eso no hace falta ninguna rama nueva arriba. */
+    if (token(cs, '--lg-lens-on', 1) === 0) return false
+
     const r = Math.min(token(cs, '--lg-r', 18), Math.min(w, h) / 2)
     // tope 1: la lente nunca se come la pieza
     const edge = Math.min(token(cs, '--lg-edge', 26), Math.min(w, h) * 0.34)
@@ -215,6 +227,19 @@ export function useGlassLens(elRef) {
   onMounted(() => {
     const el = unref(elRef)
     if (!el || !SUPPORTED()) return          // fallback: se queda en blur
+
+    /* LENTE APAGADA POR VARIANTE (`sheet`): se sale antes de crear NADA — ni el
+       nodo `<filter>`, ni los tres observadores. La guarda de `sync()` sola ya
+       ahorraba lo caro (el mapa `data:`), pero seguía dejando un `<filter>`
+       vacío y tres observadores por pieza. En un panal de 26 celdas eso son 26
+       nodos muertos y 78 observadores para nada.
+
+       Se lee UNA vez, al montar. Una variante que encendiera la lente en
+       caliente no la recuperaría — hoy ninguna se conmuta, `sheet` es una
+       decisión por pieza. Si algún día hace falta, esto pasa a ser un `watch`
+       sobre el prop `variant`. */
+    if (token(getComputedStyle(el), '--lg-lens-on', 1) === 0) return
+
     node = document.createElementNS(NS, 'filter')
     node.setAttribute('id', id)
     defsRoot().appendChild(node)

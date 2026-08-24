@@ -21,3 +21,7 @@ logs
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# La carga del paquete se GENERA (PAQUETE-COMPONENTES/empaquetar.mjs), no se guarda:
+# dos copias del mismo componente derivan en cuanto alguien toca una.
+PAQUETE-COMPONENTES/codigo/

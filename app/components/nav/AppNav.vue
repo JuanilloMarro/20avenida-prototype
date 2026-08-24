@@ -467,12 +467,35 @@ function syncKeyboard() {
   vvTop.value = Math.round(vv.offsetTop)
 }
 
+/* ¿ESCRITORIO? — y esto es lo único del componente que decide una disposición
+ * desde JS, contra la norma de arriba de resolverlas en CSS.
+ *
+ * La norma está por el primer pintado: el servidor no sabe el ancho, así que
+ * renderiza una disposición y el navegador tiene que corregirla al hidratar —
+ * y eso se ve. Aquí NO se ve, y por un detalle concreto: el panel del buscador
+ * nace con `v-show="searchOpen"`, o sea OCULTO. Para cuando alguien lo abre, la
+ * consulta ya se resolvió hace rato. No hay fotograma que corregir.
+ *
+ * El valor inicial es `false` a propósito — móvil primero — para que el HTML
+ * del servidor y el primer render del cliente coincidan.
+ *
+ * `matchMedia` pelado y no `useMediaQuery` de `@vueuse/core`: es la única cosa
+ * que haría falta de ese paquete y son seis líneas.
+ */
+const esEscritorio = ref(false)
+let mqEscritorio = null
+const syncEscritorio = e => { esEscritorio.value = e.matches }
+
 onMounted(() => {
+  mqEscritorio = window.matchMedia('(min-width: 1280px)')
+  esEscritorio.value = mqEscritorio.matches
+  mqEscritorio.addEventListener('change', syncEscritorio)
   window.addEventListener('keydown', onKey)
   window.visualViewport?.addEventListener('resize', syncKeyboard)
   window.visualViewport?.addEventListener('scroll', syncKeyboard)
 })
 onBeforeUnmount(() => {
+  mqEscritorio?.removeEventListener('change', syncEscritorio)
   window.removeEventListener('keydown', onKey)
   window.visualViewport?.removeEventListener('resize', syncKeyboard)
   window.visualViewport?.removeEventListener('scroll', syncKeyboard)
@@ -854,7 +877,7 @@ onBeforeUnmount(() => {
     v-show="searchOpen"
     id="av-search"
     class="av-search"
-    variant="panel"
+    :variant="esEscritorio ? 'panel dropdown' : 'panel'"
     role="dialog"
     aria-modal="true"
     aria-label="Buscar"
@@ -912,16 +935,26 @@ onBeforeUnmount(() => {
 
           <ul v-if="results.length" class="av-search__results">
             <li v-for="p in results" :key="p.id">
-              <!-- VIDRIO, y con el velo NEGRO de siempre — sin variante. Se
-                   probó `light` (velo blanco, tinta negra) y se descartó
-                   mirándolo: el texto en negro se leía peor. Con el velo negro
-                   el contenido vuelve a ser blanco solo, porque los
-                   `--av-on-glass-*` de la base ya son claros: la ficha no
-                   escribe ni un color, cambia de material y el texto la sigue. -->
+              <!-- VIDRIO `light sheet`, y las dos mitades tienen motivo.
+                   El comentario que había aquí decía «sin variante, velo negro,
+                   se descartó light» y dos líneas más abajo ponía
+                   `variant="light"`. Ganaba el código; el comentario era de una
+                   versión anterior.
+
+                   `light` — velo blanco y tinta sólida. Es la única pieza del
+                   sistema que lleva texto corrido sobre vidrio claro, y por eso
+                   es la que obligó a subir su velo a 0.24 y la tinta a sólida:
+                   con el 72% de la base daba 3.9:1, por debajo de AA.
+
+                   `sheet` — sin lente. Esto es una LISTA: se pintan tantas
+                   fichas como resultados, y cada lente es un filtro SVG con su
+                   mapa propio contra un presupuesto de ≈9. A 44–62 px de alto
+                   los topes ya recortaban la lente a un tercio, así que lo que
+                   se quita casi no se veía. -->
               <GlassSurface
                 tag="button"
                 type="button"
-                variant="light"
+                variant="light sheet"
                 class="av-card"
                 @click="pickResult(p)"
               >
@@ -1971,15 +2004,13 @@ onBeforeUnmount(() => {
     height: auto;
     max-height: min(58vh, 520px);
 
-    /* Y deshace la GEOMETRÍA de la variante `panel`, que es de superficies que
-       se comen la pantalla: aquí la pieza mide 240 px de ancho y una lente de
-       80 se la comería entera. Vuelve a la base — radio del sistema, lente de
-       26, compresión de 82 — y recupera el marco, porque un desplegable sí
-       tiene esquina y sí se despega de lo que hay debajo. */
-    --lg-r:     var(--lg-r-base);
-    --lg-edge:  26px;
-    --lg-scale: 82;
-    --lg-frame: 1;
+    /* La GEOMETRÍA de `panel` no vale aquí — es de superficies que se comen la
+       pantalla, y esta pieza mide 240 px: una lente de 80 se la comería entera.
+       Pero eso ya NO se arregla desde aquí. Estaban escritos a pelo los cuatro
+       tokens (`--lg-r`, `--lg-edge`, `--lg-scale`, `--lg-frame`) y era el
+       anti-patrón de la regla R4: el día que la base cambiara, esta copia se
+       quedaba atrás en silencio. Ahora es la variante `dropdown`, que vive en
+       `glass.css` y se APLICA en vez de deshacerse — ver `esEscritorio`. */
   }
 
   /* el campo ya está en la cabecera; aquí sobra, y con él la X de cerrar */

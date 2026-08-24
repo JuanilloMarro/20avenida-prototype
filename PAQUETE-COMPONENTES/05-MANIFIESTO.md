@@ -4,48 +4,107 @@
 
 ## 1 · Qué copiar, exactamente
 
-Rutas relativas a `20avenida-prototype/app/`.
+> **El código viaja como CÓDIGO.** Estos documentos son el *por qué* — de dónde
+> sale cada número, qué se probó y se descartó, y qué trampas ya costaron una
+> vez. No contienen los componentes ni podrían: son 4 958 líneas de código
+> frente a ~2 600 de prosa. **Nadie tiene que reescribir nada desde cero.**
+
+### Cómo se arma la entrega
+
+```
+node PAQUETE-COMPONENTES/empaquetar.mjs
+```
+
+Copia todo lo de las tablas de abajo a `PAQUETE-COMPONENTES/codigo/`, con su
+estructura de carpetas intacta. A partir de ahí **la carpeta del paquete es
+autosuficiente**: se entrega entera y lleva dentro los documentos y el código.
+
+`codigo/` está en `.gitignore` a propósito. Guardar una segunda copia de cada
+componente dentro del paquete garantiza deriva en cuanto alguien toca una de las
+dos; generarla justo antes de entregar no puede derivar nunca. **La única fuente
+de verdad sigue siendo `app/`.**
+
+Si el script imprime `FALTA`, es que este manifiesto se ha quedado desfasado
+respecto al repo — y sale con código de error para que se note.
 
 ### Núcleo — el material (doc 01)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `assets/css/glass.css` | 431 | **aplicar antes los arreglos del doc 01 §5-§8** |
-| `components/glass/GlassSurface.vue` | 92 | reescribir la cabecera (regla retirada) |
-| `composables/useGlassLens.js` | 273 | añadir el corte de `--lg-lens-on` |
+| `app/assets/css/glass.css` | 507 | los arreglos del doc 01 ya están dentro |
+| `app/components/glass/GlassSurface.vue` | 99 | |
+| `app/lib/glass-variants.js` | 27 | la lista cerrada de variantes |
+| `app/composables/useGlassLens.js` | 289 | el corte de `--lg-lens-on` ya está |
 
 ### Escenario (doc 04)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `assets/css/tokens.css` | 96 | extraer sólo lo que aplique; ver §2 |
-| `assets/js/backgrounds.js` | 85 | 4 rampas + grano |
-| `stores/useThemeStore.js` | — | sólo si se quiere más de un fondo |
-| `components/brand/BrandMark.vue` | 86 | + `public/brand/letrero-20av-cut.webp` |
+| `app/assets/css/tokens.css` | 96 | extraer sólo lo que aplique; ver §2 |
+| `app/assets/js/backgrounds.js` | 85 | 4 rampas + grano |
+| `app/stores/useThemeStore.js` | 41 | sólo si se quiere más de un fondo |
+| `app/components/brand/BrandMark.vue` | 86 | |
+| `public/brand/letrero-20av-cut.webp` | — | el asset de BrandMark |
 
 ### Navegación (doc 02)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `components/nav/AppNav.vue` | 2000 | la pieza grande |
+| `app/components/nav/AppNav.vue` | 2 003 | la pieza grande |
 
-### Producto (doc 03)
+### Producto — showcase (doc 03)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `components/product/ProductShowcase.vue` | 420 | |
-| `composables/useScrollSequence.js` | 65 | |
-| `composables/useFitText.js` | 45 | |
-| `assets/js/colorways.js` | 91 | los datos del producto |
+| `app/components/product/ProductShowcase.vue` | 420 | |
+| `app/composables/useScrollSequence.js` | 65 | |
+| `app/composables/useFitText.js` | 45 | **compartido con el acordeón** |
+| `app/assets/js/colorways.js` | 206 | los datos de producto — showcase y acordeón |
 | `public/products/samba/*.webp` | 8 archivos | ya recortados |
+
+### Producto — acordeón (doc 06)
+
+| Archivo | Líneas | Notas |
+|---|---|---|
+| `app/components/product/ProductAccordion.vue` | 298 | el reparto y el estado |
+| `app/components/product/ProductAccordionPanel.vue` | 778 | el recorte y el contenido |
+| `public/products/jordan/*.webp` | 4 archivos | caja unión 647×636 — ver doc 06 §13 |
+
+No añade **ninguna** dependencia nueva: reutiliza `colorways.js`, `useFitText.js`
+y `GlassSurface`, que ya vienen por los bloques anteriores. Su contrato completo
+está en el doc 06 §14.
+
+### Producto — panal (doc 07)
+
+| Archivo | Líneas | Notas |
+|---|---|---|
+| `app/components/product/ProductHoneycomb.vue` | 447 | |
+| `public/products/panel/*.webp` | 26 archivos | caja unión 182×134 |
+
+Usa además el grano de `assets/js/backgrounds.js`, que ya viene con el escenario
+(doc 04). El fondo es **negro sólido `#050506`** — la primera parada de la rampa
+`negro`, no un negro inventado.
+
+⚠️ **El filo del material no funciona sobre un polígono**: se dibuja con una
+máscara sobre el `border-radius`, así que con `clip-path` queda un anillo
+rectangular cortado en diagonal. El panal lo REPRODUCE sobre el hexágono con los
+mismos valores leídos del material (`--lg-spec`, `--lg-ang`, `--lg-elev`, `--lip`
+y las once paradas). Verificado: el degradado que compone la celda es idéntico al
+de la barra, parada por parada. Si algún día el material sabe dibujar filos no
+rectangulares, esto se borra y se enciende `--lg-frame`.
+
+Depende de `GlassSurface` con la variante **`sheet`**, que es obligatoria aquí:
+**34 celdas** de vidrio contra un presupuesto de ≈9 con lente. Los 26 recortes
+se reparten entre las 34 celdas — ocho repetidos, cosa de prototipo.
 
 ### NO copiar
 
 | Archivo | Por qué |
 |---|---|
-| `components/dev/DevPanel.vue` | herramienta de desarrollo del prototipo |
-| `pages/frame.vue` | ruta de capturas para Figma; útil sólo si se sigue diseñando |
-| `assets/js/materials.js` | tabla de referencia, no la consume nadie en runtime |
+| `app/components/dev/DevPanel.vue` | herramienta de desarrollo del prototipo |
+| `app/pages/frame.vue` | ruta de capturas para Figma; útil sólo si se sigue diseñando |
+| `app/assets/js/materials.js` | tabla de referencia, no la consume nadie en runtime |
+| `app/pages/index.vue` | es el banco de pruebas del prototipo, no una landing real. Mirar sólo cómo monta los componentes |
 | `docs/*` | 2 649 líneas de bitácora del prototipo. **Este paquete las sustituye.** |
 
 ---
@@ -54,27 +113,35 @@ Rutas relativas a `20avenida-prototype/app/`.
 
 ```
 tokens.css
-    ↑
-    │ (5 tokens: --av-ink, --av-on-glass, -strong, -hover, -hair)
-    │
-glass.css ──────────────► GlassSurface.vue ──────► useGlassLens.js
-                                 ↑                        │
-                                 │                        └─ vue (ref, onMounted…)
-              ┌──────────────────┴──────────────────┐
-         AppNav.vue                            (paneles futuros)
-              │
-              ├─ BrandMark.vue ─── public/brand/*.webp
-              └─ lucide-vue-next
+    ↑                                ↑
+    │ 5 tokens de contenido          │ --av-nav-space
+    │ (--av-ink, --av-on-glass…)     │ (con fallback: 87px)
+    │                                │
+glass.css ───────► GlassSurface.vue ─────► useGlassLens.js
+                          ↑    ↑                 │
+              ┌───────────┘    └──────┐          └─ vue
+              │                        │
+         AppNav.vue             ProductAccordion.vue
+              │                        └─ ProductAccordionPanel.vue
+              ├─ BrandMark.vue                ├─ colorways.js
+              │     └─ public/brand/*.webp     ├─ useFitText.js
+              └─ lucide-vue-next               ├─ lucide-vue-next
+                                             └─ public/products/jordan/*.webp
 
 ProductShowcase.vue ──┬─ colorways.js ─── public/products/samba/*.webp
                       ├─ useScrollSequence.js
                       └─ useFitText.js
-                                 └─ (independiente del material)
 ```
 
 **La dirección es limpia y en un solo sentido:** `glass.css → tokens.css`, nunca al revés. Verificado — `tokens.css` no referencia ningún `--lg-*`.
 
 **`ProductShowcase` no toca el material.** Se puede adoptar antes o después, sin orden.
+
+**`ProductAccordion` sí lo toca** — sus controles son vidrio — así que va después
+del material. Aparte de eso no añade nada nuevo: comparte `colorways.js` y
+`useFitText.js` con el showcase, y del anfitrión sólo pide `--av-nav-space`, que
+lleva fallback para poder montarse sin `tokens.css`. Contrato completo en el
+doc 06 §14.
 
 ### Al extraer `tokens.css`
 

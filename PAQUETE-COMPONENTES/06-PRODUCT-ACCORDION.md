@@ -1,298 +1,566 @@
 # 06 · `<ProductAccordion>` — el acordeón de productos
 
-> ⚠️ **Estado: PLANIFICADO, no construido.** Este documento es la especificación
-> para implementarlo. Todo lo demás del paquete describe código que existe; esto
-> describe código que va a existir.
+> **Estado: CONSTRUIDO y verificado.** Este documento ya no es una
+> especificación: describe código que existe, y todos los números están medidos
+> en el navegador, no recordados.
 
-**Sitio:** en la landing, **justo debajo de `<ProductShowcase />`**, sustituyendo parte del banco de pruebas actual de `pages/index.vue`.
-**Depende de:** `assets/js/colorways.js` · `composables/useFitText.js`
-**No usa liquid glass.** Es una pieza sólida, como el showcase.
+**Sitio:** en la landing, justo debajo de `<ProductShowcase />`.
+**Archivos:** `components/product/ProductAccordion.vue` · `components/product/ProductAccordionPanel.vue`
+**Sí usa liquid glass** — ver §8. Esto cambió respecto a la especificación original.
 
 ---
 
 ## 1 · Qué es
 
-Cuatro paneles verticales de color, cada uno con un producto. Al señalar uno **se expande al 40% y los otros se reparten el 60% restante**, contrayéndose. El expandido revela el producto completo, su nombre, su precio y una acción; los contraídos dejan el producto recortado y nada más.
+Cuatro paneles de color, uno por producto. Al señalar uno **se expande al 40% y
+los otros se reparten el 60% restante**. El expandido enseña el producto entero
+con su ficha; los contraídos, el producto recortado y nada más. Al hacer clic,
+el panel **se come el componente entero** y aparece la ficha completa con tallas
+— sin cambiar de página.
 
 ```
-reposo        ┌────┬────┬────┬────┐      25 · 25 · 25 · 25
-              └────┴────┴────┴────┘
+reposo         ┌────┬────┬────┬────┐      25 · 25 · 25 · 25
+               └────┴────┴────┴────┘
 
-hover en #2   ┌──┬───────┬──┬──┐         20 · 40 · 20 · 20
-              └──┴───────┴──┴──┘
+señalado #2    ┌──┬───────┬──┬──┐         20 · 40 · 20 · 20
+               └──┴───────┴──┴──┘
+
+detalle #2     ┌───────────────────┐       0 · 100 ·  0 ·  0
+               └───────────────────┘
 ```
 
-**La idea central, y de donde sale todo lo demás:** el panel contraído **recorta** el producto; al expandirse no lo escala, lo **destapa**. Es una ventana que se abre, no una foto que crece.
+**La idea central, y de donde sale todo lo demás:** el panel contraído
+**recorta** el producto; al expandirse no lo escala, lo **destapa**. Es una
+ventana que se abre, no una foto que crece.
 
 ---
 
-## 2 · La proporción
+## 2 · API
+
+```vue
+<ProductAccordion
+  :items="['jordan-pine', 'jordan-brood', 'jordan-ochre', 'jordan-chi']"
+  @select="onProducto"
+  @buy="onComprar"
+/>
+```
+
+| Prop | Tipo | Defecto | Qué hace |
+|---|---|---|---|
+| `items` | `Array` | — *(requerido)* | ids de colorways. 3–5. |
+| `open` | `Number` | `40` | % que ocupa el expandido. |
+| `initial` | `String` | `null` | cuál arranca expandido. `null` = reposo. |
+| `height` | `String` | `'100svh'` | alto de la pieza. |
+
+| Evento | Payload | Cuándo |
+|---|---|---|
+| `select` | `id` | se abre el detalle de un producto |
+| `buy` | `{ id, size }` | se pulsa «Comprar ahora». `size` puede ser `null` |
+
+Los ids que no existen en `COLORWAYS` **se filtran**, no revientan: un colorway
+mal escrito deja tres paneles, no una página en blanco.
+
+---
+
+## 3 · La proporción
 
 ```
-expandido  = 40%
-contraído  = (100 − 40) / (n − 1)
+expandido  = open                       (40 por defecto)
+contraído  = (100 − open) / (n − 1)
+reposo     = 100 / n
 ```
 
 | paneles | expandido | cada contraído |
 |---|---|---|
 | 3 | 40% | 30% |
-| **4** | **40%** | **20%** ✅ el caso pedido |
+| **4** | **40%** | **20%** ✅ el caso en uso |
 | 5 | 40% | 15% |
-| 6 | 40% | 12% |
 
-**En reposo** (nadie señalado) todos valen `100/n` — con 4, un 25% cada uno.
+> Con más de 5 el contraído baja de 15% y el producto deja de reconocerse. **Si
+> hace falta más catálogo, es otro componente** (una grilla), no más paneles.
 
-> Con más de 5 paneles el contraído baja de 15% y el producto deja de reconocerse. **Si hace falta más catálogo, es otro componente** (una grilla), no más paneles.
+El cálculo vive en JS —`geometria`, en el padre— porque **depende de cuántos
+paneles hay y CSS no sabe contar hermanos para repartir**. Lo que baja al CSS
+son longitudes ya resueltas: `--pa-rest`, `--pa-open`, `--pa-shut`.
 
 ---
 
-## 3 · Interacción
+## 4 · El reparto — `@property`, y por qué
+
+```css
+@property --pa-w {
+  syntax: '<length-percentage>';
+  inherits: false;
+  initial-value: 25%;
+}
+.pa__panel {
+  flex-grow: 0; flex-shrink: 0;
+  flex-basis: var(--pa-w);
+  transition: --pa-w .5s cubic-bezier(.22, 1, .36, 1);
+}
+```
+
+**La transición va sobre la variable, no sobre `flex-basis`.** Sin registrar con
+`@property`, una custom property es texto que se sustituye: el navegador no sabe
+que «del 25% al 40%» es un recorrido y no puede interpolarlo. Registrada pasa a
+ser una propiedad **con tipo**, el navegador la interpola, y `flex-basis` se
+limita a seguirla fotograma a fotograma.
+
+`flex-basis` y no `grid-template-columns`: es una **longitud**, interpola en
+todos lados sin sorpresas. Y mide el **eje principal** — que es lo que permite
+que en móvil, con el acordeón tumbado, **las mismas declaraciones pasen de
+repartir ancho a repartir alto sin duplicar una sola línea**.
+
+### El orden de la cascada ES la lógica
+
+No se pueden reordenar. Todas tienen la misma especificidad, así que gana la
+última — y así **cualquier motivo para abrir le gana a cualquier motivo para
+cerrar**.
+
+```css
+.pa > * { --pa-w: var(--pa-rest); }                 /* 1. reposo   */
+.pa.is-picking > *,
+.pa:has(:focus-visible) > * { --pa-w: var(--pa-shut); }  /* 2. cerrar */
+@media (hover: hover) and (pointer: fine) {
+  .pa:hover > * { --pa-w: var(--pa-shut); }
+}
+.pa > .is-open,
+.pa > *:focus-visible { --pa-w: var(--pa-open); }   /* 3. abrir    */
+@media (hover: hover) and (pointer: fine) {
+  .pa > *:hover { --pa-w: var(--pa-open); }
+}
+.pa.is-detail > *          { --pa-w: 0%; }          /* 4. detalle  */
+.pa.is-detail > .is-detail { --pa-w: 100%; }
+```
+
+El bloque del detalle va **al final, después del hover**, a propósito: mientras
+hay un detalle abierto, pasar el ratón sobre un panel plegado no puede
+devolverlo al 40%.
+
+### ⚠️ `:focus-visible`, nunca `:focus-within`
+
+**Al hacer clic, el navegador deja el foco puesto en el enlace.** Con
+`:focus-within` la regla seguía casando después de soltar el ratón y el panel se
+quedaba abierto con el cursor ya lejos. `:focus-visible` sólo casa cuando el
+navegador decide que el foco debe verse — en la práctica, navegando con teclado.
+
+**En escritorio el ancho lo manda el hover y nada más.**
+
+---
+
+## 5 · El recorte — la técnica
+
+El cuerpo (`.pa__body`) tiene **el ancho del panel expandido** y va centrado en
+absoluto; el panel recorta con `overflow: hidden`.
+
+```css
+.pa { container-type: inline-size; }      /* ← la clave */
+.pa__body { width: var(--pa-body); }      /* --pa-body = `open`cqw = 40cqw */
+```
+
+`container-type: inline-size` convierte al acordeón en contenedor de consulta, y
+con eso `cqw` mide contra **esta caja** y no contra el viewport. Sin esto habría
+que usar `vw` y la pieza tendría que ir a sangre para que el número cuadre. Hay
+fallback declarado para navegadores sin container queries:
+
+```css
+@supports not (container-type: inline-size) { .pa { --pa-body: var(--pa-body-vw); } }
+```
+
+El gemelo para el acordeón tumbado es `--pa-body-h`, y sale de un `calc()` sobre
+`height` **y no de `cqh`**: `cqh` exigiría `container-type: size` —contención en
+los dos ejes— y aquí basta con la del eje en línea.
+
+### El zapato se mueve con `object-position`, no con `transform`
+
+```css
+.pa__shot { object-position: center; transition: object-position .5s …; }
+.pa__panel.is-open .pa__shot { object-position: 14% center; }
+```
+
+En reposo el zapato está centrado; al abrirse se corre a la izquierda y deja
+sitio a la derecha para la ficha. **Con `transform: translateX()` la caja se
+movía entera y el zapato se salía del ancho.** `object-position` mueve la imagen
+*dentro* de su caja, que no se mueve: el recorte sigue siendo el mismo.
+
+---
+
+## 6 · Los tres modos de apertura
 
 | Entrada | Comportamiento |
 |---|---|
-| **Puntero fino** (ratón, trackpad) | `hover` expande. Al salir, vuelve a reposo. |
-| **Táctil** | **Tap** expande. Segundo tap en el ya expandido → navega al producto. |
-| **Teclado** | `Tab` expande vía `:focus-within`. `Enter` navega. |
+| **Puntero fino** | `hover` expande. El clic abre el detalle **directo**. |
+| **Táctil** | Primer tap expande. **Segundo tap** abre el detalle. |
+| **Teclado** | `Tab` expande vía `:focus-visible`. `Enter` abre. `Escape` cierra. |
 
-### Cómo se distinguen puntero y tacto
-
-**No con `@media (hover: hover)` sólo.** Un portátil táctil tiene las dos cosas. La regla:
-
-```css
-/* el hover expande SÓLO donde hay puntero fino */
-@media (hover: hover) and (pointer: fine) {
-  .pa__panel:hover { --pa-w: var(--pa-open); }
-}
-```
-
-y el estado por tap vive en el script (`activo`), que funciona en las dos. **El hover no escribe estado en JS** — así el ratón no deja el acordeón "pegado" en un panel al salir.
-
-### El doble tap
-
-En táctil, el primer tap **expande** y el segundo **navega**. Es lo mismo que hace cualquier carrusel de producto y evita el problema clásico del hover en móvil: que el primer toque dispare la navegación sin que el usuario haya llegado a ver lo que abrió.
+La consulta se hace **al tocar y no al montar**: un portátil táctil tiene las dos
+entradas y lo que manda es con cuál se acaba de tocar.
 
 ```js
-function tocar(id) {
-  if (activo.value === id) { emit('select', id); return }   // 2º tap → navega
-  activo.value = id                                          // 1er tap → expande
-}
+const fino = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+if (fino || activo.value === id) { /* abre detalle */ }
+else { activo.value = id }        /* sólo expande  */
 ```
+
+El doble tap existe porque **en táctil no hay hover**: sin él, el primer toque
+dispararía el detalle sin que se haya llegado a ver lo que se abrió.
+
+Y `activo` **se escribe también en escritorio** antes de abrir. El panel ya
+estaba al 40% por el hover, pero eso es CSS puro: si el detalle arranca sin que
+el estado lo diga, el punto de partida de la animación depende de dónde esté el
+ratón en ese instante. Escribiéndolo, el recorrido es siempre **40 → 100**, y al
+cerrar vuelve por donde vino.
 
 ---
 
-## 4 · El recorte — la técnica
+## 7 · El detalle, y la vuelta en dos tiempos
 
-Esto es lo único no obvio del componente. **Copiarlo tal cual.**
+El detalle **no es otra página**: es el mismo acordeón con un panel comiéndose
+el ancho entero y los otros tres plegados a cero. Se hace así porque lo que se
+mira es lo mismo —el producto—, sólo que más de cerca.
 
-El contenido de cada panel vive en una caja de **ancho fijo igual al del panel expandido**, centrada y absoluta. El panel recorta con `overflow: hidden`. Así, al contraerse, el producto se recorta simétricamente por los dos lados en vez de encogerse.
+Los plegados **no se ocultan** con `visibility` ni `display`: un ancho de cero
+con `overflow: hidden` ya no enseña nada. Para sacarlos del teclado y de los
+lectores está **`inert`**, que es exactamente para eso y no toca el pintado.
 
-```css
-.pa {
-  container-type: inline-size;   /* ← la clave */
-  display: flex;
-  overflow: hidden;
-}
+### La vuelta
 
-.pa__panel {
-  position: relative;
-  overflow: hidden;
-  flex: 0 0 var(--pa-w);
-  transition: flex-basis .5s cubic-bezier(.22, 1, .36, 1);
-}
-
-.pa__body {
-  position: absolute;
-  inset-block: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  /* 40cqw = el 40% del ancho del ACORDEÓN, no del panel.
-     Fijo: no encoge cuando el panel se estrecha, y por eso se recorta. */
-  width: 40cqw;
+```js
+function volver() {
+  detalle.value = null
+  clearTimeout(volviendo)
+  volviendo = setTimeout(() => { activo.value = null }, 520)
 }
 ```
 
-**`cqw` y no `vw`:** `40vw` sólo valdría si el acordeón ocupa el ancho entero del viewport. Con `container-type: inline-size` en la raíz, `40cqw` es el 40% del acordeón sea cual sea su ancho — funciona igual dentro de un contenedor con márgenes.
+**Dos tiempos a propósito.** Primero se suelta el detalle: el panel pasa de 100 a
+40 y los otros tres de 0 a 20, así que las cuatro opciones reaparecen mientras la
+que se estaba mirando sigue señalada. Cuando esa animación termina (520 ms,
+20 más que la transición de 500) se suelta la selección y los cuatro quedan al
+25%.
 
-> **Fallback** si hay que soportar navegadores sin container queries: `40vw` y aceptar que el componente tiene que ir a sangre.
+> Si se soltaran los dos a la vez, el panel iría de 100 a 25 de un tirón y los
+> otros de 0 a 25: se vería un salto, no una vuelta.
 
-### Por qué `flex-basis` y no `grid-template-columns`
-
-`grid-template-columns` con `fr` también se puede transicionar hoy, pero `flex-basis` es una **longitud**: interpola en todos lados sin sorpresas y no depende de soporte reciente. La animación es la misma.
-
----
-
-## 5 · Los estados del contenido
-
-| Elemento | Contraído | Expandido |
-|---|---|---|
-| producto (foto) | visible, **recortado** | completo |
-| texto gigante | oculto | visible |
-| nombre + línea | oculto | visible |
-| precio | oculto | visible |
-| CTA | oculto | visible |
-
-El texto entra con un fundido corto **y un poco de retardo** respecto al ancho: si aparece a la vez, se lee como que el texto empuja al panel. Si aparece cuando el panel ya casi terminó, se lee como consecuencia.
-
-```css
-.pa__text {
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity .28s ease .18s, transform .28s ease .18s;
-}
-.pa__panel.is-open .pa__text { opacity: 1; transform: none; }
-```
-
-**Los 180 ms de retardo son sensación, no cálculo.** Ajustar mirando.
+El temporizador **se cancela al abrir**: si el usuario vuelve a entrar antes de
+que termine, la selección no puede borrarse a media apertura.
 
 ---
 
-## 6 · Los datos — reutiliza `colorways.js` tal cual
+## 8 · El vidrio de la pieza
 
-Aquí está la mejor noticia del componente: **no hace falta una estructura nueva.** Una entrada de `COLORWAYS` ya trae todo lo que un panel necesita.
+Los planos de color son **sólidos** — son capa de contenido y ahí no va vidrio.
+Lo que sí es vidrio son **los controles que flotan sobre el plano**: el CTA de
+cada card, el botón de volver, el de comprar y cada talla.
 
-| Campo del colorway | Uso en el acordeón |
-|---|---|
-| `surface` | el color del panel |
-| `word` · `wordShadow` | el texto gigante |
-| `ink` · `inkSoft` · `hair` | textos y filetes |
-| `accent` | el CTA |
-| `frames[0].src` | la foto del producto |
-| `name` · `line` · `price` | el bloque de texto |
-
-Y `toCss(id)` ya devuelve las siete custom properties `--ps-*`.
+**Material estándar, velo negro, sin variantes, en las dos disposiciones.**
 
 ```vue
-<ProductAccordion :items="['samba-green', 'samba-night', '…', '…']" />
+<GlassSurface :radius="999" tag="span" class="pa__cta">
 ```
 
-### ⚠️ PLACEHOLDER — faltan colorways
+> La variante `light` se probó y se descartó: invierte a tinta oscura lo que va
+> encima —es su diseño— y el propio `glass.css` avisa de que está calibrada para
+> glifos, no para texto.
 
-Hoy sólo existen **dos** (`samba-green`, `samba-night`) y el componente pide **cuatro**. Añadir dos entradas más a `colorways.js` es todo el trabajo de datos — el componente no se toca.
-
-> **Ojo con una diferencia:** el showcase usa `frames[]` (seis fotos, la secuencia del scrollover). El acordeón usa **una sola**, `frames[0]`. Si en el futuro un producto del acordeón no tiene secuencia, basta con que traiga un `frames` de un elemento.
-
-### Los tokens del panel
-
-Se reusan los `--ps-*` en vez de inventar `--pa-*` para los colores. **Un producto tiene un color, no dos según dónde se pinte.** Los `--pa-*` quedan sólo para lo que es geometría del acordeón (`--pa-w`, `--pa-open`).
+La talla seleccionada usa `.av-glass-sel`, la misma selección del sistema: sobre
+el velo negro es **luz**, el mismo vidrio un poco más encendido.
 
 ---
 
-## 7 · Tipografía
-
-⚠️ **Igual que el showcase, esta pieza tiene su propia escala.** Es display, no interfaz — la regla R2 (13.5/500) es de la barra y sus paneles, no de aquí.
-
-| Elemento | Referencia de partida | Notas |
-|---|---|---|
-| texto gigante | como `.ps__word`: peso 900, `ls -.055em`, `lh .8` | con `useFitText`, `fill` menor — ver abajo |
-| nombre | como `.ps__name`: 19px / 700 | |
-| línea | como `.ps__label`: 10.5px, tono suave | |
-| precio | como `.ps__price`: 14px, `tabular-nums` | |
-| CTA | 11.5px, como `.ps__select` | |
-
-### El texto gigante — una decisión tomada
-
-**Una palabra por panel, visible sólo en el expandido.** Los contraídos quedan limpios con el producto solo.
-
-Se reutiliza `useFitText` tal cual, pero **el `fill` no es el 0.995 del showcase**: ahí la palabra llena el frame entero; aquí llena el panel expandido, que es el 40%. Empezar en **`0.90`** y ajustar mirando — hay que dejar aire lateral o la palabra choca con el recorte del panel vecino.
-
-### ⚠️ Regla R1 — sin versales
-
-Las referencias muestran `APPLE` y `JORDAN` en mayúsculas. **Aquí no.** Primera mayúscula y el resto minúsculas, igual que el showcase pasó de `ADIDAS` a `Adidas`.
-
-El texto gigante sale de `colorway.name` o de un campo `word` propio, siempre en caja de frase.
-
----
-
-## 8 · El CTA
-
-En la referencia es una píldora con flecha («Ver detalles →»).
-
-**Sólida, no de vidrio.** Es la regla del material: *la acción principal no es de vidrio porque su contraste AA no puede depender de lo que haya detrás.* Aquí el fondo es un color sólido conocido —`--ps-surface`— así que un relleno sólido con `--ps-ink` cumple y además es más barato.
-
-> Si se quisiera de vidrio, tendría que ser `variant="sheet"` (sin lente): son 4 instancias y sólo una visible a la vez, pero el material está calibrado para flotar sobre foto, no sobre un plano de color.
-
----
-
-## 9 · Accesibilidad
-
-- **Cada panel es un `<a>`** con su `href` real al producto. El acordeón no es una lista de botones decorativos.
-- **`:focus-within` expande igual que el hover.** Sin esto, con teclado sólo se ve el panel recortado.
-- **`aria-expanded`** en cada panel.
-- **La foto lleva `alt`** con el nombre del producto; el texto gigante va `aria-hidden` — es decoración, y su contenido ya está en el nombre.
-- **`prefers-reduced-motion`:** sin transición de `flex-basis` ni de opacidad. El cambio es instantáneo, no se elimina la funcionalidad.
+## 9 · Móvil — el acordeón se tumba
 
 ```css
-@media (prefers-reduced-motion: reduce) {
-  .pa__panel, .pa__text { transition: none; }
+@media (max-width: 640px) { .pa { flex-direction: column; } }
+```
+
+**Filas, no columnas.** Cuatro columnas en 390 px son tiras de 97, y ahí un
+zapato no se reconoce: la foto es casi cuadrada, así que lo que la limita es el
+lado corto, y en vertical el lado corto es ridículo. Tumbado, cada fila tiene los
+390 px enteros de ancho, el zapato pasa a estar limitado por el **alto** de su
+fila —que es mucho más— y encima sobra sitio al lado para la ficha.
+
+**El reparto no se reescribe**: 25 / 40 / 20, los mismos números, ahora de alto.
+
+En las cards de móvil **se oculta la descripción**: sólo quedan título y precio
+arriba a la izquierda y «Ver detalles» abajo a la derecha, los dos con el mismo
+margen (`--pa-pad-m: clamp(12px, 3.5vw, 20px)`) para que no se peguen al borde.
+
+### El detalle en móvil
+
+```css
+@media (max-width: 640px) {
+  .pa__detail { grid-template-rows: auto auto 1fr; padding: var(--av-nav-space, 87px) …; }
+  .pa__panel.is-detail .pa__body { inset-block: auto; top: 22%; height: 40%; transform: none; }
 }
 ```
 
----
+El zapato **no va centrado**: ocupa una banda del **22% al 62%** del alto. Arriba
+sólo hay un botón y dos líneas, así que no necesita media pantalla; **el tercio
+inferior queda entero para las tallas y el botón**, que es lo que se toca.
 
-## 10 · Móvil
-
-Decisión tomada: **el mismo acordeón, con tap en vez de hover.** No se apila ni se convierte en carrusel.
-
-Lo que sí cambia en teléfono:
-
-- **El alto.** A 375 px de ancho, cuatro paneles verticales son columnas de 75 px en reposo. El alto tiene que compensar: `clamp(340px, 70vh, 560px)` como punto de partida.
-- **El texto gigante probablemente sobra** en el expandido: a 150 px de ancho (40% de 375) no cabe una palabra legible. Recomendación: ocultarlo por debajo de ~640 px y dejar nombre, precio y CTA.
-- **El `fill` de `useFitText`** no aplica si el texto está oculto.
+La banda va en **porcentaje y no en píxeles** a propósito: el alto de un teléfono
+varía mucho y lo que tiene que mantenerse es la proporción entre las tres zonas,
+no una distancia fija.
 
 ---
 
-## 11 · API propuesta
+## 10 · El hueco de la barra
 
-```js
-defineProps({
-  /** ids de colorways. 3–5 recomendado. */
-  items: { type: Array, required: true },
-  /** % que ocupa el expandido. El resto se reparte. */
-  open: { type: Number, default: 40 },
-  /** cuál arranca expandido. null = todos iguales (reposo). */
-  initial: { type: String, default: null },
-  /** alto de la pieza. */
-  height: { type: String, default: 'clamp(340px, 70vh, 560px)' },
-})
-
-defineEmits(['select'])   // el id del colorway elegido
+```css
+--pa-pad-y: var(--av-nav-space, 87px);
 ```
 
-**`open` como prop y no fijo en 40:** el número salió de tu referencia, pero es el tipo de valor que se ajusta mirando. Que sea prop cuesta una línea y evita tener que tocar el CSS.
+El acordeón es una pieza a pantalla completa y la barra es `fixed`: sin reservar
+su hueco, el título y el botón de volver acaban **debajo** de ella.
+
+Se aplica **arriba y abajo por igual**. Abajo no hay nada que esquivar, pero un
+texto pegado al borde inferior contra otro que arranca 87 px más abajo se lee
+torcido; simétrico se lee como un encuadre. En un teléfono, además, abajo está la
+barra del navegador.
+
+**El fallback importa** — ver §14.
 
 ---
 
-## 12 · Riesgos y cosas a vigilar
+## 11 · Tipografía y tinta
 
-| Riesgo | Por qué | Mitigación |
+**Tinta blanca en todas las medidas**, y no la `--ps-ink` del colorway. Va
+declarada arriba del todo, fuera de cualquier `@media`, justamente para eso: la
+ficha se lee igual en los cuatro planos y en cualquier pantalla.
+
+```css
+--pa-on-surface:      #FFFFFF;
+--pa-on-surface-soft: rgba(255, 255, 255, .72);
+```
+
+**La jerarquía se mantiene con alfa, no con otro color**: el nombre a blanco
+puro, la descripción y el precio al 72% — el mismo «medio iluminado» que usa el
+material para lo secundario.
+
+El texto gigante del fondo usa `useFitText` y **`short`, no `name`**: `short`
+distingue el colorway (*Pino*, *Orquídea*, *Ocre*, *Chicago*), `name` los
+repetiría los cuatro. Cumple **R1** — primera mayúscula y el resto minúsculas.
+
+---
+
+## 12 · Los datos
+
+Reutiliza `colorways.js` **sin tocar el componente**: una entrada ya trae el
+color del panel, la tinta, el acento, la foto, el nombre y el precio. Añadir un
+producto es añadir un colorway.
+
+| Campo | Uso en el acordeón |
+|---|---|
+| `name` | título de la card y del detalle |
+| `short` | el texto gigante del fondo |
+| `line` | la descripción de una línea (arriba a la izquierda) |
+| `price` | precio |
+| `blurb` | párrafo del detalle |
+| `sizes` | las tallas del detalle |
+| `frames[0].src` | la foto |
+| tokens `--ps-*` | vía `toCss(id)`, aplicados por el padre como `:style` |
+
+> ⚠️ **Placeholder:** `price` (180$), `blurb` y `sizes` son de relleno. `sizes`
+> sale de `TALLAS_AJ1`, una constante compartida por los cuatro. Cuando llegue el
+> backend, cada producto traerá las suyas — y con disponibilidad.
+
+---
+
+## 13 · Assets
+
+`public/products/jordan/` — cuatro `.webp`, ~45 KB cada uno.
+
+```
+jordan-pine.webp   jordan-brood.webp   jordan-ochre.webp   jordan-chi.webp
+```
+
+**Todos en la misma caja unión: 647 × 636.** Es la tinta más ancha por la más
+alta, **con 46 px de margen a cada lado**.
+
+> Ese margen no es estético. Sin él, el Chicago —cuya tinta medía exactamente el
+> alto del lienzo— tocaba el borde y era **el primero en verse cortado** al
+> contraerse el panel, mientras los otros tres aún tenían aire. Cuatro zapatos a
+> la misma escala tienen que tener también el mismo aire.
+
+Y el `<img>` lleva **`width="647" height="636"` declarados**, que no son
+decorativos: en el acordeón tumbado la foto se dimensiona por el alto
+(`height: 100%; width: auto`), y **una imagen `lazy` que aún no ha cargado no
+tiene proporción intrínseca** — medía cero de ancho y la fila salía vacía hasta
+que llegaba el fichero.
+
+La primera foto es `eager` + `fetchpriority="high"`; las demás esperan.
+
+---
+
+## 14 · Dependencias — el contrato
+
+Esta es la superficie completa. **No hay nada más**, y está medida sobre el
+código, no estimada.
+
+### Imports de código — 3
+
+| Import | Qué se usa | ¿Evitable? |
 |---|---|---|
-| **Las cuatro fotos cargan siempre** | Son PNG/WebP recortados grandes. En la landing, encima del pliegue. | `loading="lazy"` en las tres no iniciales, `fetchpriority="high"` en la primera. Verificar peso — el showcase ya carga 6. |
-| **`container-type` crea contenedor de layout** | Puede afectar a hijos que dependan de porcentajes del viewport. | Sólo hay contenido propio dentro. Vigilar si se añade algo. |
-| **El recorte necesita `overflow: hidden`** | Y eso corta cualquier sombra o filo que quiera salirse. | El diseño de referencia no los tiene. Si se añaden, van dentro. |
-| **Cuatro transiciones simultáneas de `flex-basis`** | Provoca reflow del contenedor en cada frame. | Es un flex de 4 ítems: barato. Si diera problema, pasar a `transform: scaleX()` + contra-escala del contenido — más complejo, sólo si hace falta. |
-| **Solapamiento con el scrollover de arriba** | `ProductShowcase` ocupa 375vh de carril. El acordeón entra justo después. | Verificar que el `sticky` del showcase ya soltó antes de que el acordeón entre en viewport. |
+| `~/assets/js/colorways` | `COLORWAYS`, `toCss`, `DEFAULT_COLORWAY` | No — son los datos |
+| `~/composables/useFitText` | el ajuste del texto gigante | No — compartido con `<ProductShowcase>` |
+| `lucide-vue-next` | `ArrowLeft`, `ArrowRight` | Sí, sustituyendo por dos SVG inline |
+
+### Componentes — 1
+
+`<GlassSurface>` (auto-import de Nuxt). Es el material del paquete; ver doc 01.
+
+### CSS del anfitrión — 1 token y 1 clase
+
+| Qué | Dónde vive | Cómo se protege |
+|---|---|---|
+| `--av-nav-space` | `tokens.css` | **fallback `87px`** en los dos usos |
+| `.av-glass-sel` | `glass.css` | viene con `GlassSurface` |
+
+**Los `--ps-*` no cuentan como dependencia**: los inyecta el propio componente
+con `toCss(id)` como `:style` en cada panel. No hace falta ninguna hoja de
+estilos externa para que existan.
+
+> El fallback de `--av-nav-space` no es cosmética. Una custom property que no
+> existe **no resuelve**, y una declaración que no resuelve se cae al valor
+> inicial: el hueco de la barra pasaba a **0** y el título se iba debajo de ella.
+> Con el respaldo, la pieza se monta sola en cualquier repo; donde el token sí
+> exista, manda el del anfitrión.
+
+### Para llevárselo a otro repo
+
+```
+components/product/ProductAccordion.vue
+components/product/ProductAccordionPanel.vue
+public/products/jordan/*.webp          (4 ficheros)
+```
+
+…más `colorways.js`, `useFitText.js` y `GlassSurface` (docs 01 y 03), que ya
+vienen por otros componentes. **No hay CSS global propio de esta pieza**: todo
+está en los dos `<style scoped>`.
 
 ---
 
-## 13 · Orden de construcción sugerido
+## 15 · Accesibilidad
 
-```
-1. La rejilla y la proporción     → 4 paneles de color que se expanden al hover
-2. El recorte del producto        → la foto se destapa en vez de crecer
-3. El estado táctil               → tap/tap
-4. El contenido del expandido     → texto, precio, CTA con su retardo
-5. El texto gigante + useFitText  → el último, es el que más se ajusta mirando
-6. Teclado y reduced-motion
+| Qué | Cómo |
+|---|---|
+| El panel | `<a>` con destino real, `aria-expanded` |
+| `aria-expanded` | sigue **el foco**, no el hover — quien lee ese atributo navega con teclado |
+| Plegados | `inert` |
+| Tallas | `role="group"` + `aria-pressed` |
+| Cerrar | `Escape`, además del botón |
+| El texto gigante | `aria-hidden="true"` — su contenido ya está en el `alt` de la foto |
+| Movimiento | `@media (prefers-reduced-motion: reduce)` apaga transiciones y la animación del detalle |
+
+### ⚠️ Siempre `<a>`, nunca `<component :is>`
+
+También en detalle. Alternar la etiqueta hace que **Vue destruya el elemento y
+cree otro**, y un elemento recién creado no tiene estado previo del que
+transicionar: al cerrar el detalle el panel saltaba del 100% al 25% de golpe
+mientras los otros tres sí animaban, y eso se lee como que algo se quedó colgado.
+
+En detalle sólo se le **quita el `href`**: un `<a>` sin él no es enlace, no
+recibe foco y no se anuncia como tal — que es justo lo que hace falta.
+
+### ⚠️ El `href` no se pinta hasta montar
+
+```vue
+:href="isDetail || !montado ? undefined : '/producto/' + cwId"
 ```
 
-Cada paso se ve funcionar solo. **El 5 es el que va a pedir más idas y venidas** — igual que pasó con la lente.
+Entre que el servidor manda el HTML y que Vue engancha el manejador hay una
+ventana en la que el enlace ya está pintado y **no lo cancela nadie**: un clic
+ahí lo sigue el navegador y se va a `/producto/<id>`, que hoy no es una ruta →
+**404 con traza de servidor**, porque es una carga entera.
+
+Se arregla desde el HTML y no desde el manejador: **sin `href`, un `<a>` no tiene
+comportamiento de activación y no hay nada que cancelar.** El primer render del
+cliente coincide con el del servidor —los dos sin `href`— así que no hay
+desajuste de hidratación.
+
+> Cuando exista `/producto/:id`, esta protección **se puede quitar**. Mientras no
+> exista, el enlace es una promesa que la app no puede cumplir: abrirlo en
+> pestaña nueva sigue dando 404.
+
+### ⚠️ Los botones de dentro llevan `.stop.prevent`
+
+Volver, tallas y comprar. `.stop` corta la subida hasta el `<a>` —un botón de
+cerrar no debe pasar por el elemento que abre— pero **al cortarla, el
+`preventDefault` del panel ya no corre**, y los tres viven dentro del `<a>`.
+Quien corta la burbuja tiene que cancelar por su cuenta.
 
 ---
 
-## 14 · Preguntas abiertas
+## 16 · Trampas que ya costaron una vez
 
-Ninguna bloquea empezar, pero conviene resolverlas antes del paso 4:
+| Síntoma | Causa real |
+|---|---|
+| El detalle se quedaba montado al cerrar | `<Transition>` de Vue usa `requestAnimationFrame`; sin frames nunca completa. Se sustituyó por `v-if` + `@keyframes` CSS, que desmonta sin condiciones |
+| El panel se quedaba abierto tras el clic | `:focus-within` casaba con el foco que deja el ratón. → `:focus-visible` |
+| El zapato se salía del ancho al abrir | `transform` movía la caja entera. → `object-position` |
+| Una card se veía más compacta | el Chicago tenía 0 px de margen en el lienzo. → caja unión con 46 px |
+| Las filas salían vacías en móvil | `<img loading="lazy">` sin `width`/`height` mide cero |
+| La ficha del detalle desbordaba | `align-content: start` impedía que la fila `1fr` se estirara |
+| El último panel se cortaba con la barra del navegador | `vh` mide el viewport con las barras retraídas. → `svh` |
 
-1. **¿Los dos colorways que faltan son del mismo Samba u otros productos?** Cambia si el acordeón enseña *colorways de un modelo* (como la referencia de los Jordan y los AirPods, que son el mismo producto en 4 colores) o *productos distintos*. La referencia sugiere lo primero.
-2. **¿El CTA navega al detalle del producto o filtra la tienda?** Hoy `AppNav` ya manda a `/tienda?f=…`; el acordeón podría ir a `/producto/:id`.
-3. **¿Lleva título de sección encima?** Las referencias no lo muestran, pero una landing suele necesitarlo.
+### `svh`, y no `dvh` ni `vh`
+
+- `vh` — viewport con las barras **retraídas**. Con la barra a la vista, el
+  último panel sale cortado.
+- `dvh` — el viewport **actual**, que cambia al scrollear. No corta, pero los
+  cuatro paneles se redimensionan mientras el dedo se mueve y el reparto se ve
+  temblar.
+- `svh` — viewport con las barras **desplegadas**: el más pequeño de los tres, y
+  por eso el único estable. Se paga un hueco cuando la barra se retrae, y para
+  una pieza de cuatro paneles es mejor trato.
+
+En escritorio los tres valen lo mismo.
+
+---
+
+## 17 · Medidas verificadas
+
+Medido en el navegador sobre el prototipo, no calculado.
+
+### Reparto
+
+| Estado | 1280 px (columnas) | 390 px (filas) |
+|---|---|---|
+| reposo | 25 · 25 · 25 · 25 | 25 · 25 · 25 · 25 |
+| señalado | 20 · 40 · 20 · 20 | 20 · 40 · 20 · 20 |
+| detalle | 0 · 100 · 0 · 0 | 0 · 100 · 0 · 0 |
+| tras volver | 25 · 25 · 25 · 25 | 25 · 25 · 25 · 25 |
+
+### El detalle en teléfono — tres anchos
+
+Distancias en px desde los bordes del panel.
+
+| | 375 × 812 | 390 × 844 | 430 × 932 |
+|---|---|---|---|
+| Regresar (desde arriba) | 87 | 87 | 87 |
+| Título | 137 | 137 | 137 |
+| Zapato | 178 → 504 | 185 → 522 | 205 → 578 |
+| Tallas | 581 | 613 | 701 |
+| Comprar (desde abajo) | **87** | **87** | **87** |
+| Desborde horizontal | 0 | 0 | 0 |
+| Aire zapato↔tallas | 77 | 91 | 123 |
+
+El zapato cae siempre en la banda **22%–62%** y el reserve superior e inferior es
+siempre el mismo `--av-nav-space`.
+
+---
+
+## 18 · Qué revisar al reconstruir
+
+1. **`@property` no tiene fallback útil.** En un navegador sin soporte, `--pa-w`
+   no interpola y el reparto **salta** en vez de animarse. Funciona, pero sin
+   transición. Es el único punto del componente que degrada de forma visible.
+2. **Los tiempos están declarados, no juzgados.** 500 ms de transición y 520 de
+   la vuelta salieron mirando el resultado en el prototipo; **verifícalos en un
+   teléfono real**, que es donde el doble tap y la vuelta se sienten.
+3. **`/producto/:id` sigue sin existir.** Cuando exista, `onProducto` en
+   `pages/index.vue` pasa a ser un `navigateTo` y la protección del `href` (§15)
+   se puede retirar.
+4. **`buy` no hace nada todavía.** Cuando exista la bolsa, es un `cart.add()`.
+5. **Los datos de §12 son placeholder.** Precio, descripción y tallas.
