@@ -19,9 +19,38 @@
   --av-ink:   #0E0E0F;
   --av-paper: #FBFAF7;
 
-  /* tipografía — PENDIENTE: la marca no tiene tipografía definida todavía */
-  --av-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
-             "Helvetica Neue", Arial, sans-serif;
+  /* TIPOGRAFÍA — Outfit, y en TODO. Es la única familia del sitio: cuerpo,
+     títulos y el texto gigante del fondo. Se pide a Google Fonts en
+     `nuxt.config.ts`.
+
+     La pila de reserva es la del sistema, y está por si la descarga falla o
+     tarda: con `display=swap` se pinta con ella y se cambia al llegar la buena.
+     Lo que se mueve al cambiar es el ancho, y de eso se ocupa `useFitText`, que
+     vuelve a medir con `document.fonts.ready`. */
+  --av-font: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+             Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* LA DE DISPLAY, y display quiere decir display: es para cuerpos enormes y
+     para nada más. Hoy la usa una sola pieza —`.ps__word`, el texto gigante del
+     fondo del showcase— y el día que la use otra, será otra igual de grande.
+     Ni un título de sección, ni una etiqueta: Playfair es una didona de
+     contraste alto, y lo que a 300 px es un trazo fino a 14 px es un trazo que
+     desaparece.
+
+     La reserva no es «una serif cualquiera»: son las que ya están instaladas y
+     tienen la misma pinta de didona con remates finos —Didot en Mac, Bodoni en
+     Windows— así que mientras la web carga, la palabra se pinta con una letra
+     parecida y el cambio no es un salto de estilo, sólo de ancho. Se pide en
+     nuxt.config; ver ahí por qué un solo corte y por qué `swap`. */
+  /* El texto gigante del fondo del showcase usaba Playfair Display. Ya no: la
+     letra es Outfit en todo el sitio, así que esto apunta a la misma familia y
+     se queda como nombre —lo que distingue a ese texto es el CUERPO y el peso,
+     no otra tipografía—. Se deja el token en vez de borrarlo porque el
+     componente lo pide por nombre y así el día que vuelva a haber una familia
+     de display, se cambia aquí y en ningún sitio más. */
+  --av-font-display: var(--av-font);
+  --av-font-display-old: "Playfair Display", "Didot", "Bodoni MT",
+                     "Times New Roman", Georgia, serif;
 
   /* ── Lo que va ENCIMA del vidrio ──────────────────────────────────────────
      Estos NO se invierten con el fondo, y es a propósito: el velo es negro
@@ -86,6 +115,57 @@
   --av-nav-gap: 16px;
   --av-nav-top: calc(var(--av-nav-gap) + env(safe-area-inset-top, 0px));
   --av-nav-space: calc(var(--av-nav-top) + var(--av-nav-h) + var(--av-nav-gap));
+
+  /* ── LA PÍLDORA DE ACCIÓN ──────────────────────────────────────────────
+     UNA sola medida para todos los botones de contenido: «Ver detalles» y
+     «Regresar» y «Comprar ahora» del acordeón, los mismos tres del rollo, y el
+     «Comprar ahora» del showcase. Ocho botones repartidos en tres componentes.
+
+     Salen a token por lo que se veía al ponerlos uno al lado del otro: cada
+     pieza había elegido su alto por su cuenta y ninguna estaba mal por
+     separado — 38 en el rollo porque el botón no debía competir con el zapato,
+     35 en el acordeón porque el alto salía del relleno, 42 en el showcase
+     porque salía de otro relleno distinto. Tres números que nadie decidió
+     juntos. En la página son la misma acción repetida, y una acción que cambia
+     de tamaño según dónde esté se lee como tres acciones distintas.
+
+     44 y no 38, que era el más común de los tres: 44 px es el objetivo táctil
+     mínimo, y el rollo YA subía a 44 en teléfono con su propia regla. O sea que
+     el número al que había que converger estaba escrito hace tiempo en el sitio
+     donde el tamaño no era negociable — lo que se quita ahora es la excepción
+     de escritorio, no el criterio.
+
+     El cuerpo del texto y el glifo van con el alto y no aparte: un botón de 44
+     con letra de 12 es un botón con un agujero en medio. 13.5 es el cuerpo del
+     sistema, y el glifo un pelo por encima —16— que es lo que hace que un icono
+     de trazo pese igual que una mayúscula al lado. */
+  /* EL ANCHO MÍNIMO, y es lo que faltaba para que dejaran de parecerse a
+     medias: con el alto, el cuerpo y el relleno ya unificados, «Regresar» medía
+     118 y «Comprar ahora» 159 sencillamente porque una palabra es más larga que
+     dos. Dos botones de la misma familia y a la misma altura de la mano, uno
+     un 35% más ancho que el otro — el ojo lee eso como jerarquía y aquí no la
+     hay: son las dos salidas de la ficha.
+
+     164 sale del más ancho de todos («Comprar ahora», 159) más un respiro. El
+     contenido va centrado dentro, así que a los cortos les crece el aire, no el
+     texto. */
+  /* EL MARGEN LATERAL DE TODA PIEZA A PANTALLA COMPLETA. Un solo número para
+     el showcase, el acordeón, el rollo, el panal y el díptico: eran cinco
+     `clamp` distintos —24/4vw/64, 3cqw/34, 16/4vw/64, 10/2vw/26, 18/3.4vw/56— y
+     en una página donde las piezas se ven una detrás de otra, cinco márgenes
+     distintos se leen como cinco encuadres distintos.
+
+     Lo que NO entra aquí: lo que va a sangre por diseño — el texto gigante del
+     fondo, el plano de color del acordeón y las fotos del panal. El margen es
+     de lo que se lee, no del fondo. */
+  --av-gutter:      clamp(16px, 4vw, 64px);
+
+  --av-action-w:    164px;
+  --av-action-h:    44px;
+  --av-action-px:   20px;    /* relleno lateral */
+  --av-action-gap:  9px;     /* glifo ↔ palabra */
+  --av-action-fs:   13.5px;
+  --av-action-ico:  16px;
 }
 
 /* La escribe el escenario según el fondo activo (layouts/default.vue).

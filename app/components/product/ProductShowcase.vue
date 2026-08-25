@@ -8,7 +8,7 @@
  *   FRAME DE ENFRENTE
  *     fila 1   texto corto, centrado en horizontal y en vertical
  *     fila 2   el zapato — se monta sobre el texto del fondo
- *     fila 3   dos columnas: info izquierda · info derecha
+ *     fila 3   tres huecos: info izquierda · comprar · info derecha
  *
  * El scrollover: un carril alto con la pieza `sticky` dentro. Mientras el
  * carril cruza el viewport la composición se queda quieta y lo único que gira
@@ -25,6 +25,7 @@
  * El contenido entra por props, con slots para los dos bloques de info cuando
  * un producto pida algo que no cabe en el molde.
  */
+import { ShoppingBag } from 'lucide-vue-next'
 import { COLORWAYS, COLORWAY_IDS, DEFAULT_COLORWAY, toCss } from '~/assets/js/colorways'
 
 const props = defineProps({
@@ -42,16 +43,34 @@ const props = defineProps({
   hold: { type: Number, default: 55 },
   /** Sólo en frame="fixed": qué frame de la secuencia se pinta. */
   still: { type: Number, default: 0 },
-  /** El texto gigante del frame de atrás. Sin versales, como todo lo demás:
-      primera mayúscula y el resto minúsculas, aunque sea una marca. */
+  /**
+   * El texto gigante del frame de atrás.
+   *
+   * Se escribe como se lee y se pinta como se escribe: «Adidas», primera
+   * mayúscula y el resto minúsculas, aunque sea una marca y aunque acabe a 300
+   * px de cuerpo. La regla de la casa no tiene excepción, y aquí además la caja
+   * mixta es la que le da perfil a la mancha — ver `.ps__word`.
+   */
   word: { type: String, default: 'Adidas' },
   /** Fila 1 — texto corto, centrado. */
   eyebrow: { type: String, default: '' },
 })
 
+/* MISMA FIRMA que el acordeón y el rollo: `{ id, size }`. Aquí `size` va
+   siempre `null` —el showcase no pide talla, sus dos «Color» y «Size» son
+   maquetas sin estado— pero la forma del evento se respeta igual para que la
+   página pueda enganchar los tres al mismo manejador. Cuando exista la bolsa,
+   este botón lleva a elegir talla; el acordeón y el rollo ya la traen. */
+const emit = defineEmits(['buy'])
+
 const cw = computed(() => COLORWAYS[props.variant] || COLORWAYS[DEFAULT_COLORWAY])
 const frames = computed(() => cw.value.frames || [])
-const eyebrowText = computed(() => props.eyebrow || `${cw.value.name} — ${cw.value.line}`)
+/* PUNTO MEDIO, no raya. La raya —«—»— es un signo de puntuación: abre un inciso
+   y pide una pausa de lectura, y lo que hay aquí no es una frase sino dos datos
+   del mismo rango puestos uno al lado del otro. El punto medio es un SEPARADOR y
+   no dice nada más. Es además el que ya usa el rollo en su ficha, así que los
+   dos componentes separan igual. */
+const eyebrowText = computed(() => props.eyebrow || `${cw.value.name} · ${cw.value.line}`)
 
 const scrolls = computed(() => props.frame === 'fluid' && frames.value.length > 1)
 
@@ -59,10 +78,19 @@ const track = ref(null)
 const { index: scrollIndex } = useScrollSequence(track, () => (scrolls.value ? frames.value.length : 0))
 
 /* El texto del fondo llena el ancho del frame. Con un tamaño fijo en vw el
-   margen a los lados dependería de cuántas letras tenga la palabra. */
+   margen a los lados dependería de cuántas letras tenga la palabra.
+
+   Y con TOPE DE ALTO al 42% del frame. Sin él, una marca de pocas letras se
+   pasa: «NIKE» necesita casi vez y media el cuerpo de «ADIDAS» para llenar el
+   mismo ancho, y a ese cuerpo la palabra se sale del encuadre por arriba y por
+   abajo. Con el tope manda el más pequeño de los dos — llena el ancho si cabe
+   de alto, y si no, llena el alto y deja aire a los lados.
+
+   42% y no más porque el zapato se monta encima y la palabra tiene que asomar,
+   no rodearlo. */
 const back = ref(null)
 const wordEl = ref(null)
-useFitText(wordEl, back, 0.995)
+useFitText(wordEl, back, 0.995, 0.42)
 
 const active = computed(() => {
   if (!scrolls.value) return Math.min(frames.value.length - 1, Math.max(0, props.still))
@@ -100,7 +128,7 @@ const trackStyle = computed(() => (scrolls.value
                 v-for="(f, i) in frames"
                 :key="f.src"
                 :src="f.src"
-                :alt="`${cw.name} — ${f.label}`"
+                :alt="`${cw.name} · ${f.label}`"
                 class="ps__shoe"
                 :class="{ 'is-on': i === active, 'is-flow': i === 0 }"
                 :fetchpriority="i === 0 ? 'high' : 'auto'"
@@ -123,6 +151,29 @@ const trackStyle = computed(() => (scrolls.value
               </slot>
             </div>
 
+            <!-- EL BOTÓN VA EN LA FILA 3 Y NO FLOTANDO SOBRE EL FRAME, y es la
+                 diferencia entre estar centrado y estar en medio: en su hueco
+                 propio de la rejilla comparte línea de base con el precio y con
+                 el contador, así que el borde inferior de la composición sigue
+                 siendo uno. Puesto en absoluto quedaría encima de la fila y
+                 taparía a alguien en cuanto la ventana se estrechara.
+
+                 SÓLIDO, y el único macizo de toda la pieza. Aquí no cabe el
+                 vidrio: detrás pasa el color plano del colorway, que cambia con
+                 el zapato, y un velo translúcido sobre cuatro fondos distintos
+                 es cuatro botones distintos. En tinta llena se lee igual sobre
+                 todos, y de paso es lo que lo separa de los dos recuadros de
+                 «Color» y «Size» que tiene al lado — aquéllos se eligen, éste se
+                 pulsa. -->
+            <GlassSurface :radius="999" class="ps__buy">
+              <button
+                type="button"
+                @click="emit('buy', { id: variant, size: null })"
+              >
+                <ShoppingBag :stroke-width="1.8" /> Comprar ahora
+              </button>
+            </GlassSurface>
+
             <div class="ps__info-r">
               <slot name="right">
                 <p class="ps__index">{{ String(active + 1).padStart(2, '0') }}</p>
@@ -144,7 +195,7 @@ const trackStyle = computed(() => (scrolls.value
   position: relative;
   /* El margen lateral del frame. Vive aquí y no dentro del `padding` para que
      el bloque de móvil lo cambie en un sitio y no reescriba la regla entera. */
-  --ps-pad-x: clamp(24px, 4vw, 64px);
+  --ps-pad-x: var(--av-gutter);
   /* La unidad de alto del frame. En `fluid` es el viewport; en `fixed` se pina
      a 1024 (ver el bloque del final), y por eso pasa por una variable en vez de
      escribir `vh` a pelo en la fórmula del zapato. */
@@ -177,18 +228,49 @@ const trackStyle = computed(() => (scrolls.value
   pointer-events: none;
 }
 /* el tamaño de aquí es solo el punto de partida: useFitText lo reescala para
-   que la palabra llene el ancho del frame, sea la palabra que sea — «ADIDAS» y
-   «NIKE» acaban los dos pegados a los dos bordes */
+   que la palabra llene el ancho del frame, sea la palabra que sea — «Adidas» y
+   «Nike» acaban las dos pegadas a los dos bordes */
 .ps__word {
+  /* PLAYFAIR DISPLAY, la única pieza del proyecto que no va con la letra del
+     sistema. Es una didona: contraste altísimo entre el trazo grueso y el fino,
+     y remates de pelo. A 300 px de cuerpo eso es exactamente lo que se quiere de
+     un fondo —la mancha deja de ser un bloque plano y pasa a tener dibujo— y por
+     eso el token se llama `display` y no `serif`: a cuerpo pequeño los finos se
+     rompen y no vale para nada más. */
+  font-family: var(--av-font-display);
+  /* VERSALES. Es la excepcion a la regla de la casa —primera mayuscula y el
+     resto minusculas— y va escrita: aqui la palabra no es un titulo que se lee,
+     es la MASA que ocupa el fondo del encuadre, y en caja baja las astas
+     descendentes obligan a dejar aire por abajo que rompe la banda. */
+  text-transform: uppercase;
   font-size: 26vw;
   font-weight: 900;
-  letter-spacing: -.055em;
+  /* SIN VERSALES, tampoco aquí. La regla de la casa —primera mayúscula y el
+     resto minúsculas— no tiene excepción en todo el proyecto, ni siquiera para
+     un fondo de 300 px que nadie lee. La palabra se pinta tal y como llega en
+     `word`: «Adidas».
+
+     Y con Playfair la caja mixta gana algo que en palo seco no daba: las
+     ascendentes y las descendentes son lo que dibuja una didona. La `d` sube,
+     la `s` se cierra, y el fondo pasa de ser un rectángulo de letras a tener
+     perfil. Un bloque de versales lo habría aplanado. */
+
+  /* EL TRAZO SE ABRE DE -.055em A -.015em AL CAMBIAR DE LETRA, y no es un
+     retoque: el -.055 estaba calculado para una grotesca de palo seco, donde
+     apretar sólo acerca dos verticales. Playfair tiene REMATES, que son lo que
+     más sobresale de la caja de cada letra — a ese trazo, el remate de la `d` se
+     mete debajo del de la `i` y la palabra se lee como una sola forma pegada,
+     que es exactamente lo contrario de lo que hace una didona. Sigue siendo
+     negativo, que es lo que mantiene la mancha compacta; sólo deja pasar el
+     remate. */
+  letter-spacing: -.015em;
   /* CSS aplica el letter-spacing TAMBIÉN después de la última letra, así que la
-     caja acaba .055em antes que la tinta: centrada, dejaba margen a la
+     caja acaba .015em antes que la tinta: centrada, dejaba margen a la
      izquierda y se comía la última letra por la derecha. Este padding devuelve
      justo ese hueco a la caja y el centrado vuelve a ser simétrico. Va en em
-     para que escale con el tamaño que le ponga useFitText. */
-  padding-inline-end: .055em;
+     para que escale con el tamaño que le ponga useFitText, y su número es SIEMPRE
+     el del trazo de arriba — si uno cambia, cambian los dos. */
+  padding-inline-end: .015em;
   line-height: .8;
   white-space: nowrap;
   color: var(--ps-word);
@@ -315,12 +397,19 @@ const trackStyle = computed(() => (scrolls.value
 .ps__shoe.is-flow { position: relative; height: auto; }
 .ps__shoe.is-on { opacity: 1; }
 
-/* ── fila 3 — dos columnas ─────────────────────────────────────────────── */
+/* ── fila 3 — dos columnas y el botón en medio ─────────────────────────────
+   `1fr auto 1fr` y no `1fr 1fr 1fr`: los dos `1fr` de los lados son IGUALES
+   entre sí, así que el hueco de en medio queda centrado en el frame pase lo que
+   pase — y como mide `auto`, el botón ocupa lo que ocupa su texto y no estira ni
+   encoge con el ancho de la ventana. Con tres tercios el botón se centraría
+   igual, pero el suyo sería un tercio de pantalla y en 1440 eso son 440 px de
+   caja para 130 de texto: el `justify-self` lo volvería a apretar y estaríamos
+   describiendo dos veces la misma medida. */
 .ps__info {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr auto 1fr;
   align-items: end;
   gap: 24px;
 }
@@ -345,6 +434,53 @@ const trackStyle = computed(() => (scrolls.value
   letter-spacing: .03em;
   color: var(--ps-ink-soft);
 }
+
+/* VIDRIO, como los otros cuatro botones de la casa. Era de tinta maciza del
+   colorway y se cambió: en una página donde «Comprar ahora» aparece en tres
+   piezas seguidas —aquí, en el acordeón y en el rollo— tener uno macizo y dos
+   de vidrio los convierte en tres botones distintos.
+
+   Y las MEDIDAS son las del sistema (`--av-action-*`): mismo alto, mismo
+   relleno, mismo cuerpo, mismo glifo y el mismo ancho mínimo que «Regresar» y
+   «Ver detalle». Tenía 13 px de letra, 26 de relleno y alto libre.
+
+   Lo que se pierde al dejar la tinta del colorway: el botón ya no se invierte
+   con el zapato. No hace falta — sobre el velo negro el texto es claro siempre,
+   que es justo para lo que existe un material estandarizado. */
+.ps__buy {
+  flex: none;
+  min-width: var(--av-action-w);
+  height: var(--av-action-h);
+  white-space: nowrap;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.ps__buy :deep(.av-glass__body) { height: 100%; }
+.ps__buy button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--av-action-gap);
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  padding: 0 var(--av-action-px);
+  font-family: inherit;
+  font-size: var(--av-action-fs);
+  font-weight: 500;
+  letter-spacing: -.005em;
+  /* Sobre el velo negro el contenido es claro, dé igual el colorway. Es el
+     motivo de tener un material estandarizado: el contraste del texto deja de
+     depender del plano de color que haya detrás. */
+  color: var(--av-on-glass-strong);
+  cursor: pointer;
+}
+.ps__buy :deep(svg) { width: var(--av-action-ico); height: var(--av-action-ico); }
+/* El hover no cambia el color —no hay un segundo tono de tinta en el colorway y
+   no se va a inventar aquí—: lo abre un poco hacia el fondo, que es el mismo
+   gesto sea cual sea el zapato. */
+.ps__buy:hover { opacity: .86; }
+.ps__buy:active { transform: translateY(1px); }
 
 .ps__index {
   margin: 0;
@@ -383,7 +519,7 @@ const trackStyle = computed(() => (scrolls.value
 @media (max-width: 560px) {
   /* Aquí el que manda es el ANCHO — al revés que en escritorio — así que cada
      píxel que se le quita al margen lateral es alto de zapato. */
-  .ps { --ps-pad-x: 16px; }
+  /* el minimo del token ya es 16 en pantalla estrecha; no hace falta repetirlo */
 
   /* Se abre la red, y SÓLO la red: el tope por alto sigue en la fórmula. */
   .ps__seq { --ps-shoe-net: 92%; }
@@ -391,6 +527,17 @@ const trackStyle = computed(() => (scrolls.value
   .ps__info { grid-template-columns: 1fr; }
   .ps__info-r { text-align: left; }
   .ps__ticks { justify-content: flex-start; }
+
+  /* EL BOTÓN SE VA AL FINAL Y SE ESTIRA. Con una columna deja de haber un
+     «medio» donde ponerlo: en el DOM está entre los dos bloques de info, y ahí
+     partiría en dos lo que es un solo dato del producto —nombre, precio,
+     contador—. `order` lo baja sin tocar el orden de lectura de arriba.
+
+     Y ancho completo, que es lo que se hace en un teléfono con la única acción
+     de la pantalla: el pulgar no apunta, barre. Deja además de estar centrado a
+     ojo cuando el texto es corto — el borde del botón coincide con el de la
+     columna, que es el mismo que el del nombre y el del precio. */
+  .ps__buy { order: 1; justify-content: center; width: 100%; margin-top: 4px; }
 }
 
 /* ── la medida de diseño no mira por la ventana ─────────────────────────────
@@ -408,13 +555,18 @@ const trackStyle = computed(() => (scrolls.value
   --ps-vh: 10.24px;     /* 1% de 1024: el alto del frame, no el de la ventana */
 }
 .ps--fixed .ps__seq { --ps-shoe-net: 58%; }
-.ps--fixed .ps__info { grid-template-columns: 1fr 1fr; }
+.ps--fixed .ps__info { grid-template-columns: 1fr auto 1fr; }
 .ps--fixed .ps__info-r { text-align: right; }
 .ps--fixed .ps__ticks { justify-content: flex-end; }
+/* deshace el bloque de teléfono: en la medida de diseño el botón vuelve a en
+   medio y a medir lo que mide su texto */
+.ps--fixed .ps__buy { order: 0; width: auto; margin-top: 0; }
 
 /* Sin movimiento: la secuencia deja de depender del scroll y se queda en el
    primer frame. El resto de la composición no cambia. */
 @media (prefers-reduced-motion: reduce) {
   .ps__shoe { transition: none; }
+  .ps__buy { transition: none; }
+  .ps__buy:active { transform: none; }
 }
 </style>

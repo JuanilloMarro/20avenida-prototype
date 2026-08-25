@@ -51,6 +51,14 @@ const catalog = computed(() => Object.entries(COLORWAYS).map(([id, c], i) => ({
       <slot />
     </main>
 
+    <!-- FUERA de `<main>`, y eso es lo que lo hace el landmark `contentinfo`:
+         un `<footer>` metido dentro de `<main>` o de una `<section>` sigue
+         siendo HTML válido pero deja de ser el pie de la PÁGINA, y un lector de
+         pantalla pierde el salto directo. Está aquí y no en la landing por el
+         mismo motivo por el que <AppNav> está aquí: la barra y el pie son el
+         marco, no el contenido. -->
+    <SiteFooter />
+
     <DevPanel v-if="isDev" />
   </div>
 </template>

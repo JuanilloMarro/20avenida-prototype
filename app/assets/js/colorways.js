@@ -132,6 +132,30 @@ export const COLORWAYS = {
     price: '180$',
   },
 
+  /* PLACEHOLDER COMPLETO — el quinto Jordan.
+     No es un colorway real: reutiliza la foto del «pino» y sólo existe para que
+     el rollo pueda enseñar sus CINCO puestos ocupados, que con cuatro dejaba
+     uno vacío. Cuando llegue una quinta foto de verdad, se cambia `frames`, el
+     nombre de la línea y el `short`, y nada más. Y si no llega, esto se borra:
+     un catálogo con un producto inventado es peor que uno corto. */
+  'jordan-royal': {
+    name: 'Air Jordan 1',
+    short: 'Royal',
+    line: 'Game Royal · Black',
+    surface: '#1B2A63',
+    word: '#2C3F8C',
+    wordShadow: 'rgba(0, 0, 0, .18)',
+    ink: '#F1F3FA',
+    inkSoft: 'rgba(241, 243, 250, .62)',
+    hair: 'rgba(241, 243, 250, .24)',
+    accent: '#E8C547',
+    /* PLACEHOLDER: copy de muestra, no definitivo. */
+    blurb: 'Azul de cancha sobre negro. La silueta de siempre en el par de colores que la sacó del parqué a la calle.',
+    sizes: TALLAS_AJ1,
+    frames: [{ src: '/products/jordan/jordan-pine.webp', label: 'Perfil exterior' }],
+    price: '180$',
+  },
+
   'jordan-brood': {
     name: 'Air Jordan 1',
     short: 'Orquídea',

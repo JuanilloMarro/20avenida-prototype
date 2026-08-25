@@ -196,7 +196,9 @@ const estilo = computed(() => ({
   --ph-cols:  9;
 
   position: relative;
-  padding: clamp(16px, 2.6vw, 34px) clamp(10px, 2vw, 26px);
+  /* El margen lateral es el del sistema — ver `--av-gutter`. El vertical se
+     queda propio: el panal no reserva barra arriba ni suelo abajo. */
+  padding: clamp(16px, 2.6vw, 34px) var(--av-gutter);
   overflow: hidden;
 
   background-color: var(--ph-bg);

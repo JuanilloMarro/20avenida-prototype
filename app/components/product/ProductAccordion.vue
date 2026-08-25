@@ -53,6 +53,20 @@ const props = defineProps({
    * En escritorio los tres valen lo mismo: no hay barras dinámicas.
    */
   height: { type: String, default: '100svh' },
+  /**
+   * EL EMPALME CON LO QUE HAY ENCIMA. Se le pasa el id del colorway de la
+   * sección anterior —hoy el del showcase— y el acordeón difumina ese color
+   * sobre el borde de arriba de sus paneles, así que el corte entre las dos
+   * piezas deja de ser una línea.
+   *
+   * Es un ID y no un color a pelo a propósito: el que está arriba es un
+   * colorway, y pasar su id deja que sea `colorways.js` quien diga de qué color
+   * es. Si mañana el showcase cambia de zapato, el empalme le sigue solo.
+   *
+   * Vacío por defecto — sin vecino no hay nada que fundir, y la pieza suelta
+   * tiene que seguir teniendo su borde limpio.
+   */
+  blendFrom: { type: String, default: '' },
 })
 
 const emit = defineEmits(['select', 'buy'])
@@ -165,6 +179,11 @@ const geometria = computed(() => {
        basta con la del eje en línea. Un `calc()` sobre un valor que ya se
        conoce sale más barato que cambiar el tipo de contenedor. */
     '--pa-body-h': 'calc(' + props.height + ' * ' + (props.open / 100) + ')',
+    /* El color del empalme. `transparent` cuando no hay vecino: el degradado se
+       sigue pintando, pero de transparente a transparente, o sea nada. Mejor eso
+       que una regla condicional — un valor que resuelve siempre no puede dejar
+       la declaración a medias. */
+    '--pa-blend': COLORWAYS[props.blendFrom]?.surface ?? 'transparent',
   }
 })
 </script>
@@ -294,5 +313,16 @@ const geometria = computed(() => {
    declaraciones pasan de repartir ancho a repartir alto. */
 @media (max-width: 640px) {
   .pa { flex-direction: column; }
+
+  /* Y EL EMPALME SE QUEDA SÓLO EN EL PRIMERO. En columnas los cuatro paneles
+     tocan el borde de arriba de la pieza y los cuatro tienen que fundirse; en
+     filas, el único que toca lo que hay encima es el primero. Sin esto, cada
+     fila estrenaría su propia niebla clara a media pieza — cuatro cortes
+     nuevos en vez del que se venía a quitar.
+
+     Se apaga poniendo el alto de la banda a cero desde el PADRE, que es quien
+     sabe cómo está tumbado; el panel sigue sin tener que enterarse de dónde
+     está. Gana a la declaración del panel por especificidad y no por orden. */
+  .pa > *:not(:first-child) { --pa-blend-h: 0px; }
 }
 </style>

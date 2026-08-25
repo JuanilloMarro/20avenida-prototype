@@ -178,6 +178,22 @@ Valen para todo, no sólo para la barra:
   versales se va el trazo ancho que las acompañaba (`.2em`, `.42em`): ese aire
   estaba para que un bloque de mayúsculas se leyera, y en minúscula lo único que
   hace es descoser la palabra.
+
+  **Sin excepciones, y se ha comprobado dos veces.** El texto gigante del fondo
+  del showcase —`.ps__word`, 300 px de cuerpo, difuminado y en `aria-hidden`—
+  parecía la excepción evidente y no lo es: se pinta «Adidas», tal y como llega
+  en el prop. Con una didona la caja mixta gana además lo que en palo seco no
+  daba: la `d` sube, la `s` se cierra, y el fondo pasa de rectángulo de letras a
+  tener perfil.
+
+  Corolario práctico: **el dato se escribe como se lee**. Ninguna pieza tiene un
+  `text-transform` que lo cambie, así que el mismo nombre vale para el fondo del
+  showcase, para el acordeón y para el pie.
+
+- **Punto medio para separar, no raya.** «Samba OG · Collegiate Green». La raya
+  es puntuación —abre un inciso y pide pausa— y lo que hay entre esos dos datos
+  no es una frase: son dos campos del mismo rango, uno al lado del otro. El
+  punto medio separa y no dice nada más.
 - **Un solo cuerpo por panel** — 13.5 px en la barra y sus dos paneles. Lo que
   separa un título de una opción es el **peso**: 700 contra 500. Única excepción
   escrita: el input del buscador va a 16 px porque por debajo iOS hace zoom solo
@@ -261,7 +277,7 @@ FRAME DE ATRÁS      el texto gigante de marca, nada más
 FRAME DE ENFRENTE
   fila 1   texto corto, centrado en horizontal y en vertical
   fila 2   el zapato — la secuencia
-  fila 3   dos columnas: info izquierda · info derecha
+  fila 3   tres huecos: info izquierda · comprar ahora · info derecha
 ```
 
 | prop | tipo | default | qué hace |
@@ -274,6 +290,15 @@ FRAME DE ENFRENTE
 | `eyebrow` | String | nombre + línea | fila 1 |
 
 Slots `left` y `right` para la fila 3.
+
+| evento | payload | cuándo |
+|---|---|---|
+| `buy` | `{ id, size }` | «Comprar ahora», el botón del centro de la fila 3 |
+
+`id` es el colorway; `size` llega **siempre `null`** — aquí no se elige talla, así
+que el botón es la entrada a la ficha y no una compra cerrada. La firma es la
+misma que la de `<ProductAccordion>` y `<ProductReel>` para que los tres puedan
+colgar del mismo manejador.
 
 **El scrollover.** Un carril alto con la pieza `sticky` dentro. Mientras el
 carril cruza el viewport, la composición se queda clavada y lo único que cambia
@@ -322,6 +347,180 @@ pasan por detrás del texto de arriba y del bloque de info.
 
 **Ruta `/frame`** renderiza a 1440×1024 sin barra. `?v=samba-night` cambia el
 colorway, `?f=3` el frame.
+
+### `<ProductReel>` — el rollo
+
+| prop | tipo | default |
+|---|---|---|
+| `items` | Array | los cinco Air Jordan |
+| `initial` | Number | `0` |
+| `bg` | String | `'#050506'` |
+| `grain` | Number | `GRAIN_DEFAULT` |
+
+Emite `select(id)` y `change(id)`.
+
+```
+              ░░    ░░░░    ██████    ░░░░    ░░
+            extremo  lado    FOCO      lado  extremo
+
+                       Air Jordan 1
+                    Yellow Ochre · Sail
+                      [ Ver detalle → ]
+                        ─ ── ─ ─ ─
+```
+
+**Hubo un primer piso de MARCAS y se quedó fuera.** La idea era encadenar dos
+rollos —marcas → productos— y metía dos pantallas donde el usuario sólo quería
+una: el rollo es un escaparate, y un escaparate no pide que elijas la marca
+antes de dejarte mirar. `assets/js/brands.js` **sigue existiendo** con el mapa de
+marca → productos, que es cierto y hará falta en la Tienda; simplemente ya no lo
+usa esta pieza.
+
+**Sin precio.** El rollo da ganas de abrir la ficha; el precio es información de
+decisión y vive donde se decide.
+
+**Fondo negro plano `#050506`, el mismo del panal** — la primera parada de la
+rampa `negro` de marca, no un negro inventado. Tapa la rampa del escenario a
+propósito: sobre negro liso lo único que se ve es la silueta del zapato y el filo
+del vidrio. Y con él viene el **grano**, que no es textura decorativa sino lo que
+el vidrio dobla: sobre negro plano la lente no tiene detalle que doblar y las
+flechas se leerían como cristal limpio. Va en un `::before` —necesita opacidad
+propia— y **debajo** de todo, porque un `backdrop-filter` sólo ve lo que se pintó
+antes que él.
+
+**Alto: `100svh`, el MISMO que el acordeón.** Las dos piezas se comen el viewport
+y tienen que medir lo mismo o la página deja de avanzar de pantalla en pantalla
+— verificado sobre la página real. Se probó `lvh` para tapar el hueco que `svh`
+deja cuando la barra del navegador se retrae y se descartó: rompía esa igualdad.
+El hueco se cubre por el otro lado, con **`--rl-suelo: 70px`** de reserva abajo
+— donde se posa la barra del navegador — más `--av-nav-space` arriba. Medido: el
+botón queda a 84 px del borde inferior en los dos anchos.
+
+**El nombre cambia de sitio según el ancho:** encima del zapato en teléfono,
+debajo —junto al botón— en escritorio. En 375 px el zapato ocupa casi todo y el
+nombre arriba es lo primero que se lee; en escritorio el zapato es la pieza
+grande y el nombre trabaja mejor de pie de foto. Marcado duplicado con una copia
+en `display: none`, y el `aria-live` sólo en una: dos regiones vivas anunciarían
+lo mismo dos veces.
+
+**El botón es pequeño a propósito** (134×38 en escritorio): la atención es del
+nombre y del zapato. En teléfono sube a 44 de alto, el mínimo de un objetivo
+táctil.
+
+**Regla del encuadre: un rollo, un encuadre.** Los productos de un rollo tienen
+que compartir caja de recorte o el zapato pega un salto de tamaño justo en el
+momento en que se está mirando. Los cinco Jordan comparten 647×636.
+
+#### Las cinco columnas — sólo escritorio y tableta
+
+```
+│ extremo │  opción  │   FOCO   │  opción  │ extremo │
+0        20        40        60        80       100vw
+```
+
+**Cinco puestos y tres planos de profundidad:** foco (escala 1), vecinos
+(0.52 · blur 10 · opacidad .42) y extremos (0.30 · blur 17 · opacidad .20). Los
+extremos **no se pueden tocar**: a esa escala son fondo, no opción — quien
+quiera uno gira. En teléfono se apagan y quedan tres, porque a 375 px caerían
+encima de las flechas.
+
+`--rl-side-shift: 20vw` es **una columna hacia fuera**, no un número a ojo. Antes
+era `33%`, y ese porcentaje se resolvía contra el ancho del propio zapato —125
+px en un monitor de 1440—, así que los tres se amontonaban en el tercio central
+y las dos quintas partes de los extremos quedaban vacías.
+
+`translateX` va el primero de la cadena de transformaciones, así que el
+desplazamiento se aplica en el espacio del padre y **no lo encoge el `scale`**
+que viene detrás. Por eso puede ir en `vw` y significa lo que dice.
+
+**Y los puestos NO están a distancias iguales.** Los vecinos van a una columna
+del centro y los extremos a **1.55**, no a dos. Es lo que separa una fila plana
+de un rollo: un carrete redondo visto de frente tiene a los de fuera girando
+hacia el fondo, así que su separación aparente se encoge conforme se alejan. Es
+la proyección de un cilindro, `sin θ` — con pasos de 40° sale 0 · 0.64 · 0.99,
+o sea que el segundo salto es la mitad del primero.
+
+**Lo que se mide en el zapato es la TINTA, no la caja.** El recorte tiene margen
+transparente por los cuatro lados: con el ítem a 285 px la caja girada medía 351
+pero la tinta sólo 250, así que el «hueco de 9 px» que decía la caja eran 95 px
+de aire de verdad y el zapato estaba pequeño para nada. Subió un 25%.
+
+Medido en tinta a 1425 de ancho: **105 px** entre foco y vecino, **74** entre
+vecino y extremo — y ese 74 contra 105 es la perspectiva del rollo, no un
+descuadre.
+
+#### En teléfono
+
+**No hay cinco columnas:** los vecinos vuelven al desplazamiento relativo al
+propio ítem (`42%`), que es lo que a 375 px hace que se lean como profundidad y
+no como tres fotos. Los extremos se apagan.
+
+**El zapato va centrado en la PANTALLA, no en lo que sobra.** En flujo, el
+escenario se quedaba con el hueco entre el nombre y el botón, y ese hueco no
+está centrado: arriba pesan los 87 px que reserva la barra del ecommerce más los
+104 del nombre, y abajo sólo los 70 del suelo más el botón — 203 contra 140, o
+sea el zapato 31 px por debajo del centro. Sacándolo del flujo con
+`position: absolute; inset: 0` el escenario pasa a medir la **padding box**
+entera —que es contra lo que se resuelve un absoluto— así que su centro es el de
+la sección. Medido: centro del zapato 406, centro del viewport 406.
+
+**Sin flechas: el gesto es el dedo.** Un botón de 44 px sobre el zapato en una
+pantalla de 375 quita más de lo que da. Lo único que hacía falta era decirlo, y
+para eso está la pista —«Desliza para ver más»— encima del botón: una línea de
+12 px al 60% de opacidad. Es la única excepción al cuerpo del sistema en toda la
+pieza, y es a propósito: no es contenido, es una ayuda que tiene que poder
+ignorarse. El teclado y el toque en un vecino siguen girando el rollo.
+
+### `<SiteFooter>` — el pie
+
+`props: bg` (`#050506`) · `grain` (0–100).
+
+Cierra la página: la casa a la izquierda —letrero, una línea de qué es la tienda
+y las cuatro redes— y tres columnas de enlaces (20 Avenida · Métodos de pago ·
+Marcas).
+
+**Vive en el layout, detrás de `</main>`, no en la landing.** Un `<footer>`
+metido dentro de `<main>` sigue siendo HTML válido pero deja de ser el landmark
+`contentinfo`, y con eso un lector de pantalla pierde el salto directo al pie. Es
+además la simetría de `<AppNav>`: la barra y el pie son el marco, no el
+contenido. Sustituye al banco de pruebas del scroll —el héroe con el letrero—
+que estaba ahí sólo para tener altura que scrollear.
+
+**El fondo es el negro del panal, no el del escenario.** `#050506`, la primera
+parada de la rampa `negro`, y el mismo grano al 4%. Los dos plafones se tocan, y
+la única forma de que se lean como un solo bloque negro de cierre es que sean el
+mismo plafón; con la rampa del escenario debajo, el pie se aclara justo donde el
+panal es más oscuro y el empalme se ve como una costura.
+
+**El color del texto va escrito, no heredado.** `.is-light-bg` cambia la tinta
+del escenario a `--av-ink`, y esa regla llegaría hasta aquí: sobre un plafón que
+es negro siempre, dejaría el pie en negro sobre negro.
+
+**La tercera columna sale de `brands.js`.** La referencia enseña marcas que no
+están en el catálogo; escribirlas aquí sería la segunda lista de marcas de la
+casa y las dos se separarían el primer día.
+
+**El hover es amarillo, no blanco.** El enlace en reposo va al 72%; subirlo a
+blanco es un salto de brillo que se lee como movimiento, no como enlace.
+`--av-y-400` cambia de tono, que es lo único que no se confunde con el resto de
+la columna, y es el mismo gesto del icono de red y del foco.
+
+**Los títulos de columna no gritan.** Primera mayúscula y el resto minúsculas
+aunque sean títulos y aunque la referencia los ponga en versales — la regla de
+tipografía de arriba no tiene excepción aquí. Lo que separa un título de un
+enlace son el peso (800 contra 400), el cuerpo y el color: tres señales, de
+sobra. Las versales serían una cuarta y la única que además cuesta legibilidad.
+
+**Los cuatro glifos de red van dibujados en el componente.** lucide 1.0 trae
+`facebook` e `instagram` pero ya no trae youtube ni tiktok; importar dos y
+dibujar dos deja una fila corta con dos trazos distintos. Van los cuatro en el
+idioma de lucide —caja 24, trazo 2, remates redondos— y en trazo, no macizos
+como la referencia: el peso visual del resto de la casa manda sobre el parecido.
+
+**Pendiente:** ninguna de las rutas existe (`/nosotros`, `/faq`, `/marca/:id`…) y
+los perfiles de red están sin verificar. Y el título «Métodos de pago» no
+describe su lista —envíos, tiendas, ayuda, FAQ—: viene así de la referencia y se
+reproduce tal cual, pero es una decisión de contenido pendiente.
 
 ### `<BrandMark>`
 

@@ -936,3 +936,265 @@ Auditadas las diez superficies visibles: todas con el mismo anillo de 1.5 px a
 135°, `--lg-frame: 1`, y `--lg-spec` en 0.60 salvo las dos fichas `light` en
 0.72.
 
+**2026-08-24 · El rollo pasa a tener dos pisos: marcas → productos.**
+Era un carrusel de producto suelto. Ahora el primer piso gira MARCAS —texto por
+ahora, logotipo cuando lo haya— con su lista abajo a la izquierda, y «Ver
+productos» entra al segundo piso, que es el carrusel de siempre con un «←
+Marcas» arriba a la izquierda.
+
+Un solo componente, porque el mecanismo del giro es el mismo y partirlo en dos
+habría garantizado que en tres semanas se comportaran distinto. Lo que sí van
+separados son los índices: uno por piso, o volver atrás te deja en otra marca de
+la que saliste.
+
+**2026-08-24 · El rollo de escritorio se reparte en cinco columnas.**
+Los tres zapatos se amontonaban en el tercio central. La causa: `translateX(33%)`
+resuelve el porcentaje contra el ancho del PROPIO zapato —125 px a 1440—, no
+contra el de la sección. Ahora `--rl-side-shift: 20vw`, que es exactamente una
+columna de cinco, y los lados caen clavados en los centros de la 2 y la 4
+(medido: 425 y 1001 contra los 427.5 y 997.5 teóricos).
+
+Al tocar tamaños hay que medir la caja GIRADA, no la nominal: un cuadrado de
+285 px a 16° ocupa 351 de ancho real, y es esa la que no puede tocar a la del
+vecino. Por eso el ancho del ítem bajó a una columna clavada y el cuerpo del
+nombre de marca a 66 px — con «New Balance» a 84 el nombre medía 472 y se metía
+debajo de los lados.
+
+**Teléfono no se tocó**: allí los lados siguen con el desplazamiento relativo al
+propio ítem, que es lo que los hace leer como profundidad en 375 px.
+
+**2026-08-24 · El rollo, a pantalla completa de verdad, y con reservas arriba y abajo.**
+`height: 100svh` en vez de `min-height`: con un mínimo la pieza podía crecer y
+dejar de ser fullscreen en cuanto la ficha ganara una línea. Y dos reservas que
+antes no estaban escritas como tales: `--av-nav-space` arriba (la barra fija del
+ecommerce) y `--rl-suelo`, 70 px, abajo — donde se posa la barra del navegador
+en teléfono. Medido: los botones quedan a 90 px del borde inferior en los dos
+anchos.
+
+La lista de marcas sube de la esquina inferior izquierda a un **navbar de
+categorías** arriba, en columnas. Y la fila que lo contiene tiene alto propio
+(46 px) lleve el navbar o el botón de volver: sin eso, el escenario cambiaba de
+alto al cambiar de piso y el zapato pegaba un salto.
+
+En teléfono, volver baja junto a «Ver detalle» y los dos forman pareja —flecha
+izquierda / flecha derecha—. Marcado duplicado con una copia en `display: none`,
+que es el patrón que ya usa la barra de navegación.
+
+**2026-08-24 · Lo que limita el tamaño del ítem es la TINTA, no la caja.**
+El zapato se veía pequeño para una pieza a pantalla completa. La caja decía que
+no había sitio —9 px de hueco— pero eso era mentira: el recorte lleva margen
+transparente por los cuatro lados, y medido sobre el pixel la tinta del foco
+ocupaba 250 px de los 351 de su caja girada. El aire real eran 95 px.
+
+Subido un 25% (`min(25vw, 46vh, 440px)`), la tinta del foco pasa a 313 y siguen
+quedando **47 px** de aire real hasta el zapato de al lado.
+
+Una letra no tiene ese margen. Por eso el cuerpo del nombre de marca no pudo
+subir con el zapato: a 76 px «New Balance» mide 445 y su cola se mete debajo del
+ítem de la derecha. Se queda en 66.
+
+**Y fuera el «Pronto».** Todas las marcas del navbar son marcas reales; que a
+una le falten fotos hoy es un hueco del prototipo, no un estado del producto.
+Lo único que queda de eso es que su botón «Ver productos» está apagado.
+
+**2026-08-24 · Cinco puestos en el rollo de escritorio, y NO a distancias iguales.**
+Las columnas 1 y 5 se dejaban libres; ahora las ocupan dos ítems más, con un
+tercer plano de profundidad (escala 0.30, blur 17, opacidad .20) y sin poder
+tocarse — a esa escala son fondo, no opción. En teléfono se apagan y quedan
+tres, porque a 375 px caerían encima de las flechas.
+
+Los vecinos van a una columna del centro y los extremos a **1.55**, no a dos.
+Con pasos iguales lo que se ve es una fila de fotos alineadas; un carrete
+redondo visto de frente tiene a los de fuera girando hacia el fondo y su
+separación aparente se encoge. Es `sin θ`: con pasos de 40°, 0 · 0.64 · 0.99 —
+el segundo salto es la mitad del primero. Medido en tinta a 1425: **105 px**
+entre foco y vecino, **74** entre vecino y extremo.
+
+Con 4 ítems y 5 puestos uno de los extremos queda vacío, y es inevitable: el que
+está a distancia 2 es el MISMO por los dos caminos. Se prefiere el izquierdo
+(`d >= total/2` en el empate) porque es el lado por el que se lee.
+
+**2026-08-24 · El alto del rollo se ata al del acordeón, y se descarta `lvh`.**
+Se había cambiado a `100lvh` para que la sección no dejara asomar la siguiente
+cuando la barra del navegador se retrae. Descartado: importa más que las dos
+piezas a pantalla completa midan LO MISMO, o la página deja de avanzar de
+pantalla en pantalla. Vuelve a `100svh`, igual que el acordeón — verificado en
+la página real: acordeón en 3375 con 900 de alto, rollo en 4275 con 900.
+
+El hueco que `svh` deja cuando la barra se retrae se cubre por el otro lado, con
+`--rl-suelo: 70px` de reserva abajo.
+
+**2026-08-24 · «N modelos» baja a su botón, y el nombre cambia de lado.**
+La cuenta estaba en la cabecera, arriba del todo, separada de «Ver productos»
+por el escenario entero. Es el pie del botón, no un titular: van juntos.
+
+El nombre del producto va **encima** del zapato en teléfono y **debajo**, junto
+a los botones, en escritorio. En 375 px el zapato ocupa casi todo y el nombre
+arriba es lo primero que se lee; en escritorio el zapato es la pieza grande y el
+nombre trabaja mejor de pie de foto. Marcado duplicado con una copia en
+`display: none`, y el `aria-live` sólo en una: dos regiones vivas anunciarían lo
+mismo dos veces.
+
+Y los botones bajan de 158×46 a **134×38** en escritorio. A 46 competían con el
+nombre y con el zapato, que es donde tiene que estar la atención. En teléfono se
+quedan en 44 de alto porque ahí manda el objetivo táctil.
+
+**2026-08-24 · Un quinto Jordan y una quinta marca, para poder ver los cinco puestos.**
+El rollo tiene cinco puestos y con cuatro ítems uno quedaba siempre vacío. Se
+añaden `jordan-royal` —**PLACEHOLDER COMPLETO**: reutiliza la foto del pino, no
+es un colorway real— y la marca **Veja**, sin catálogo como Nike y New Balance.
+
+El quinto Jordan es un id NUEVO y no el mismo repetido, y esto importa: dos
+entradas con el mismo id romperían la clave del `v-for` y Vue reutilizaría el
+nodo equivocado al girar. Cuando llegue una quinta foto de verdad se cambian
+`frames`, `line` y `short`; y si no llega, se borra — un catálogo con un
+producto inventado es peor que uno corto.
+
+**2026-08-24 · REVERTIDO · el primer piso de marcas del rollo.**
+Se quitó entero. Metía dos pantallas donde el usuario sólo quería una: el rollo
+es un escaparate, y un escaparate no pide que elijas la marca antes de dejarte
+mirar. Con él se van el navbar de categorías y el botón de volver — queda un
+solo botón, «Ver detalle».
+
+`assets/js/brands.js` **se queda**: el mapa de marca → productos sigue siendo
+cierto y hará falta en la Tienda. Lo que se fue es el componente que lo usaba.
+
+**2026-08-24 · Fuera el precio del rollo.**
+El rollo da ganas de abrir la ficha; el precio es información de decisión y vive
+donde se decide.
+
+**2026-08-24 · El rollo pinta su propio fondo: negro plano, como el panal.**
+`#050506`, la primera parada de la rampa `negro` de marca. Tapa la rampa del
+escenario a propósito: sobre negro liso lo único que se ve es la silueta del
+zapato y el filo del vidrio.
+
+Y con él entra el grano, que no es decoración: sobre negro plano la lente no
+tiene detalle que doblar y las flechas se leerían como cristal limpio. Va en un
+`::before` —necesita opacidad propia— y debajo de todo, porque un
+`backdrop-filter` sólo ve lo que se pintó antes que él. Es la misma solución que
+ya usa el panal, con los mismos dos props (`bg` y `grain`).
+
+**2026-08-24 · Centrado del teléfono: comprobado, y no había desvío.**
+Se reportó que en teléfono no todo estaba centrado. Medido pieza a pieza contra
+el centro del área de contenido: foco 0, nombre 0, botón 0, contador 0. Lo que
+descuadraba la medición hecha sobre el pixel eran dos cosas ajenas al
+componente: la barra de scroll del navegador headless —15 px que no existen en
+un teléfono— y el engranaje del `DevPanel`, que flota abajo a la derecha y sólo
+existe en desarrollo.
+
+Lo que sí cambió, y probablemente era lo que se veía torcido: con dos botones el
+par se centraba como fila; ahora hay uno solo y no hay nada que repartir.
+
+**2026-08-24 · Teléfono: el zapato se centra en la pantalla y se van las flechas.**
+El zapato se veía bajo, y no era una impresión: en flujo el escenario ocupaba el
+hueco entre el nombre y el botón, y ese hueco no está centrado. Arriba pesan los
+87 px que reserva la barra del ecommerce más los 104 del nombre; abajo, sólo los
+70 del suelo más el botón. 203 contra 140 — el zapato caía 31 px por debajo del
+centro.
+
+Se arregla sacando el escenario del flujo: `position: absolute; inset: 0` lo
+hace medir la **padding box** entera —que es contra lo que se resuelve un
+absoluto, no contra la caja de contenido— así que su centro es el de la sección.
+El nombre y el botón siguen en flujo por encima, con `space-between`. Medido:
+centro del zapato 406, centro del viewport 406.
+
+Y fuera las flechas: en 375 px un botón de 44 sobre el zapato quita más de lo
+que da, y el gesto ya existía. Lo que faltaba era decirlo — de ahí la pista
+«Desliza para ver más» encima del botón, a 12 px y al 60% de opacidad. Es la
+única excepción al cuerpo del sistema en la pieza, y deliberada: no es
+contenido, es una ayuda que tiene que poder ignorarse. Un carrusel sin mando
+visible es un carrusel que nadie descubre.
+
+**2026-08-24 · Entra `<SiteFooter>` y se va el banco de pruebas del scroll.**
+La landing terminaba en el héroe con el letrero —dos botones y un párrafo sobre
+el material— que estaba ahí sólo para tener altura que scrollear mientras se
+comprobaba que la barra fija aguantaba hasta abajo y que el velo no se inmutaba
+al pasar de sección clara a oscura. Su propio comentario decía que se borraba en
+cuanto hubiera contenido real. Lo hay: cuatro componentes de producto comprueban
+ya las dos cosas, y lo que faltaba era el cierre.
+
+**El pie va en el LAYOUT, no en la página.** Un `<footer>` dentro de `<main>` es
+HTML válido pero no es el landmark `contentinfo`: deja de ser el pie de la
+página y un lector pierde el salto directo. Va detrás de `</main>`, junto a
+`<AppNav>` — la barra y el pie son el marco, no el contenido, y el día que haya
+una segunda ruta ya están puestos.
+
+**Y pisa el fondo del escenario con el negro del panal.** Es la excepción a lo
+que documenta `backgrounds.js` —no pintar plano propio— y tiene motivo
+geométrico, no estético: el panal es quien lo toca por arriba, y sobre la rampa
+del escenario el pie se aclara justo donde el panal es más oscuro. La costura
+horizontal se ve. Mismo `#050506` y mismo grano al 4% = misma superficie, y los
+dos plafones se leen como un solo bloque negro de cierre. Por lo mismo el color
+del texto va escrito: `.is-light-bg` llegaría hasta aquí y dejaría el pie en
+negro sobre negro.
+
+**Las marcas salen de `brands.js`.** La referencia enseña Puma y Under Armour,
+que no están en el catálogo. Escribirlas en el pie sería la segunda lista de
+marcas de la casa; a la primera alta empiezan a separarse.
+
+**Hover amarillo en los enlaces, no blanco.** El enlace en reposo va al 72% de
+blanco; subirlo a blanco puro es un salto de BRILLO, y sobre una columna de
+texto del mismo tono eso se lee como que algo se ha movido, no como que hay un
+enlace. `--av-y-400` cambia de tono — lo único que no se confunde con sus
+vecinos— y repite el gesto que ya hacen el icono de red y el foco.
+
+**Los cuatro glifos de red van dibujados a mano.** lucide 1.0 trae `facebook` e
+`instagram` pero ya no youtube ni tiktok. Importar dos y dibujar dos deja una
+fila de cuatro con dos trazos distintos, y en una fila corta eso se ve. Los
+cuatro en el idioma de lucide —caja 24, trazo 2, remates redondos— y en trazo,
+no macizos como la referencia: todos los iconos de la casa son de trazo y el
+peso visual manda sobre el parecido.
+
+**2026-08-24 · «Nunca versales» se queda SIN excepciones, y el fondo del showcase estrena Playfair Display.**
+La regla de tipografía se puso a prueba en las dos direcciones el mismo día y
+sale reforzada: primera mayúscula y el resto minúsculas, sea un título, una
+etiqueta, una fila o una palabra de 300 px de cuerpo.
+
+El pie nuevo la cumple entera —sus tres títulos de columna van en caja mixta
+aunque la referencia los grite—: lo que separa ahí un título de un enlace son el
+peso (800 contra 400), el cuerpo y el color; tres señales bastan, y las versales
+serían la única cuarta que además cuesta legibilidad.
+
+Y `.ps__word`, el texto gigante del frame de atrás, TAMPOCO es excepción. Pasó
+un rato en versales con el argumento de que no es texto sino una mancha —va
+difuminada, va en `aria-hidden`— y de que una mancha necesita bloque. No se
+sostiene: con la letra nueva, la caja mixta es precisamente lo que le da perfil.
+La `d` sube, la `s` se cierra, y el fondo deja de ser un rectángulo de letras.
+Un bloque de versales lo aplanaba.
+
+Corolario práctico, que es lo que hay que recordar: **ninguna pieza lleva
+`text-transform`**, así que el dato se escribe como se lee y el mismo nombre
+vale para el fondo del showcase, para el acordeón y para el pie. Un dato en
+mayúsculas no se puede devolver a minúsculas.
+
+**La letra: Playfair Display, y sólo ahí.** Es la primera pieza del proyecto que
+no usa la pila del sistema. Una didona —contraste altísimo entre el grueso y el
+fino, remates de pelo— es justo lo que se le pide a un fondo a ese cuerpo: la
+mancha deja de ser plana y pasa a tener dibujo. Por eso el token se llama
+`--av-font-display` y no `--av-font-serif`: a 14 px los finos se rompen y no
+vale para nada más. Ni un título de sección, ni una etiqueta.
+
+Se pide **un solo corte** (900, sin cursiva) y no el rango variable entero: la
+familia completa son ~120 KB para usar exactamente un peso, y con `wght@900`
+Google sirve una instancia estática de ~30 KB. Con `display=swap`, porque con el
+`block` por defecto habría hasta 3 s de hueco en blanco donde va la palabra; el
+salto de ancho al llegar la buena no descoloca nada, porque `useFitText` ya
+vuelve a medir con `document.fonts.ready` — es justo el caso para el que está.
+Y dos `preconnect`, porque son dos dominios: el CSS sale de `googleapis` y el
+fichero de `gstatic`, y sin el segundo esa conexión no se abre hasta haber leído
+el CSS.
+
+**El trazo se abre de -.055em a -.015em**, y el relleno de compensación con él
+—los dos números son siempre el mismo. El -.055 estaba calculado para una
+grotesca, donde apretar sólo acerca dos verticales. Con remates, a ese trazo el
+de la `d` se mete debajo del de la `i` y la palabra se lee como una sola forma
+pegada, que es lo contrario de lo que hace una didona. Sigue negativo —la mancha
+tiene que quedar compacta—, sólo deja pasar el remate.
+
+**Y el separador pasa de raya a punto medio.** «Samba OG · Collegiate Green», no
+«Samba OG — Collegiate Green». La raya es un signo de puntuación: abre un inciso
+y pide una pausa de lectura. Lo que hay entre esos dos datos no es una frase,
+son dos campos del mismo rango puestos uno al lado del otro, y para eso está el
+punto medio, que separa y no dice nada más. Era el separador que ya usaba el
+rollo en su ficha, así que ahora los dos componentes separan igual. Cambia
+también el `alt` de los frames, que llevaba la misma raya.

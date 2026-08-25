@@ -593,15 +593,14 @@ onBeforeUnmount(() => {
               @click.prevent="emit('select', item.id)"
             >
               <span v-if="item.id === active" class="av-glass-sel" aria-hidden="true" />
-              <!-- El icono va en su propio `<span class="av-glyph">`, NUNCA en
-                   el `<a>`: `.av-glyph` lleva `filter: drop-shadow(...)` y un
-                   ancestro con `filter` crea un backdrop root — la selección de
-                   al lado se quedaría sin nada que refractar y dejaría de ser
-                   vidrio. Como es HERMANO de `.av-glass-sel` y no su padre, no
-                   la toca. -->
-              <span v-if="item.icon" class="av-nav__icon av-glyph" aria-hidden="true">
-                <component :is="item.icon" :stroke-width="1.7" />
-              </span>
+              <!-- SIN ICONO. Estuvo aquí y se quitó: en la píldora los seis
+                   enlaces son texto corto y el glifo no añadía información, sólo
+                   143 px de ancho a una pieza que va centrada sobre la pantalla
+                   y paga cada píxel por los dos lados.
+
+                   `item.icon` NO se toca ni se borra del prop: lo siguen usando
+                   las filas del menú del teléfono, donde una lista vertical sí
+                   se recorre mejor con glifo. -->
               {{ item.label }}
             </a>
           </li>
@@ -1212,8 +1211,6 @@ onBeforeUnmount(() => {
    aquí acompaña a una letra de 13.5 y tiene que pesar menos que ella. `flex:
    none` porque un icono que se encoge dentro de un flex apretado deja de ser el
    mismo icono en cada enlace. */
-.av-nav__icon { flex: none; }
-.av-nav__icon :deep(svg) { width: 16px; height: 16px; }
 
 /* El activo NO es un relleno sólido: lleva `.av-glass-sel`, que vuelve a
    frostar lo que hay detrás — ahora con el amarillo de marca — y queda como un

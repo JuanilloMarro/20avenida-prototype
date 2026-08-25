@@ -13,7 +13,21 @@
  * fuentes web: medir antes de que llegue la fuente definitiva da un numero de la
  * fuente de reserva, que es otra.
  */
-export function useFitText(textRef, boxRef, fill = 0.99) {
+/**
+ * `fillH` — el TOPE DE ALTO, en fraccion de la caja. 0 lo desactiva.
+ *
+ * Ajustar solo por ancho basta mientras la palabra tenga siempre las mismas
+ * letras. En cuanto cambia —«ADIDAS» son seis y «NIKE» cuatro— la de menos
+ * letras necesita mucho mas cuerpo para llenar el mismo ancho, y ese cuerpo se
+ * le va de alto: la palabra crece hacia arriba y hacia abajo hasta salirse del
+ * encuadre.
+ *
+ * Con el tope, manda el que quede mas pequeno de los dos: llena el ancho si
+ * cabe de alto, y si no, llena el alto y deja aire a los lados. Es la regla de
+ * «contain» de toda la vida, escrita a mano porque aqui lo que se escala es un
+ * `font-size`, no una caja.
+ */
+export function useFitText(textRef, boxRef, fill = 0.99, fillH = 0) {
   let ro = null
 
   function fit() {
@@ -28,7 +42,21 @@ export function useFitText(textRef, boxRef, fill = 0.99) {
     const base = parseFloat(getComputedStyle(el).fontSize)
     const natural = el.scrollWidth
     if (!natural || !base) return
-    el.style.fontSize = (base * target / natural).toFixed(2) + 'px'
+    let next = base * target / natural
+    el.style.fontSize = next.toFixed(2) + 'px'
+
+    /* Y el tope de alto, con el cuerpo nuevo ya puesto: se mide lo que ocupa de
+       verdad y se reduce por la misma regla de tres. Se mide DESPUES de escribir
+       el tamano porque `line-height` es relativo al cuerpo — calcularlo sobre el
+       alto anterior daria un numero que no es. */
+    const targetH = fillH ? box.clientHeight * fillH : 0
+    if (targetH) {
+      const alto = el.scrollHeight
+      if (alto > targetH) {
+        next = next * targetH / alto
+        el.style.fontSize = next.toFixed(2) + 'px'
+      }
+    }
   }
 
   onMounted(() => {
