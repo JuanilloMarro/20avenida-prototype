@@ -146,6 +146,17 @@ function luminancia(hex) {
 const claro = computed(() => luminancia(props.bg) > 0.5)
 
 /**
+ * LA CAÍDA — cuántos píxeles tiene que BAJAR el zapato para quedar en el centro
+ * de la sección al abrir la ficha. La escribe `medirVuelo()`.
+ *
+ * Vive en una medida y no en una regla de CSS porque el número depende del ALTO
+ * DEL PIE, que es contenido: el nombre, la línea, el precio, el botón y el
+ * contador. No hay forma de escribirlo a mano sin que quede desfasado el día que
+ * cualquiera de esos cinco cambie de tamaño.
+ */
+const caida = ref(0)
+
+/**
  * El color del TÍTULO GIGANTE — el que vuela y el que llevan los zapatos de los
  * lados.
  *
@@ -198,6 +209,11 @@ const estilo = computed(() => ({
      `--rl-accent`  el acento, y aquí sólo lo lleva el precio. Es el único dato
                     de la columna con color, y por eso se despega sin necesitar
                     más cuerpo ni más peso. */
+  /* CUÁNTO BAJA EL ZAPATO AL ABRIR LA FICHA. Lo mide `medirVuelo` y el porqué
+     está ahí: en reposo el escenario no ocupa la sección entera —el pie le come
+     los de abajo— así que su centro está por encima del de la pieza. Este es el
+     que falta. */
+  '--rl-drop': caida.value + 'px',
   '--rl-banner': actual.value?.surface ?? '#222',
   '--rl-bword': actual.value?.word ?? 'rgba(255,255,255,.22)',
   '--rl-accent': actual.value?.accent ?? 'var(--av-y-400)',
@@ -347,7 +363,7 @@ const marca = computed(() => actual.value?.brand ?? '')
    gracia de ajustar por MEDIDA en vez de por cuerpo fijo. */
 const cajaMarca = ref(null)
 const palabraMarca = ref(null)
-useFitText(palabraMarca, cajaMarca, 0.5)
+const { fit: ajustarMarca } = useFitText(palabraMarca, cajaMarca, 0.5)
 
 /* Y LA DEL BANNER SE AJUSTA AL ALTO. Es el mismo ajuste medido contra una caja
    GIRADA — ver `.rl__bbox`: la caja tiene el alto del banner por ancho, así que
@@ -356,22 +372,51 @@ useFitText(palabraMarca, cajaMarca, 0.5)
    tiene que tocar los dos bordes. */
 const cajaBanner = ref(null)
 const palabraBanner = ref(null)
-useFitText(palabraBanner, cajaBanner, 1, 0)
+const { fit: ajustarBanner } = useFitText(palabraBanner, cajaBanner, 1, 1)
 
-/* `1, 0` — LLENA EL ALTO Y SIN TOPE DE ANCHO, y el cero tiene precio.
+/* Y SE REAJUSTAN AL CAMBIAR DE MARCA, que es lo que faltaba y se pilló midiendo:
+ * girando de «Nike» a «adidas» la palabra de la franja se quedaba con el cuerpo
+ * de la anterior —322 px medidos para cuatro letras— y con seis se salía por los
+ * dos extremos, 737 px de largo en una franja de 720 y 244 de alto en 238.
  *
- * Lo pedido es que la palabra no deje hueco ni arriba ni abajo, así que el largo
- * manda y no se le pone freno. Con la franja a un cuarto del ancho eso significa
- * que a las marcas CORTAS la letra se les sale por los costados y la franja se la
- * recorta: para que «NIKE» —cuatro letras— mida el alto entero hace falta un
- * cuerpo cuya altura de mayúscula supera el ancho de la franja.
+ * `useFitText` no puede enterarse solo: su `ResizeObserver` vigila LA CAJA, y la
+ * caja no cambia de tamaño cuando cambia el texto de dentro. Observar la palabra
+ * tampoco valdría —cambiarle el cuerpo cambia su ancho, y eso vuelve a disparar
+ * al observador—, así que el aviso tiene que venir de quien sabe que el producto
+ * ha cambiado: de aquí.
  *
- * Con marcas largas no pasa: «adidas» llena el alto con bastante menos cuerpo y
- * entra de sobra. El recorte aparece y desaparece según la marca.
+ * `nextTick` porque el texto lo pinta Vue: medir antes de que el DOM tenga la
+ * palabra nueva mide la vieja. */
+watch(marca, () => nextTick(() => { ajustarMarca(); ajustarBanner() }))
+
+/* `1, 1` — LLENA EL LARGO **Y** EL ANCHO, y manda el que se quede corto.
  *
- * Hubo aquí un trazo de .16em inventado para esquivar esto — alargaba la palabra
- * sin engordar la letra. Se quitó: no se había pedido. Si el recorte molesta, las
- * salidas son ensanchar la franja o dejar de pedir que toque los dos bordes. */
+ * LO QUE SE PIDE es que la letra toque los dos costados de la franja: que el alto
+ * de mayúscula sea EXACTAMENTE el ancho de la franja, sin aire ni recorte a
+ * ninguno de los dos lados. Como la palabra va girada, ese ancho es su ALTO, y
+ * `fillH` es justamente el tope de alto de `useFitText` — medido contra la tinta
+ * real, no contra la caja de línea.
+ *
+ * Estuvo en `1, 0`: sin tope de alto, o sea el largo mandando siempre. Eso deja
+ * la palabra tocando arriba y abajo, pero a las marcas CORTAS les engorda tanto
+ * la letra que se sale por los costados y la franja se la recorta — para que
+ * «NIKE», cuatro letras, midiera los 720 px de largo hacía falta un cuerpo de 486
+ * con 360 px de altura de mayúscula, contra una franja de 291.
+ *
+ * NO SE PUEDE TENER TODO A LA VEZ, y conviene tenerlo escrito: con una franja de
+ * medidas fijas, sólo hay UNA proporción de palabra que llena el largo y el ancho
+ * al mismo tiempo. Medido en Bebas, alto de mayúscula partido por largo:
+ *
+ *     NIKE     0.74 / 1.476 em  =  0.50
+ *     ADIDAS   0.76 / 2.293 em  =  0.33   ← la más larga, la que manda
+ *
+ * (el largo lleva ya el trazo de `--av-track-display`, 0.02em por letra.)
+ *
+ * Así que la franja se dimensiona para la MÁS LARGA —ver `--rl-col-banner`: 0.33
+ * de su propio alto— y con eso «adidas» llena las dos medidas a la vez. Las
+ * cortas quedan capadas por el ancho: tocan los dos costados, que es lo pedido, y
+ * dejan aire por los extremos del largo. El recorte, que era lo que se veía, ya
+ * no puede pasar en ninguna marca. */
 const modelo = computed(() => {
   const n = actual.value?.name ?? ''
   const m = marca.value
@@ -504,6 +549,26 @@ async function medirVuelo() {
   const slot = ranuraVisible()
   const t = tituloEl.value
   const st = escenario.value
+
+  /* ── LA CAÍDA, ANTES QUE NADA Y FUERA DE LA GUARDA ────────────────────
+     Son dos medidas distintas y una no depende de la otra: el vuelo necesita
+     una ranura con el título ya ajustado, y esto sólo necesita el escenario. Si
+     se midiera después de la guarda, cualquier pantalla en la que el título aún
+     no esté listo dejaría el zapato sin su caída — y el zapato se ve siempre.
+
+     LA CUENTA: centro de la sección menos centro del escenario. En reposo el
+     escenario es un hijo en flujo y el pie —nombre, precio, botón y contador—
+     le come los píxeles de abajo, así que su centro queda ALTO. La diferencia es
+     justo lo que el zapato tiene que bajar en la ficha para acabar en el medio.
+
+     En teléfono da cero solo, y no hay que escribir ninguna excepción: allí el
+     escenario ya está en absoluto con `inset: 0`, o sea que su centro Y el de la
+     sección son el mismo punto. */
+  if (st && seccion.value) {
+    const e = cajaEnSeccion(st)
+    caida.value = Math.round(seccion.value.offsetHeight / 2 - (e.y + e.h / 2))
+  }
+
   if (!slot || !t || !st || !t.offsetWidth) {
     vuelo.value = null
     calzado.value = false
@@ -995,7 +1060,26 @@ watch(idx, () => nextTick(medirVuelo))
      margen en un lado y a sangre en el otro se lee torcida aunque cada mitad esté
      bien. */
   --rl-col-info:   calc((100% - 2 * var(--av-gutter)) * .25);
-  --rl-col-banner: calc((100% - 2 * var(--av-gutter)) * .25);
+
+  /* LA FRANJA ES LA EXCEPCIÓN DEL REPARTO, y no por gusto: su ancho lo decide la
+     PALABRA que lleva dentro, no la rejilla.
+
+     Para que la letra girada toque los dos costados sin salirse, el ancho de la
+     franja tiene que ser el alto de mayúscula del cuerpo que llena su largo. Esa
+     proporción es una constante de la tipografía y de la marca más larga del
+     catálogo —«adidas»: 0.76 em de alto contra 2.293 em de largo, o sea 0.33— y
+     el largo de la franja es el alto de la sección. De ahí el `33svh`.
+     El razonamiento completo está en `useFitText(palabraBanner…)`.
+
+     Y VA EN `min()` CON EL CUARTO DE ANTES, que sigue siendo el techo: en una
+     ventana muy baja el 33% del alto se queda por debajo del cuarto y manda él,
+     que es lo que se quiere —la franja se estrecha—; en una muy alta manda el
+     cuarto y lo único que pasa es que a «adidas» le sobra un poco de costado,
+     que es el fallo suave de los dos posibles.
+
+     A 1265×720 sale 238 px donde antes eran 291: la franja adelgaza y la
+     columna del zapato se lo queda. */
+  --rl-col-banner: min(calc((100% - 2 * var(--av-gutter)) * .25), 33svh);
 
   /* Cuánto crece el zapato al abrirse la ficha. Ver la nota de
      `.rl.is-ficha .rl__item.is-focus`. */
@@ -1133,7 +1217,13 @@ watch(idx, () => nextTick(medirVuelo))
    detrás, porque un zapato recortado sobre la rampa ya tiene silueta. */
 .rl__item.is-focus {
   z-index: 3;
-  transform: rotate(var(--rl-tilt)) scale(1);
+  /* EL `translateY(0)` NO SOBRA. La ficha le pone una caída aquí mismo —ver
+     `.rl.is-ficha .rl__item.is-focus`— y dos listas de transformación con el
+     mismo número de funciones y en el mismo orden se interpolan función a
+     función, que es un recorrido predecible. Si una lleva tres y la otra dos, el
+     navegador cae a descomponer matrices, y el camino entre las dos deja de ser
+     el que se escribió. */
+  transform: translateY(0px) rotate(var(--rl-tilt)) scale(1);
   filter: drop-shadow(0 26px 38px rgba(0, 0, 0, .55));
   opacity: 1;
 }
@@ -2029,23 +2119,42 @@ watch(idx, () => nextTick(medirVuelo))
  * 1.08 el paso adelante se notaba pero el zapato seguía siendo pequeño para una
  * ficha a pantalla completa.
  *
- * EL ESCENARIO NO SE TOCA: `inset: 0`, el mismo que en reposo, y ahí está la
- * gracia. Con las columnas repartidas 25/50/25 y el MISMO margen a los dos lados,
- * el centro de la columna del medio es el centro de la sección — así que centrar
- * en la sección ya es centrar en su columna, sin restarle nada a nadie.
+ * ── Y BAJA MIENTRAS CRECE, QUE ES LO ÚNICO QUE HACE QUE EL GESTO SE LEA ──
  *
- * Estuvo restándole el ancho del banner y por eso el zapato aparecía corrido a la
- * izquierda: se centraba en el hueco que quedaba, no en su columna. El desajuste
- * era justo medio banner.
+ * EL ESCENARIO YA NO SE SACA DEL FLUJO AL ABRIR. Estuvo pasando a
+ * `position: absolute; inset: 0` con la ficha, escrito con la idea de que así el
+ * zapato se centraba en la sección sin restarle nada a nadie. La idea era buena
+ * y el efecto, malo, porque esa cuenta se hizo sólo para el estado FINAL:
  *
- * Y NO CAMBIA DE SITIO AL ABRIR LA FICHA, que es lo que hace que la transición se
- * lea limpia: mismo centro que en el carrusel, sólo que más grande. */
-.rl.is-ficha .rl__stage {
-  position: absolute;
-  inset: 0;
-}
+ *   en reposo   el escenario es un hijo en flujo y el pie le come 200 px por
+ *               abajo — medido: caja de 352 px que arranca en 87, o sea centro
+ *               en 263 de una sección de 720;
+ *   en ficha    con `inset: 0` la caja pasa a ser la sección entera y su centro,
+ *               a 360.
+ *
+ * Esos 97 px de diferencia NO SE ANIMABAN. Un cambio de `position` y de `inset`
+ * es disposición, no transformación: el navegador la aplica en el primer
+ * repintado y sólo después empieza a interpolar la escala. Lo que se veía era
+ * exactamente lo que se describía — el zapato daba un salto hacia abajo y desde
+ * ahí, ya descolocado, empezaba a crecer.
+ *
+ * Ahora el escenario se queda donde está SIEMPRE y los 97 px son un
+ * `translateY` más de la misma cadena. Sale gratis: `transform` ya estaba en la
+ * transición, así que el crecer y el bajar son una sola interpolación con una
+ * sola curva. El zapato arranca donde estaba, y mientras se hace grande se
+ * desliza hasta el centro de la pieza.
+ *
+ * EL NÚMERO LO MIDE EL JS — `--rl-drop`, ver `medirVuelo()`. No puede ser una
+ * constante: depende del alto del pie, y el pie es contenido.
+ *
+ * EL ORDEN DE LA CADENA IMPORTA. `translateY` va PRIMERO, así que se aplica en
+ * el espacio del padre y no lo multiplica el `scale` que viene detrás: 97 px son
+ * 97 px y no 97 × 1.75. Al revés, el zapato se pasaría de largo. */
 .rl.is-ficha .rl__item.is-focus {
-  transform: rotate(var(--rl-tilt)) scale(var(--rl-ficha-scale));
+  transform:
+    translateY(var(--rl-drop, 0px))
+    rotate(var(--rl-tilt))
+    scale(var(--rl-ficha-scale));
   filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .58));
   pointer-events: none;
 }
@@ -2111,12 +2220,19 @@ watch(idx, () => nextTick(medirVuelo))
     --rl-col-info: calc(100% - 2 * var(--av-gutter) - var(--rl-col-banner) - 14px);
   }
 
-  /* Y EL ZAPATO SE CENTRA EN LO QUE QUEDA, no en la sección. En escritorio las
-     dos laterales miden lo mismo, así que el centro de la sección ES el centro de
-     la columna del medio y no hay que restar nada. Aquí no: la franja y la
-     lectura miden distinto, y centrar en la sección dejaría el zapato metido
-     debajo del banner. */
-  .rl.is-ficha .rl__stage { inset: 0 var(--rl-col-banner) 0 0; }
+  /* EL ZAPATO SE CENTRA EN LA PANTALLA, Y SE MONTA SOBRE LA FRANJA SI HACE
+     FALTA. Estuvo restándole el ancho del banner —`inset: 0 var(--rl-col-banner)
+     0 0`— para que no se le metiera debajo, y el precio era que el producto
+     quedaba descentrado en la única pantalla donde el producto ES la pantalla.
+
+     Aquí la prioridad se invierte respecto a escritorio: allí hay sitio para tres
+     bandas y cada una respeta la suya; en 375 px no hay bandas que respetar, hay
+     un zapato. Que pise la franja no es un defecto — la franja está DETRÁS
+     (`z-index: 0`, justo abajo), así que lo que se ve montado es el zapato sobre
+     su propio color, no un recorte contra una pieza de la interfaz.
+
+     Y no le quita nada a la compra: el zapato es una imagen sin eventos, así que
+     el botón de la franja sigue recibiendo los clics aunque le pase por encima. */
 
   /* EL BANNER, AL FONDO. En escritorio va por encima porque el zapato se queda
      en su columna y no llega a tocarlo; aquí el zapato es mucho más grande en
@@ -2126,19 +2242,39 @@ watch(idx, () => nextTick(medirVuelo))
      La compra sigue recibiendo clics: el zapato es una imagen con
      `pointer-events: none`, así que lo que se le ponga encima no intercepta
      nada. */
-  .rl__banner { z-index: 0; }
+  .rl__banner {
+    z-index: 0;
 
-  /* LA PALABRA DEJA DE AJUSTARSE Y VUELVE A UN CUERPO FIJO, y es la única medida
-     donde pasa. En escritorio la franja son 327 px y llenar el alto le cuesta a
-     la letra que se le corte un 14% por cada lado, que se lee como un encuadre.
-     Aquí la franja son 86: el mismo criterio deja fuera el 80% de la letra y lo
-     que queda no es una palabra, es una raya.
+    /* A SANGRE POR LA DERECHA. En escritorio la franja respeta el mismo margen
+       que la columna de lectura, porque las dos son bandas de una rejilla y una
+       pieza con margen a un lado y a sangre al otro se lee torcida. En teléfono
+       no hay rejilla que respetar y ese margen es tierra de nadie: 16 px de
+       fondo negro entre la franja y el filo de la pantalla que no llevan nada.
 
-     Las dos cosas que se piden —tocar arriba y abajo, y que la letra se lea— no
-     caben juntas en 86 px con una marca de cuatro letras. A este ancho gana la
-     legibilidad. El `!important` es para pisar el cuerpo que `useFitText` escribe
-     en línea, que es la única forma de anularlo desde CSS. */
-  .rl__bword { font-size: clamp(44px, 29vw, 116px) !important; }
+       Se los queda la franja —`right: 0` y el ancho crecido por lo mismo que se
+       le quita al margen— así que el borde derecho de la pieza ES el borde de la
+       pantalla y su borde izquierdo no se mueve: la columna de lectura conserva
+       su sitio, que es la cuenta que hace `--rl-col-info`.
+
+       Y la palabra crece con la franja: su cuerpo lo pone el ancho, así que los
+       16 px van a la letra. */
+    right: 0;
+    width: calc(var(--rl-col-banner) + var(--av-gutter));
+  }
+
+  /* LA PALABRA SE AJUSTA IGUAL QUE EN ESCRITORIO, y aquí ya no hay excepción.
+
+     Estuvo con un cuerpo fijo —`clamp(44px, 29vw, 116px) !important`— porque con
+     el criterio de entonces, LLENAR EL LARGO, una franja de 86 px dejaba fuera
+     cuatro quintas partes de la letra: lo que quedaba no era una palabra, era una
+     raya. El cuerpo fijo tapaba ese recorte, pero también rompía lo que se pide
+     en las dos medidas: que la letra toque los dos costados.
+
+     Con el tope de alto puesto —ver `useFitText(palabraBanner…)`— el problema se
+     va solo: la letra se cala al ancho de la franja, sea cual sea, así que ni se
+     sale ni deja aire. Lo que cambia entre teléfono y escritorio es cuánto largo
+     le sobra, no si se recorta. Una regla menos y el mismo criterio en todas las
+     pantallas. */
 
   /* Y EL ZAPATO SE MODERA. A 1.75 medía 462 px de ancho contra los 304 que deja
      la franja: se salía por los dos lados y lo recortaba la sección. 1.15 lo deja
@@ -2157,15 +2293,17 @@ watch(idx, () => nextTick(medirVuelo))
   .rl__comprar button { padding: 0; width: var(--av-action-h); justify-content: center; }
   .rl__clabel { display: none; }
 
-  /* EL PANEL MANTIENE SUS 312 y no se estrecha, aunque parezca que a 390 px
-     debería. El motivo es el ALTO, no el ancho: estrechado a 250 caben cuatro
-     tallas por fila, y diez tallas en filas de cuatro son TRES filas —180 px—
-     que suben por encima del hueco de la barra y se meten debajo de ella.
-     Con 312 caben cinco por fila, o sea dos filas y 124 px, y el panel entra
-     entero entre el disparador y la barra.
+  /* TRES POR FILA. El panel es el mismo que en escritorio —misma caja, mismo
+     sitio, misma forma de abrirse— y lo único que cambia es cuántas tallas caben
+     en cada línea: dos allí, tres aquí. La cuenta es la de siempre, el ancho
+     manda el reparto: 3×56 + 2×8 = 184.
 
-     312 caben de sobra: 390 menos los 16 de cada margen deja 358. */
-  .rl__tpanel :deep(.av-glass__body) { width: min(312px, calc(100vw - 32px)); }
+     ESTUVO EN 312, o sea cinco por fila, y el motivo era el alto: cinco por fila
+     son dos filas y 124 px, y así el panel entraba de sobra entre el disparador y
+     la barra del navegador. Tres por fila son cuatro filas y 236 px, que es casi
+     el doble — cabe, pero es el número que hay que vigilar el día que la lista de
+     tallas crezca. Con doce ya serían cuatro filas justas; con trece, cinco. */
+  .rl__tpanel :deep(.av-glass__body) { width: 184px; }
 
   .rl {
     --rl-side-scale: 0.42;
