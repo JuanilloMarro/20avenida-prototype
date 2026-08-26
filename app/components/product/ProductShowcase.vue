@@ -46,12 +46,18 @@ const props = defineProps({
   /**
    * El texto gigante del frame de atrás.
    *
-   * Se escribe como se lee y se pinta como se escribe: «Adidas», primera
-   * mayúscula y el resto minúsculas, aunque sea una marca y aunque acabe a 300
-   * px de cuerpo. La regla de la casa no tiene excepción, y aquí además la caja
-   * mixta es la que le da perfil a la mancha — ver `.ps__word`.
+   * VA EN VERSALES, y es la unica excepcion a la regla R1 en todo el proyecto:
+   * aqui la palabra no es un titulo que se lee, es la MASA que ocupa el fondo
+   * del encuadre. Las versales las pone `.ps__word` con `text-transform`, no
+   * este valor — asi el dato sigue siendo el nombre de la marca y el que decide
+   * como se pinta es quien lo pinta.
+   *
+   * «Nike» porque el zapato del escaparate es el Mind 001. Iba «Adidas» cuando
+   * era el Samba; si se cambia el colorway por defecto hay que cambiar esto
+   * tambien — son dos sitios y no uno, que es deuda conocida: la marca deberia
+   * salir del propio colorway.
    */
-  word: { type: String, default: 'Adidas' },
+  word: { type: String, default: 'Nike' },
   /** Fila 1 — texto corto, centrado. */
   eyebrow: { type: String, default: '' },
 })
@@ -90,7 +96,40 @@ const { index: scrollIndex } = useScrollSequence(track, () => (scrolls.value ? f
    no rodearlo. */
 const back = ref(null)
 const wordEl = ref(null)
-useFitText(wordEl, back, 0.995, 0.42)
+/* LA CAJA CONTRA LA QUE SE AJUSTA ES `.ps__stage`, LA BANDA — no `.ps__back`.
+   Es el cambio que arregla esto de verdad, y merece la pena contar el camino
+   porque el numero anterior parecia razonable y no lo era.
+
+   `.ps__back` es la seccion ENTERA, asi que cualquier fraccion de su alto
+   describe una caja que la palabra no debe respetar: por arriba esta la linea de
+   marca y colorway, y por abajo el nombre, el precio y los selectores. Con
+   `0.86` la tinta salia de 808 px sobre 940 y se comia las dos cosas — medido,
+   la fraccion se cumplia clavada. El mecanismo estaba bien; la caja, no.
+
+   Y NO SIRVE bajar el numero, que fue el primer intento. Los dos textos que hay
+   que esquivar miden lo MISMO en pixeles a cualquier altura de ventana, asi que
+   la banda libre no es una fraccion constante del alto: se estrecha en pantallas
+   bajas. `0.62` despejaba a 940 con 39 px arriba y 30 abajo, y a 720 se pasaba —
+   5 arriba y **-6** abajo, encima del bloque. Cualquier constante falla en un
+   extremo o en el otro.
+
+   `.ps__stage` es la fila 2 de la rejilla del frente, o sea literalmente el
+   hueco que dejan libre la fila 1 y la fila 3. Comprobado: empieza donde acaba
+   el subtitulo y acaba donde empieza el bloque de abajo, a las dos alturas. Ya
+   no hay que estimar la banda porque la banda es un elemento, y se mueve sola
+   con la disposicion.
+
+   LO QUE SE PAGA: la banda respeta el margen lateral —es 102 px mas estrecha que
+   la seccion a 1280— asi que la palabra deja de ir a sangre y se alinea con el
+   resto del contenido. Se acepta: era lo unico que la sacaba del margen comun.
+
+   `0.88` Y NO `0.95` por una asimetria que queda: la palabra se centra en
+   `.ps__back` —la seccion— mientras que la banda NO esta centrada en ella,
+   porque el bloque de abajo es mas alto que el subtitulo de arriba. Ese desfase
+   se come el aire por abajo antes que por arriba, y 0.88 es lo que deja las dos
+   holguras en positivo de 720 a 1080. */
+const banda = ref(null)
+useFitText(wordEl, banda, 0.995, 0.88)
 
 const active = computed(() => {
   if (!scrolls.value) return Math.min(frames.value.length - 1, Math.max(0, props.still))
@@ -122,7 +161,7 @@ const trackStyle = computed(() => (scrolls.value
 
           <!-- fila 2 · la secuencia. Todos los frames apilados; sólo cambia
                cuál es visible, así el navegador los tiene ya decodificados. -->
-          <div class="ps__stage">
+          <div ref="banda" class="ps__stage">
             <div class="ps__seq">
               <img
                 v-for="(f, i) in frames"
@@ -231,12 +270,18 @@ const trackStyle = computed(() => (scrolls.value
    que la palabra llene el ancho del frame, sea la palabra que sea — «Adidas» y
    «Nike» acaban las dos pegadas a los dos bordes */
 .ps__word {
-  /* PLAYFAIR DISPLAY, la única pieza del proyecto que no va con la letra del
-     sistema. Es una didona: contraste altísimo entre el trazo grueso y el fino,
-     y remates de pelo. A 300 px de cuerpo eso es exactamente lo que se quiere de
-     un fondo —la mancha deja de ser un bloque plano y pasa a tener dibujo— y por
-     eso el token se llama `display` y no `serif`: a cuerpo pequeño los finos se
-     rompen y no vale para nada más. */
+  /* LA DE DISPLAY, la única pieza del proyecto que no va con la letra del
+     sistema. Hoy es BEBAS NEUE — condensada de palo seco, con `Roboto Condensed`
+     y `Arial Narrow` de reserva.
+
+     Ojo si se lee documentación vieja: aquí decía «Playfair Display, una didona
+     de contraste altísimo y remates de pelo», y describía una letra que ya no
+     es. El token cambió y el comentario se quedó atrás; queda escrito para que
+     nadie vuelva a calibrar el interletrado contra unos remates que no existen
+     — que es justo lo que explica el cambio de signo del trazo de aquí abajo.
+
+     El token se llama `display` y no `sans` por lo de siempre: es para cuerpos
+     enormes y para nada más. */
   font-family: var(--av-font-display);
   /* VERSALES. Es la excepcion a la regla de la casa —primera mayuscula y el
      resto minusculas— y va escrita: aqui la palabra no es un titulo que se lee,
@@ -245,16 +290,6 @@ const trackStyle = computed(() => (scrolls.value
   text-transform: uppercase;
   font-size: 26vw;
   font-weight: 900;
-  /* SIN VERSALES, tampoco aquí. La regla de la casa —primera mayúscula y el
-     resto minúsculas— no tiene excepción en todo el proyecto, ni siquiera para
-     un fondo de 300 px que nadie lee. La palabra se pinta tal y como llega en
-     `word`: «Adidas».
-
-     Y con Playfair la caja mixta gana algo que en palo seco no daba: las
-     ascendentes y las descendentes son lo que dibuja una didona. La `d` sube,
-     la `s` se cierra, y el fondo pasa de ser un rectángulo de letras a tener
-     perfil. Un bloque de versales lo habría aplanado. */
-
   /* EL TRAZO SE ABRE DE -.055em A -.015em AL CAMBIAR DE LETRA, y no es un
      retoque: el -.055 estaba calculado para una grotesca de palo seco, donde
      apretar sólo acerca dos verticales. Playfair tiene REMATES, que son lo que
@@ -263,14 +298,19 @@ const trackStyle = computed(() => (scrolls.value
      que es exactamente lo contrario de lo que hace una didona. Sigue siendo
      negativo, que es lo que mantiene la mancha compacta; sólo deja pasar el
      remate. */
-  letter-spacing: -.015em;
+  letter-spacing: var(--av-track-display);
   /* CSS aplica el letter-spacing TAMBIÉN después de la última letra, así que la
-     caja acaba .015em antes que la tinta: centrada, dejaba margen a la
-     izquierda y se comía la última letra por la derecha. Este padding devuelve
-     justo ese hueco a la caja y el centrado vuelve a ser simétrico. Va en em
-     para que escale con el tamaño que le ponga useFitText, y su número es SIEMPRE
-     el del trazo de arriba — si uno cambia, cambian los dos. */
-  padding-inline-end: .015em;
+     caja no acaba donde acaba la tinta y el centrado sale torcido. Este padding
+     devuelve el mismo hueco por el otro lado y la caja vuelve a ser simétrica.
+
+     OJO, QUE CAMBIÓ DE LADO. Con el trazo NEGATIVO que había antes la caja se
+     quedaba CORTA por la derecha, así que el parche era `padding-inline-end`.
+     Ahora el trazo es positivo: la caja se pasa por la derecha, y lo que hay
+     que añadir va al PRINCIPIO. Mismo problema, lado contrario.
+
+     Su valor es SIEMPRE el del trazo de arriba, por eso los dos leen el mismo
+     token: si uno cambia, cambian los dos, y ahora eso pasa solo. */
+  padding-inline-start: var(--av-track-display);
   line-height: .8;
   white-space: nowrap;
   color: var(--ps-word);
@@ -418,10 +458,10 @@ const trackStyle = computed(() => (scrolls.value
 .ps__label {
   margin: 0;
   font-size: 10.5px;
-  letter-spacing: .04em;
+  letter-spacing: var(--av-track);
   color: var(--ps-ink-soft);
 }
-.ps__name { margin: 2px 0 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.ps__name { margin: 2px 0 0; font-size: 19px; font-weight: 700; letter-spacing: var(--av-track); }
 .ps__price { margin: 1px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--ps-ink-soft); }
 
 .ps__selects { display: flex; gap: 12px; margin-top: 16px; }
@@ -431,7 +471,7 @@ const trackStyle = computed(() => (scrolls.value
   border: 1px solid var(--ps-hair);
   border-radius: 4px;
   font-size: 11.5px;
-  letter-spacing: .03em;
+  letter-spacing: var(--av-track);
   color: var(--ps-ink-soft);
 }
 
@@ -468,7 +508,7 @@ const trackStyle = computed(() => (scrolls.value
   font-family: inherit;
   font-size: var(--av-action-fs);
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   /* Sobre el velo negro el contenido es claro, dé igual el colorway. Es el
      motivo de tener un material estandarizado: el contraste del texto deja de
      depender del plano de color que haya detrás. */
@@ -486,14 +526,14 @@ const trackStyle = computed(() => (scrolls.value
   margin: 0;
   font-size: 44px;
   font-weight: 800;
-  letter-spacing: -.04em;
+  letter-spacing: var(--av-track);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .ps__line {
   margin: 6px 0 0;
   font-size: 10.5px;
-  letter-spacing: .04em;
+  letter-spacing: var(--av-track);
   color: var(--ps-ink-soft);
   min-height: 1em;
 }

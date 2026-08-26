@@ -13,17 +13,17 @@
  *   │   ▒▒▒▒▒▒▒▒▒▒▒▒▒   │   │                               │
  *   │                   │   │                               │
  *   └───────────────────┘   └───────────────────────────────┘
- *          50%                          50%
+ *         44.7%                        44.7%
+ *         (dos columnas iguales; el hueco se lo reparten las dos)
  *
  * DE DÓNDE SALE CADA MITAD, porque no es una pieza nueva sino un cruce de dos
  * que ya existen:
  *
- *   · la lámina  → una tarjeta SÓLIDA BLANCA con paspartú y sombra, no vidrio.
- *     Fue de vidrio y se quitó: sobre un lila claro el velo negro la volvía una
- *     mancha oscura al lado de dos fotos luminosas, y el paspartú blanco es lo
- *     que hace que la foto se lea como una foto MONTADA. La sombra corta no
- *     está para dar dramatismo: está para despegarla del lila un par de
- *     milímetros. Ver `.pd__plate`.
+ *   · la lámina  → una tarjeta SÓLIDA BLANCA con la foto a sangre, no vidrio.
+ *     Fue de vidrio y se quitó: el velo negro la volvía una mancha oscura al
+ *     lado de dos fotos luminosas. Tuvo además paspartú y sombra, y los dos se
+ *     fueron después — ver `.pd__plate`, que cuenta por qué. Hoy lo que la
+ *     despega del fondo es su propio blanco.
  *   · la celda   → el hexágono de <ProductHoneycomb>, con su MISMA geometría
  *     (punta arriba, proporción 2/√3) y su MISMO anillo especular leído de
  *     `--lg-spec` / `--lg-ang`. Ver `.pd__cell`.
@@ -35,11 +35,17 @@
  * botón, ni contador. Sólo las flechas y la celda. El díptico es una pieza de
  * IMAGEN — lo que tenga que decirse se dice en la ficha, no aquí.
  *
- * EL FONDO ES PROPIO Y ES CLARO — `#c4b3e9`, el lila de las fotos. Es la única
- * pieza de la landing que no se apoya en la rampa oscura del escenario, y por
- * eso trae su propio plano: entre el rollo y el panal, los dos negros, este
- * corte claro es lo que hace que se lean como dos piezas y no como una sola
- * larga.
+ * EL FONDO ES NEGRO — `#050506`, la primera parada de la rampa `negro` de marca,
+ * y la misma del rollo y del panal.
+ *
+ * TUVO EL LILA DE LAS FOTOS (`#c4b3e9`) y se cambió, así que si alguien lee esto
+ * buscando el corte claro: ya no está. El motivo no era de pieza sino de PÁGINA
+ * — rollo, panal y díptico van seguidos y cierran con el pie, que también es
+ * negro. Con cuatro planos del mismo tono la costura entre ellos desaparece y el
+ * final de la página se lee como un bloque; con uno lila en medio, cada cambio
+ * de sección era un corte.
+ *
+ * Con el lila se fue también la sombra morada de la lámina — ver `.pd__plate`.
  *
  * Y TRAE GRANO, por el mismo motivo que el panal: un plano liso no le da nada
  * que doblar a la lente, así que el vidrio de las flechas se leería como
@@ -48,6 +54,7 @@
  */
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { GRAIN_URL, GRAIN_DEFAULT } from '~/assets/js/backgrounds'
+import { SNEAKERS, SNEAKER_IDS } from '~/assets/js/sneakers'
 
 const props = defineProps({
   /**
@@ -57,53 +64,43 @@ const props = defineProps({
   plate: {
     type: Object,
     default: () => ({
-      src: '/products/diptico/foto.jpg',
-      alt: 'Air Jordan sobre un balón, tapicería lila',
+      src: '/products/diptico/columna.jpg',
+      alt: 'Tenis de piel en crema y arena, en la mano',
     }),
   },
   /**
-   * Las celdas del carrusel, en orden de giro.
+   * Las celdas del carrusel, en orden de giro. Ids de `sneakers.js`.
    *
-   * SIETE, y hay DOS clases de celda a propósito — es lo que esta lista está
-   * para enseñar:
+   * LOS MISMOS SEIS DEL ROLLO, y compartirlos es la idea: son el catálogo de la
+   * tienda, no la decoración de una pieza. El díptico los enseña recortados en
+   * hexágono y el rollo a pedestal, pero el producto es el mismo y el dato vive
+   * en un solo sitio. Que la lista se acorte en `sneakers.js` acorta las dos
+   * piezas a la vez, que es exactamente lo que se quería de compartirla — pasó
+   * al quitar New Balance y Veja, y ninguna de las dos hubo que tocarla.
    *
-   *   FOTOGRAFÍA (`.jpg`)  llena el hexágono a sangre. El vidrio queda debajo y
-   *                        no se ve: lo que se lee es la foto recortada en
-   *                        hexágono, con el filo especular por encima.
-   *   RECORTE (`.png`)     fondo transparente, así que el zapato flota SOBRE el
-   *                        material y el velo, el desenfoque y el filo se ven
-   *                        enteros. Es la celda del panal.
-   *
-   * Cuál es cuál lo dice la EXTENSIÓN, no un prop — ver `celdas` más abajo.
-   *
-   * El reparto: alternando `foto-2`/`foto-1` ninguna celda queda al lado de su
-   * gemela **tampoco en la vuelta**, y el recorte entra en el tercer puesto para
-   * que se alcance con dos toques de flecha desde el arranque. Comprobado en
-   * ciclo: 2·1·J·2·1·2·1 y de la última a la primera, sin dos iguales seguidas.
-   *
-   * Empieza por `foto-2` porque es el plano abierto: el par completo sobre la
-   * pista. `foto-1` es el detalle de las punteras y funciona mejor de segunda,
-   * cuando ya se sabe qué se está mirando.
-   *
-   * Con catálogo real esto desaparece solo: se pasan siete productos y ya está.
-   * El componente no distingue una foto repetida de una que no lo es.
+   * Antes había aquí dos fotografías editoriales repartidas en siete celdas, con
+   * un recorte suelto en medio para poder comparar las dos formas de llenar el
+   * hexágono. Se fueron enteras —fotos incluidas— en cuanto hubo catálogo de
+   * verdad: siete celdas con dos imágenes repetidas era un decorado, y seis
+   * zapatos distintos es una tienda.
    */
   items: {
     type: Array,
-    default: () => [
-      { src: '/products/diptico/foto-2.jpg', alt: 'Air Jordan lila, par completo' },
-      { src: '/products/diptico/foto-1.jpg', alt: 'Air Jordan lila, detalle de puntera' },
-      { src: '/products/diptico/jordan.png', alt: 'Air Jordan 1 Yellow Ochre' },
-      { src: '/products/diptico/foto-2.jpg', alt: 'Air Jordan lila, par completo' },
-      { src: '/products/diptico/foto-1.jpg', alt: 'Air Jordan lila, detalle de puntera' },
-      { src: '/products/diptico/foto-2.jpg', alt: 'Air Jordan lila, par completo' },
-      { src: '/products/diptico/foto-1.jpg', alt: 'Air Jordan lila, detalle de puntera' },
-    ],
+    default: () => SNEAKER_IDS,
   },
   /** Cuál arranca en el centro. */
   initial: { type: Number, default: 0 },
-  /** El plano de detrás. El lila de las fotos, pedido en hexadecimal. */
-  bg: { type: String, default: '#c4b3e9' },
+  /**
+   * El plano de detrás. El MISMO negro del rollo y del panal —`#050506`, la
+   * primera parada de la rampa `negro` de marca—, y no el lila de las fotos que
+   * llevaba antes.
+   *
+   * El motivo es de página y no de pieza: rollo, panal y díptico van seguidos y
+   * cierran con el pie, que también es negro. Con cuatro planos del mismo tono
+   * la costura entre ellos desaparece y el final de la página se lee como un
+   * bloque; con uno lila en medio, cada cambio de sección era un corte.
+   */
+  bg: { type: String, default: '#050506' },
   /** el grano, 0–100. No es textura: es lo que el vidrio dobla. */
   grain: { type: Number, default: GRAIN_DEFAULT },
 })
@@ -116,32 +113,34 @@ const estilo = computed(() => ({
   '--pd-grain-a': props.grain / 100,
 }))
 
-/* La clave es la POSICIÓN y no el `src`: con tres imágenes en siete celdas hay
-   rutas repetidas, y dos `:key` iguales rompen el `v-for`. Es el mismo problema
-   —y la misma salida— que el panal con sus 26 fotos en 34 celdas. */
-const celdas = computed(() => props.items.map((it, i) => {
-  const src = typeof it === 'string' ? it : it.src
+/* El producto de cada id, resuelto una vez. Si un id no existe se cae fuera en
+   vez de pintar una celda rota.
+
+   LA CLAVE ES LA POSICIÓN y no el id: hoy los seis son distintos, pero
+   `items` es un prop y nada impide repetir uno — y dos `:key` iguales rompen el
+   `v-for`. Es la misma salida que el panal con sus 26 fotos en 34 celdas.
+
+   YA NO SE ADIVINA SI LA IMAGEN ES UN RECORTE, y conviene contar por qué se
+   adivinaba: cuando aquí había fotografías editoriales mezcladas con un recorte
+   suelto, la extensión era la única señal disponible —un `.png` en un catálogo
+   de zapatillas está ahí porque lleva alfa— y la fotografía se encajaba a
+   sangre mientras el recorte iba entero y centrado.
+
+   Con el catálogo del rollo esa regla no sólo sobra: SERÍA FALSA. Los seis
+   son recortes con alfa y todos son `.webp`, así que la extensión diría
+   «fotografía» de los seis y les recortaría la puntera contra los biseles del
+   hexágono. Lo que era una señal pasó a ser una coincidencia del formato, y una
+   señal que ya no señala se quita. */
+const celdas = computed(() => props.items.map((id, i) => {
+  const p = SNEAKERS[id]
+  if (!p?.name) return null
   return {
     key: i,
-    src,
-    alt: typeof it === 'string' ? '' : (it.alt ?? ''),
-    /* RECORTE O FOTOGRAFÍA, y lo decide la EXTENSIÓN. No es un atajo perezoso:
-       es la misma regla que se usa al exportar. Un `.png` en un catálogo de
-       zapatillas está ahí porque lleva canal alfa —si no, sería un `.jpg`, que
-       pesa la mitad— así que la extensión ya ES la señal, y pedir además un
-       prop `recorte: true` sería obligar a repetir a mano un dato que el
-       nombre del fichero ya lleva encima.
-
-       Cambia una sola cosa: cómo se encaja la imagen en el hexágono. La
-       fotografía va a sangre (`cover`); el recorte va entero y centrado
-       (`contain`), porque recortarle la puntera a un zapato que flota sobre el
-       vidrio es exactamente lo que no se quiere ver. Ver `.pd__shot`.
-
-       El día que haya catálogo real, esto lo dirá el backend en un campo y esta
-       línea pasa a leerlo. Mientras tanto, la extensión no miente. */
-    recorte: /\.png(\?|$)/i.test(src || ''),
+    id,
+    src: p.frames?.[0]?.src,
+    alt: `${p.name} — ${p.line}`,
   }
-}))
+}).filter(Boolean))
 
 const n = computed(() => celdas.value.length)
 const idx = ref(0)
@@ -155,8 +154,9 @@ const actual = computed(() => celdas.value[idx.value] || null)
  *
  * `>=` y no `>` en el primer tope: con un número PAR de celdas, la que cae justo
  * a la mitad está a la misma distancia por los dos caminos, y sin esto se
- * quedaba siempre a la derecha y el puesto izquierdo vacío. Hoy son SIETE y el
- * caso no se da, pero la lista es un prop: en cuanto alguien pase ocho, vuelve.
+ * quedaba siempre a la derecha y el puesto izquierdo vacío. Hoy son SEIS, que
+ * es par, así que el caso SÍ se da: la celda a siete de distancia está a la
+ * misma por los dos lados y sin el `>=` se quedaría siempre a la derecha.
  */
 function distancia(i) {
   const total = n.value
@@ -170,12 +170,11 @@ function distancia(i) {
    así que a partir del segundo vecino la celda cae debajo de la flecha. El resto
    sigue en el DOM —para que la foto esté decodificada cuando le toque— pero
    fuera del encuadre. */
-function claseDe(i, celda) {
+function claseDe(i) {
   const d = distancia(i)
   const a = Math.abs(d)
   return {
     'pd__cell': true,
-    'is-recorte': !!celda?.recorte,
     'is-focus': d === 0,
     'is-side': a === 1,
     'is-left': d < 0,
@@ -276,7 +275,7 @@ onMounted(() => {
             variant="sheet"
             tag="button"
             type="button"
-            :class="claseDe(i, c)"
+            :class="claseDe(i)"
             :tabindex="distancia(i) === 0 ? 0 : -1"
             :aria-hidden="Math.abs(distancia(i)) > 1"
             :aria-label="distancia(i) === 0 ? 'Ver detalle' : 'Traer al centro'"
@@ -516,9 +515,14 @@ onMounted(() => {
   background: #FFFFFF;
   border-radius: clamp(14px, 1.5vw, 26px);
   overflow: hidden;
-  box-shadow:
-    0 30px 62px -22px rgba(46, 28, 84, .55),
-    0 6px 16px -6px rgba(46, 28, 84, .34);
+  /* SIN SOMBRA. Llevaba una morada —`rgba(46,28,84)`, sacada del lila que este
+     componente tenia de fondo— y con el plano ya en negro dejo de ser una
+     sombra: un morado es MAS CLARO que `#050506`, asi que en vez de hundir la
+     lamina le pintaba un halo alrededor.
+
+     Y no se sustituye por una neutra: sobre negro no hay nada que hundir. Lo
+     que despega la lamina del fondo es su propio blanco, que ya es el contraste
+     mas alto que hay en la pagina. */
 }
 
 /* A SANGRE DE LA TARJETA. Sin relleno que descontar, `height: 100%` es el alto
@@ -658,31 +662,33 @@ onMounted(() => {
   display: block;
 }
 
-/* A SANGRE DE LA CELDA. Sin `clip-path` propio: el `clip-path` de la celda
-   recorta TAMBIÉN a sus descendientes, así que ponerlo otra vez aquí era dibujar
-   el mismo hexágono dos veces. */
+/* EL ZAPATO VA ENTERO Y CENTRADO — `contain`, no `cover`, y ahora para TODAS las
+   celdas porque todas son recortes con alfa.
+
+   Hubo aquí dos reglas, una por clase de imagen: la fotografía editorial a
+   sangre y el recorte entero. Con el catálogo del rollo la distinción
+   desapareció, y con ella la clase `is-recorte` — ver la nota de `celdas`.
+
+   `cover` escalaría el zapato hasta cubrir el hexágono y le cortaría la puntera
+   y el talón contra los biseles, que es justo lo que no se quiere ver.
+
+   SIN RELLENO VERTICAL, y sale de la geometría en vez del ojo: el recorte viene
+   en caja unión de 1160×599 —proporción 1.94, muy tumbada— así que en un
+   hexágono de 216×249 `contain` lo encaja por ANCHO y le deja 111 px de alto
+   centrados, o sea del 28% al 72%. Los hombros del hexágono están al 25% y al
+   75%: el zapato cae entero dentro de la banda que tiene el ancho completo y no
+   se acerca a ninguna punta.
+
+   El 5% lateral es lo único que hace falta. La tinta llena el 97.5% de la caja
+   unión, así que sin él el zapato quedaría a 2 px de los lados del hexágono —
+   cabe, pero se lee apretado. Con el 5% son unos 9 px de aire por lado. */
 .pd__shot {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-/* EL RECORTE VA ENTERO Y CENTRADO, no a sangre. `cover` en un `.png` con fondo
-   transparente escala el zapato hasta cubrir el hexágono y le corta la puntera
-   y el talón por los biseles — justo lo que no se quiere ver en la única celda
-   donde el material se ve entero.
-
-   Y lleva relleno porque el hexágono NO es su caja: sólo tiene el ancho completo
-   en la banda del centro y se cierra en punta arriba y abajo. Los porcentajes de
-   `padding` se resuelven todos contra el ANCHO —también los verticales—, así que
-   15% y 12% son 32 y 26 px en una celda de 216: el zapato se queda dentro de la
-   banda ancha y no toca ningún bisel. Es el mismo motivo del 78% del panal,
-   escrito como margen en vez de como escala. */
-.pd__track > .pd__cell.is-recorte .pd__shot {
   object-fit: contain;
-  padding: 15% 12%;
+  padding: 0 5%;
+  pointer-events: none;
 }
 
 /* EL ANILLO ES UN POLÍGONO CON AGUJERO: se traza el hexágono exterior y después

@@ -275,6 +275,22 @@ rectangular del material se pintaría encima del hexagonal.
 
 ---
 
+## 8b · El margen lateral es el del sistema
+
+```css
+padding: clamp(16px, 2.6vw, 34px) var(--av-gutter);
+```
+
+El lateral era `clamp(10px, 2vw, 26px)` —el más estrecho de las cinco piezas de
+la página— y ahora es `--av-gutter`. El vertical se queda propio y no es
+descuido: el panal **no reserva barra arriba ni suelo abajo**, a diferencia del
+acordeón y del rollo, así que su aire vertical no tiene por qué ser el de ellos.
+
+Ojo con la tabla del §14: la fila «margen lateral 24» es de antes de este cambio.
+A 1440 el número de hoy es **57.6**. Ver doc 04 §3b.
+
+---
+
 ## 9 · El fondo
 
 **Negro sólido `#050506`** — la primera parada de la rampa `negro` de marca, no un

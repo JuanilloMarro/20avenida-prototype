@@ -3,7 +3,9 @@
  * Landing.
  *
  * El recorrido, de arriba abajo: <ProductShowcase> con su scrollover, el
- * acordeón, el rollo y el panal. El pie NO está aquí — vive en el layout, detrás
+ * acordeón, el rollo, el panal y el díptico. Los tres últimos comparten plano
+ * negro con el pie, así que el final de la página se lee como un bloque y no
+ * como cuatro cortes. El pie NO está aquí — vive en el layout, detrás
  * de `</main>`, con la barra; ver la cabecera de <SiteFooter>.
  *
  * SE FUE EL BANCO DE PRUEBAS DEL SCROLL que cerraba la página. Era el héroe con
@@ -55,18 +57,32 @@ function onComprar({ id, size }) {
   <div class="home">
     <ProductShowcase @buy="onComprar" />
 
-    <!-- El acordeón entra JUSTO después del showcase, que se lleva 375vh de
+    <!-- EL ACORDEÓN ENTRA JUSTO DEBAJO DEL SCROLLOVER, que se lleva 375vh de
          carril: cuando esto aparece, su `sticky` ya soltó. -->
     <ProductAccordion
-      :items="['jordan-pine', 'jordan-brood', 'jordan-ochre', 'jordan-chi']"
+      :items="['suede-miel', 'suede-arena', 'suede-pecana', 'suede-hueso']"
       @select="onProducto"
       @buy="onComprar"
     />
 
-    <!-- El rollo va DESPUÉS del acordeón y ANTES del panal, y el orden cuenta
-         algo: el acordeón compara cuatro colores, el rollo saca uno a pedestal
-         con su nombre y su precio, y el panal enseña que hay muchos más. De lo
-         general a lo concreto y otra vez a lo general. -->
+    <!-- EL CARTEL DE DOBLE COLUMNA, entre el acordeón y el bloque negro.
+         Aquí y no al final por el color: el acordeón es un plano de color y el
+         rollo abre la seguidilla de negros con la que cierra la página. Metido
+         entre ellos, el cartel es la última pieza clara y la transición va de
+         claro a claro a oscuro en vez de dar dos saltos. -->
+    <ProductPoster />
+
+    <!-- EL ROLLO, DESPUÉS DEL ACORDEÓN. Se probó al revés —rollo primero— y se
+         volvió: el rollo abre su propia ficha a pantalla completa, y ponerlo
+         pegado al scrollover encadenaba dos piezas que se comen el viewport y
+         piden gesto antes de que la página haya enseñado nada que se pueda
+         comparar.
+
+         Su fondo es el negro del sistema, el mismo del panal y del díptico. Con
+         el rollo pegado al escaparate llegó a pasársele el `surface` claro del
+         colorway para que la costura no se notara; ya no hace falta y se quitó
+         — el rollo es una de las tres piezas negras con las que cierra la
+         página. -->
     <ProductReel @select="onRollo" @buy="onComprar" />
 
     <!-- El panal entra después del acordeón: el acordeón enseña CUATRO productos

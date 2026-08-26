@@ -341,7 +341,7 @@ const estilo = computed(() => ({
   margin: 0 0 clamp(14px, 1.6vw, 22px);
   font-size: clamp(15px, 1.3vw, 19px);
   font-weight: 800;
-  letter-spacing: -.01em;
+  letter-spacing: var(--av-track);
   /* SIN VERSALES, aunque sean títulos y aunque la referencia los grite: primera
      mayúscula y el resto minúsculas, como todo el texto de la casa. Lo que
      separa un título de un enlace aquí es el peso (800 contra 400), el cuerpo y

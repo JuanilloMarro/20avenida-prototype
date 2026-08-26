@@ -46,7 +46,7 @@ const open = ref(false)
 .dev__panel { width: 236px; }
 .dev__body { padding: 14px 15px; display: flex; flex-direction: column; gap: 13px; color: var(--av-on-glass-strong); }
 /* sin versales: la regla vale también para el panel de desarrollo */
-.dev__t { font-size: 9.5px; letter-spacing: .04em; opacity: .6; margin: 0 0 7px; }
+.dev__t { font-size: 9.5px; letter-spacing: var(--av-track); opacity: .6; margin: 0 0 7px; }
 .dev__row { display: flex; flex-wrap: wrap; gap: 5px; }
 .dev__row button {
   padding: 5px 9px; border-radius: 7px; font-size: 10.5px; border: 0;

@@ -59,18 +59,108 @@ defineEmits(['select', 'open', 'search', 'filter'])
 
 | | Escritorio (≥1280) | Móvil (≤1279) |
 |---|---|---|
-| Marca | suelta, sin panel | dentro del menú |
-| Enlaces | píldora centrada | dentro del menú del ⋯ |
-| Buscador | barra propia en la cabecera + desplegable | panel a pantalla completa |
-| Acciones | tres botones sueltos | dentro de la barra única |
+| Marca | **en burbuja de vidrio**, 55×55 | dentro de la barra única |
+| Enlaces | píldora **centrada sobre la pantalla**, sin iconos | dentro del menú del ⋯ |
+| Buscador | **barra propia** en la cabecera + desplegable | panel a pantalla completa |
+| Acciones | bolsa · favoritos · cuenta, sueltas | dentro de la barra única |
+| El ⋯ | **no existe** | abre el menú |
+
+**El ⋯ es de teléfono y sólo de teléfono.** Llegó a estar también en escritorio,
+y sobraba: ahí los seis enlaces ya están a la vista en la píldora, así que el
+botón abría un panel para enseñar lo que no estaba escondido. La lupa siguió el
+mismo camino — en escritorio buscar no es un botón que abre algo, es un campo
+que está.
 
 **Se resuelven en CSS con el marcado duplicado**, no con `matchMedia` + `v-if`. El motivo está escrito: el servidor no sabe el ancho, renderiza una y el navegador tendría que corregirla al hidratar. Duplicar en CSS lo resuelve en el primer pintado, y la copia oculta sale del árbol de accesibilidad — no hay botones repetidos para un lector.
 
 ---
 
+---
+
+## 2b · La cabecera de escritorio, pieza por pieza
+
+Tres grupos en una fila `space-between`: `.av-nav__left` (marca + buscador), la
+píldora, y `.av-nav__actions`.
+
+### La marca, dentro de una burbuja
+
+`<GlassSurface :radius="999">` de `--av-nav-h` × `--av-nav-h`, con el rótulo al
+**60 %** del alto. Estuvo suelta sobre el fondo y volvió al vidrio; el porqué,
+el aire de los lados y —lo importante— **por qué se le quitó el halo** están en
+el doc 04 §4. Resumen de una línea: un `filter` en un ancestro crea backdrop
+root y deja sin refracción a todo el vidrio que tenga dentro.
+
+### La píldora está centrada SOBRE LA PANTALLA, no sobre su hueco
+
+```css
+.av-nav__pill { position: absolute; left: 50%; transform: translateX(-50%); }
+```
+
+Estaba en la columna de en medio de una rejilla `auto 1fr auto` con
+`justify-self: center`, **y esa columna no está centrada**: arranca después de
+la marca (58 px) y acaba antes de las acciones (250 px). Su centro caía en 616
+de 1425 cuando el de la pantalla está en 712 — **96 px corrida a la izquierda**,
+que es exactamente lo que se veía.
+
+`1fr auto 1fr` habría centrado la columna, pero **un `1fr` no baja de su
+contenido**: a 1024 px las dos laterales pedirían 250 cada una y la fila se
+desbordaría. Sacarla del flujo es lo único que centra de verdad sin reservar a
+los lados un sitio que no hay.
+
+**El precio se paga en la media query:** fuera del flujo, la píldora ya no
+empuja a nadie, así que el solape hay que impedirlo con el ancho mínimo de la
+disposición — y es la razón real de que el corte esté en 1280 y no más abajo.
+
+### `--av-nav-air` — un número para el aire de la selección
+
+```css
+.av-nav__inner { --av-nav-air: 5px; padding: 0 var(--av-nav-air); }
+.av-nav__links { gap: calc(var(--av-nav-air) * 2); }
+.av-nav__link  { height: calc(var(--av-nav-h) - var(--av-nav-air) * 2);
+                 padding-block: 0; }
+```
+
+La selección se pegaba arriba y abajo. El arreglo no fue meter un `padding`
+vertical —eso deja el hueco a merced de la altura de línea— sino **derivar la
+altura del enlace del alto de la barra menos el aire dos veces**. Así el hueco
+es exactamente `--av-nav-air` por los cuatro lados: arriba y abajo por resta, a
+los lados por el `padding` del contenedor, y entre enlaces por un `gap` que es
+el doble (medio de cada uno).
+
+**Un solo número gobierna los cuatro lados.** Con cuatro valores sueltos, la
+igualdad se rompe en cuanto alguien toca uno.
+
+### Los enlaces de la píldora NO llevan icono
+
+Estuvieron y se quitaron. En la píldora los seis enlaces son palabras cortas y
+están todas a la vista: el icono no desambigua nada y suma seis manchas a la
+única pieza de la barra que tiene que leerse de un vistazo. `item.icon` **sigue
+en los datos** porque el menú de teléfono sí lo usa — ahí las filas están una
+debajo de otra y el icono es la columna que las alinea.
+
+> **Trampa que costó encontrar:** el primer intento fue `display: none` sobre
+> `.av-nav__icon`, y no ganaba. `.av-glyph { display: grid }` aparece **más
+> abajo en el mismo CSS scoped** y con la misma especificidad, así que gana por
+> orden. La solución correcta era la obvia: sacar el icono del marcado.
+
+---
+
 ## 3 · El menú (el panel del ⋯)
 
-**A pantalla completa**, `variant="panel"`, con `v-show` (regla R5).
+**A pantalla completa y A SANGRE**, `variant="panel"`, con `v-show` (regla R5).
+
+```css
+.av-menu, .av-search { position: fixed; inset: 0; width: 100vw; }
+```
+
+**`100vw` y no `100%`, y no es lo mismo:** `100%` se mide contra el bloque
+contenedor y **no incluye la barra de scroll**, así que quedaba una franja de
+14-17 px por la derecha — el «margen» que se veía y que no venía de ningún
+`padding`. `100vw` sí la incluye.
+
+Lo que quita el filo es `--lg-frame: 0`, que trae la variante `panel`: sin
+esquina donde doblar, el especular de 1.5 px se lee como el borde de una ventana
+y la sombra de elevación proyecta sobre algo que no está. Ver doc 01 §4.
 
 Dentro, dos cosas y en este orden:
 
@@ -131,6 +221,28 @@ Las filas sí van 13 px más adentro, y no es incoherencia: **una fila tiene fon
 **Teléfono:** panel a pantalla completa, `variant="panel"`.
 **Escritorio:** barra propia en la cabecera + desplegable colgando de ella.
 
+```vue
+<GlassSurface :variant="esEscritorio ? 'panel dropdown' : 'panel'" />
+```
+
+En escritorio ocupar la pantalla entera para enseñar cuatro resultados es gasto
+sin contrapartida: el campo está ahí y lo que hace falta es lo que cae debajo.
+La geometría no se puede heredar tal cual —`panel` trae una lente de 80 px,
+pensada para superficies que se comen el viewport, y aquí la pieza mide 240: se
+la comería entera—, así que hay una segunda variante que se **aplica encima** en
+vez de deshacer la primera a mano.
+
+> **Esto fue un anti-patrón corregido** (doc 01 §6). Los cuatro tokens
+> —`--lg-r`, `--lg-edge`, `--lg-scale`, `--lg-frame`— estaban escritos a pelo
+> dentro de la media query del componente, y el día que la base cambiara, esa
+> copia se quedaba atrás **en silencio**. La regla R4 es: geometría del material
+> sólo en `glass.css`.
+
+**Dónde cae** lo dice `--av-search-x` (§6). **Cuánto mide**, `--av-search-w`.
+Dentro, el campo de la cabecera ya existe, así que el panel esconde su propia
+cabecera y su X, y la ficha se estrecha —foto de 44 en vez de 62— porque a 240
+px una foto de 62 se comía la mitad de la fila.
+
 ### Por qué `v-show` y no `v-if`
 
 Además de la regla R5 (la lente), hay un segundo motivo específico de este panel:
@@ -150,13 +262,47 @@ Dos variables que escribe el script:
 
 ### La ficha de resultado
 
-Es una `<GlassSurface variant="light">` — vidrio dentro de vidrio, **a propósito** (regla R3). Permite fichas liquid sin perder el fondo.
+```vue
+<GlassSurface tag="button" variant="light sheet" class="av-card">
+```
 
-⚠️ Dos pendientes sobre ella, ambos en el doc 01:
-- El contraste AA de `light` con texto (§7)
-- El comentario encima que dice lo contrario de lo que hace el código (§8c)
+Vidrio dentro de vidrio, **a propósito** (regla R3). Y dos variantes a la vez,
+cada una por su motivo:
 
-**Cambio sin commitear en el prototipo:** se le quitó el recuadro de fondo a la foto. Tenía un rectángulo redondeado con `--av-on-glass-hair` y sumaba **una tercera superficie** a la pila —panel, ficha y encima el recuadro—: tres velos apilados para enmarcar un PNG que ya viene recortado. La foto va suelta; `place-items` sigue centrándola.
+- **`light`** — velo blanco. Es la única pieza clara de la barra, y lo es para
+  que un resultado se lea como una tarjeta y no como una fila más del panel.
+- **`sheet`** — sin lente. Esto es una **lista**: se pinta una ficha por
+  resultado y cada lente es un filtro SVG con su mapa propio, contra un
+  presupuesto de ≈9 instancias. A 44-62 px de alto los topes ya recortaban la
+  lente a un tercio, así que lo que se quita casi no se veía. Ver doc 01 §5.
+
+### El texto va BLANCO sobre el velo claro, y es deliberado
+
+```css
+.av-card {
+  --av-on-glass:        rgba(255,255,255,.72);
+  --av-on-glass-strong: #FFFFFF;
+  --av-on-glass-hover:  rgba(255,255,255,.10);
+  --av-on-glass-hair:   rgba(255,255,255,.14);
+}
+```
+
+`light` pone los cuatro tokens de contenido **a tinta oscura** —es lo correcto
+para un botón claro— y aquí se deshace. Con tinta negra sobre el velo blanco,
+que encima está sobre el panel oscuro, la ficha se leía apagada: el velo no
+llega a ser papel y la tinta no llega a tener contra qué apoyarse.
+
+Se cambian **los cuatro tokens y no un `color` suelto** para que los hijos
+—línea, nombre, precio, chevron y la caja de la foto— sigan sin escribir ni un
+color propio. Es el mismo motivo por el que los tokens existen.
+
+> **El velo se queda `light`.** Se probó devolver la ficha al velo negro y no es
+> lo mismo: lo que se pedía era la tinta, no la superficie.
+
+**La foto va suelta.** Tuvo un rectángulo redondeado de fondo con
+`--av-on-glass-hair` y sumaba **una tercera superficie** a la pila —panel, ficha
+y encima el recuadro—: tres velos apilados para enmarcar un PNG que ya viene
+recortado. `place-items` sigue centrándola.
 
 ---
 

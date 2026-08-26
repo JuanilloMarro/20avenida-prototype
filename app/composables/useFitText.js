@@ -26,7 +26,53 @@
  * cabe de alto, y si no, llena el alto y deja aire a los lados. Es la regla de
  * «contain» de toda la vida, escrita a mano porque aqui lo que se escala es un
  * `font-size`, no una caja.
+ *
+ * SE MIDE LA TINTA, NO LA CAJA DE LINEA, y esto costo tener la palabra a un
+ * tercio del tamano que le tocaba. La version anterior comparaba `scrollHeight`
+ * contra el tope, y `scrollHeight` es la caja de linea del elemento: para Bebas
+ * Neue son 1.05 em cuando la TINTA -- de la base de las mayusculas al alto de
+ * mayuscula -- son 0.740. O sea que el tope se gastaba en aire por encima y por
+ * debajo de las letras, que no se ve, y el numero que se escribia aqui no
+ * significaba lo que decia.
+ *
+ * Medida contra tinta, `fillH: 0.95` quiere decir literalmente «que las letras
+ * ocupen el 95% del alto de la caja», y sale igual con cualquier tipografia --
+ * que es justo lo que no pasaba antes: el numero habia que reajustarlo cada vez
+ * que cambiaba la familia, porque cada una tiene su reparto entre tinta y aire.
+ *
+ * La tinta se mide con `measureText` sobre un canvas suelto, que es la unica
+ * forma de saber donde empieza y acaba de verdad: `actualBoundingBoxAscent` y
+ * `Descent` son las cotas reales del trazado, no las metricas declaradas de la
+ * fuente.
  */
+/**
+ * Cuanto ocupa el trazado de este texto, en em.
+ *
+ * Se mide sobre un canvas y a un cuerpo de referencia grande —100 px— y no al
+ * cuerpo que tenga puesto el elemento: el resultado es una PROPORCION, y a
+ * cuerpos chicos el redondeo del rasterizador la ensucia.
+ *
+ * El canvas no hereda nada del documento, asi que la fuente hay que armarla a
+ * mano desde el estilo computado. `letter-spacing` no entra: no cambia el alto.
+ *
+ * Si `measureText` no trae las cotas reales —Safari viejo— se cae a 0.72, que
+ * es el alto de mayuscula tipico de una grotesca. Un numero de reserva
+ * razonable es mejor que desactivar el tope y que la palabra se salga.
+ */
+function tintaPorEm(el) {
+  try {
+    const cs = getComputedStyle(el)
+    const cv = (tintaPorEm.cv ||= document.createElement('canvas').getContext('2d'))
+    const M = 100
+    cv.font = `${cs.fontStyle} ${cs.fontWeight} ${M}px ${cs.fontFamily}`
+    const m = cv.measureText(el.textContent.trim() || 'M')
+    const alto = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent
+    return alto > 0 ? alto / M : 0.72
+  } catch {
+    return 0.72
+  }
+}
+
 export function useFitText(textRef, boxRef, fill = 0.99, fillH = 0) {
   let ro = null
 
@@ -45,13 +91,13 @@ export function useFitText(textRef, boxRef, fill = 0.99, fillH = 0) {
     let next = base * target / natural
     el.style.fontSize = next.toFixed(2) + 'px'
 
-    /* Y el tope de alto, con el cuerpo nuevo ya puesto: se mide lo que ocupa de
-       verdad y se reduce por la misma regla de tres. Se mide DESPUES de escribir
-       el tamano porque `line-height` es relativo al cuerpo — calcularlo sobre el
-       alto anterior daria un numero que no es. */
+    /* Y el tope de alto. Se mide la TINTA y no `scrollHeight` — ver la nota de
+       `fillH` arriba. `tintaPorEm()` devuelve cuanto ocupa de verdad el trazado
+       por cada em, asi que el alto real es esa fraccion por el cuerpo, y la
+       reduccion vuelve a ser una regla de tres. */
     const targetH = fillH ? box.clientHeight * fillH : 0
     if (targetH) {
-      const alto = el.scrollHeight
+      const alto = next * tintaPorEm(el)
       if (alto > targetH) {
         next = next * targetH / alto
         el.style.fontSize = next.toFixed(2) + 'px'

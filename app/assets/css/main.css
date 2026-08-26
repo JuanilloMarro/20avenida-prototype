@@ -91,6 +91,37 @@
     @apply bg-background text-foreground;
     font-family: var(--av-font);
     -webkit-font-smoothing: antialiased;
+
+    /* EL TRAZO, y va aquí por lo mismo que el `font-synthesis` de abajo: es una
+       propiedad HEREDADA, así que puesta en `body` llega a todo lo que no
+       declare el suyo — y lo que sí lo declara apunta al mismo token. El número,
+       y por qué ese número, están en `tokens.css` junto a `--av-track`. */
+    letter-spacing: var(--av-track);
+
+    /* NADA DE NEGRITA FABRICADA. Bebas tiene UN corte, el 400, y el sitio
+       declara cuarenta y tres pesos por encima —de 500 a 900, repartidos por la
+       barra, el rollo, el acordeón, el showcase y el pie—. Ninguno existe. Sin
+       esto, el navegador los fabricaría engordando el trazo; sobre una
+       condensada estrecha eso cierra las contraformas y las palabras se leen
+       como una barra — que es exactamente lo que el `letter-spacing` de arriba
+       está puesto para evitar. Sin esta línea, una cosa deshace la otra.
+
+       LO QUE SE PIERDE: la jerarquía se apoyaba en el PESO —el título a 800
+       contra el subtítulo a 500— y con una familia de un solo corte esa señal
+       desaparece. Quedan el cuerpo y el color. Si el texto secundario y el
+       principal empiezan a confundirse, es esto y no un fallo de los
+       componentes.
+
+       Los pesos se quedan escritos en los componentes a propósito: son la
+       INTENCIÓN y vuelven a valer solos el día que la letra tenga esos cortes.
+       Bajarlos a 400 uno por uno sería atar los componentes al catálogo de
+       pesos de la familia de hoy.
+
+       Va en `body` y no en `*` porque es una propiedad HEREDADA: puesta aquí
+       llega a todo, incluido lo que está dentro del vidrio, y se puede levantar
+       en una pieza suelta el día que haga falta. Con `*` no habría dónde
+       levantarla. */
+    font-synthesis-weight: none;
   }
   button { cursor: pointer; }
 }

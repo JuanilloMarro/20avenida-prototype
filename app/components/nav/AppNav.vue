@@ -1054,7 +1054,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
 }
 .av-nav__search input::placeholder { color: var(--av-on-glass); }
@@ -1198,7 +1198,7 @@ onBeforeUnmount(() => {
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: .005em;
+  letter-spacing: var(--av-track);
   white-space: nowrap;
   color: var(--av-on-glass);
   text-decoration: none;
@@ -1457,7 +1457,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
 }
 .av-menu__close {
@@ -1545,7 +1545,7 @@ onBeforeUnmount(() => {
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   white-space: nowrap;
   color: var(--av-on-glass);
   text-decoration: none;
@@ -1617,7 +1617,7 @@ onBeforeUnmount(() => {
      fila es sólo el COLOR — blanco puro contra el 72%. */
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1637,7 +1637,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1748,7 +1748,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
 }
 .av-search__field input::placeholder { color: var(--av-on-glass); }
@@ -1787,7 +1787,7 @@ onBeforeUnmount(() => {
   margin: 0 0 10px;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
 }
 
@@ -1815,7 +1815,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.01em;
+  letter-spacing: var(--av-track);
   text-align: left;
   color: var(--av-on-glass);
   cursor: pointer;
@@ -1838,7 +1838,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.01em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -1929,7 +1929,7 @@ onBeforeUnmount(() => {
 .av-card__line {
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass);
   /* una línea y con puntos suspensivos: el nombre largo no puede empujar al
      precio fuera de la tarjeta */
@@ -1940,7 +1940,7 @@ onBeforeUnmount(() => {
 .av-card__name {
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   overflow: hidden;
   text-overflow: ellipsis;

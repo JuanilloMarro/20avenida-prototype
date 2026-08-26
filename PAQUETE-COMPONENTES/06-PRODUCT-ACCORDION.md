@@ -1,87 +1,137 @@
 # 06 · `<ProductAccordion>` — el acordeón de productos
 
-> **Estado: CONSTRUIDO y verificado.** Este documento ya no es una
-> especificación: describe código que existe, y todos los números están medidos
-> en el navegador, no recordados.
-
-**Sitio:** en la landing, justo debajo de `<ProductShowcase />`.
-**Archivos:** `components/product/ProductAccordion.vue` · `components/product/ProductAccordionPanel.vue`
-**Sí usa liquid glass** — ver §8. Esto cambió respecto a la especificación original.
+> **Guía de migración.** Todo lo necesario para reconstruirlo desde cero,
+> incluidas las decisiones que costaron y las trampas que ya se pisaron una vez.
+>
+> **Archivos:** `app/components/product/ProductAccordion.vue` (328 líneas, el
+> reparto) · `app/components/product/ProductAccordionPanel.vue` (1174 líneas, el
+> recorte y la ficha).
+> **Depende de:** `assets/js/colorways.js` · `composables/useFitText.js` ·
+> `<GlassSurface>` · los tokens del anfitrión (§12).
 
 ---
 
 ## 1 · Qué es
 
-Cuatro paneles de color, uno por producto. Al señalar uno **se expande al 40% y
-los otros se reparten el 60% restante**. El expandido enseña el producto entero
-con su ficha; los contraídos, el producto recortado y nada más. Al hacer clic,
-el panel **se come el componente entero** y aparece la ficha completa con tallas
-— sin cambiar de página.
+Cuatro planos de color, uno por producto. Al señalar uno se expande y los demás
+se reparten lo que queda.
 
 ```
-reposo         ┌────┬────┬────┬────┐      25 · 25 · 25 · 25
-               └────┴────┴────┴────┘
-
-señalado #2    ┌──┬───────┬──┬──┐         20 · 40 · 20 · 20
-               └──┴───────┴──┴──┘
-
-detalle #2     ┌───────────────────┐       0 · 100 ·  0 ·  0
-               └───────────────────┘
+reposo         ┌─────┬─────┬─────┬─────┐    25 · 25 · 25 · 25
+señalado #2    ┌───┬────────┬───┬───┐       20 · 40 · 20 · 20
+detalle  #2    ┌────────────────────────┐    0 · 100 ·  0 ·  0
 ```
 
-**La idea central, y de donde sale todo lo demás:** el panel contraído
-**recorta** el producto; al expandirse no lo escala, lo **destapa**. Es una
-ventana que se abre, no una foto que crece.
+**LA IDEA, y de donde sale todo lo demás:** el panel contraído **recorta** el
+producto; al expandirse no lo escala, lo **destapa**. Es una ventana que se abre,
+no una foto que crece.
+
+Ésa es la diferencia con el escaparate, que está justo encima: el escaparate
+enseña **un** producto y lo hace girar; el acordeón enseña **cuatro** y deja
+compararlos. De lo concreto a lo general.
 
 ---
 
-## 2 · API
+## 2 · Proporciones de ocupación
+
+Medidas del DOM, con las transiciones apagadas para leer los estados destino.
+
+### 2.1 · Escritorio — sección 1425 × 1024
+
+| estado | p1 | p2 | p3 | p4 |
+|---|---|---|---|---|
+| reposo | 356.3 (**25 %**) | 356.3 | 356.3 | 356.3 |
+| señalado #2 | 285 (**20 %**) | 570 (**40 %**) | 285 | 285 |
+| detalle #2 | 0 | 1425 (**100 %**) | 0 | 0 |
+
+**El cuerpo del panel mide 570 px SIEMPRE** — `--pa-body: 40cqw`, el ancho del
+expandido — en los tres estados y en los cuatro paneles. Lo único que cambia es
+cuánto de él deja ver el panel:
+
+| estado | panel | cuerpo visible | recortado |
+|---|---|---|---|
+| reposo | 356.3 | **62.5 %** | 18.75 % por cada lado |
+| señalado | 570 | **100 %** | — |
+| contraído | 285 | **50 %** | 25 % por cada lado |
+
+Y como el cuerpo va centrado en absoluto, **el recorte es simétrico**: el
+producto se cierra por los dos lados a la vez, como una persiana, no se desplaza.
+
+### 2.2 · La ficha del detalle — escritorio
+
+Relleno: **87 px arriba** (el hueco de la barra) · **57 px a los lados**.
+
+| pieza | posición | tamaño | % del ancho |
+|---|---|---|---|
+| título | 57, 155 | 217.6 × 144.9 | 15.3 % |
+| precio | 57, 307.9 | 217.6 × 48 | 15.3 % |
+| descripción | 57, 369.9 | 217.6 × 80.6 | 15.3 % |
+| **Regresar** | 57, **893** | 164 × 44 | 11.5 % |
+| tallas | 1056, 771 | 312 × 104 | 21.9 % |
+| **Comprar ahora** | 1204, **893** | 164 × 44 | 11.5 % |
+| zapato | 340.5, 173.1 | 743.9 × 677.9 | 52.2 % |
+| palabra | 330.2, 282.9 | 764.6 × 376.2 | 53.7 % |
+
+**Las dos salidas comparten línea de base** — `y = 893` las dos, en esquinas
+opuestas. Volver y comprar quedan a la misma altura de la mano y no se
+confunden.
+
+La rejilla de tallas son **5 × 2** de 56 × 48 con 8 de hueco → 312 × 104.
+
+### 2.3 · Teléfono — 375 × 812
+
+**El acordeón se tumba: filas, no columnas.**
+
+| estado | p1 | p2 | p3 | p4 |
+|---|---|---|---|---|
+| reposo | 203 (**25 %**) | 203 | 203 | 203 |
+| detalle #2 | 0 | 812 (**100 %**) | 0 | 0 |
+
+El cuerpo pasa a tener **alto** fijo: `--pa-body-h: calc(100svh * 0.4)` = 324.8
+px, centrado, así que se recorta **60.9 px por arriba y por abajo**. Zapato
+461.2 × 453.8. **La palabra gigante se apaga** (`display: none`).
+
+La ficha en teléfono, en una columna (345 px), relleno **87 / 15**:
+
+| pieza | y | tamaño |
+|---|---|---|
+| **Regresar** | 87 | 164 × 44 — **arriba**, encima del título |
+| título | 143 | 217.6 × 27.3 |
+| banda del zapato | 178.6 (**22 %**) | alto 324.8 (**40 %**) |
+| tallas | 559 | 312 × 104 |
+| **Comprar ahora** | 681 | 164 × 44 |
+
+La descripción se apaga: no cabe, y el nombre ya orienta.
+
+---
+
+## 3 · API
 
 ```vue
 <ProductAccordion
-  :items="['jordan-pine', 'jordan-brood', 'jordan-ochre', 'jordan-chi']"
-  @select="onProducto"
-  @buy="onComprar"
+  :items="['nb-sea-salt', 'nb-mushroom', 'nb-dark-mushroom', 'nb-angora']"
+  :open="40"
+  :initial="null"
+  height="100svh"
+  blend-from="mind-001"
+  @select="id => {}"
+  @buy="({ id, size }) => {}"
 />
 ```
 
-| Prop | Tipo | Defecto | Qué hace |
+| prop | tipo | por defecto | notas |
 |---|---|---|---|
-| `items` | `Array` | — *(requerido)* | ids de colorways. 3–5. |
-| `open` | `Number` | `40` | % que ocupa el expandido. |
-| `initial` | `String` | `null` | cuál arranca expandido. `null` = reposo. |
-| `height` | `String` | `'100svh'` | alto de la pieza. |
+| `items` | Array | **requerido** | ids de `colorways.js`. **3–5**; por encima de 5 el contraído deja de reconocerse |
+| `open` | Number | `40` | % del expandido; el resto se reparte |
+| `initial` | String | `null` | `null` = reposo, todos iguales |
+| `height` | String | `'100svh'` | ver §11 |
+| `blendFrom` | String | `''` | id del colorway de la sección de encima |
 
-| Evento | Payload | Cuándo |
-|---|---|---|
-| `select` | `id` | se abre el detalle de un producto |
-| `buy` | `{ id, size }` | se pulsa «Comprar ahora». `size` puede ser `null` |
+Los ids que no existen **se caen sin reventar**: un colorway mal escrito deja
+tres paneles, no una página en blanco.
 
-Los ids que no existen en `COLORWAYS` **se filtran**, no revientan: un colorway
-mal escrito deja tres paneles, no una página en blanco.
-
----
-
-## 3 · La proporción
-
-```
-expandido  = open                       (40 por defecto)
-contraído  = (100 − open) / (n − 1)
-reposo     = 100 / n
-```
-
-| paneles | expandido | cada contraído |
-|---|---|---|
-| 3 | 40% | 30% |
-| **4** | **40%** | **20%** ✅ el caso en uso |
-| 5 | 40% | 15% |
-
-> Con más de 5 el contraído baja de 15% y el producto deja de reconocerse. **Si
-> hace falta más catálogo, es otro componente** (una grilla), no más paneles.
-
-El cálculo vive en JS —`geometria`, en el padre— porque **depende de cuántos
-paneles hay y CSS no sabe contar hermanos para repartir**. Lo que baja al CSS
-son longitudes ya resueltas: `--pa-rest`, `--pa-open`, `--pa-shut`.
+**Eventos:** `select` con el id · `buy` con `{ id, size }` — misma firma que el
+escaparate y el rollo, para que la página enganche los tres al mismo manejador.
 
 ---
 
@@ -93,474 +143,488 @@ son longitudes ya resueltas: `--pa-rest`, `--pa-open`, `--pa-shut`.
   inherits: false;
   initial-value: 25%;
 }
-.pa__panel {
-  flex-grow: 0; flex-shrink: 0;
-  flex-basis: var(--pa-w);
-  transition: --pa-w .5s cubic-bezier(.22, 1, .36, 1);
-}
 ```
 
-**La transición va sobre la variable, no sobre `flex-basis`.** Sin registrar con
-`@property`, una custom property es texto que se sustituye: el navegador no sabe
-que «del 25% al 40%» es un recorrido y no puede interpolarlo. Registrada pasa a
-ser una propiedad **con tipo**, el navegador la interpola, y `flex-basis` se
-limita a seguirla fotograma a fotograma.
+**Sin registrar, una custom property es texto que se sustituye**: el navegador no
+sabe que «del 25 % al 40 %» es un recorrido y no puede interpolarlo, así que una
+transición sobre ella no tiene nada que animar. Registrada pasa a ser una
+propiedad **con tipo**, el navegador la interpola, y `flex-basis` se limita a
+seguirla fotograma a fotograma.
 
-`flex-basis` y no `grid-template-columns`: es una **longitud**, interpola en
-todos lados sin sorpresas. Y mide el **eje principal** — que es lo que permite
-que en móvil, con el acordeón tumbado, **las mismas declaraciones pasen de
-repartir ancho a repartir alto sin duplicar una sola línea**.
+**Por eso la transición va sobre `--pa-w` y no sobre `flex-basis`.**
+
+La geometría se calcula en JS porque **depende de cuántos paneles hay y CSS no
+sabe contar hermanos**:
+
+```
+contraído = (100 − open) / (n − 1)      reposo = 100 / n
+```
 
 ### El orden de la cascada ES la lógica
 
-No se pueden reordenar. Todas tienen la misma especificidad, así que gana la
-última — y así **cualquier motivo para abrir le gana a cualquier motivo para
-cerrar**.
-
 ```css
-.pa > * { --pa-w: var(--pa-rest); }                 /* 1. reposo   */
+.pa > *                              { --pa-w: var(--pa-rest); }
 .pa.is-picking > *,
-.pa:has(:focus-visible) > * { --pa-w: var(--pa-shut); }  /* 2. cerrar */
-@media (hover: hover) and (pointer: fine) {
-  .pa:hover > * { --pa-w: var(--pa-shut); }
-}
+.pa:has(:focus-visible) > *          { --pa-w: var(--pa-shut); }
+@media (hover:hover) and (pointer:fine) { .pa:hover > * { --pa-w: var(--pa-shut); } }
 .pa > .is-open,
-.pa > *:focus-visible { --pa-w: var(--pa-open); }   /* 3. abrir    */
-@media (hover: hover) and (pointer: fine) {
-  .pa > *:hover { --pa-w: var(--pa-open); }
-}
-.pa.is-detail > *          { --pa-w: 0%; }          /* 4. detalle  */
-.pa.is-detail > .is-detail { --pa-w: 100%; }
+.pa > *:focus-visible                { --pa-w: var(--pa-open); }
+@media (hover:hover) and (pointer:fine) { .pa > *:hover { --pa-w: var(--pa-open); } }
+.pa.is-detail > *                    { --pa-w: 0%; }
+.pa.is-detail > .is-detail           { --pa-w: 100%; }
 ```
 
-El bloque del detalle va **al final, después del hover**, a propósito: mientras
-hay un detalle abierto, pasar el ratón sobre un panel plegado no puede
-devolverlo al 40%.
+**No se pueden reordenar.** Primero se contraen todos, después se expande el
+señalado: al tener la misma especificidad gana el último, y así cualquier motivo
+para abrir (tap, foco o ratón) le gana a cualquier motivo para cerrar.
+
+Y el bloque del detalle va **al final, después del hover**: mientras hay un
+detalle abierto el ratón no debe poder alterar nada — pasándolo sobre un panel
+plegado, la regla de hover intentaría devolverlo al 40 %.
 
 ### ⚠️ `:focus-visible`, nunca `:focus-within`
 
-**Al hacer clic, el navegador deja el foco puesto en el enlace.** Con
-`:focus-within` la regla seguía casando después de soltar el ratón y el panel se
-quedaba abierto con el cursor ya lejos. `:focus-visible` sólo casa cuando el
-navegador decide que el foco debe verse — en la práctica, navegando con teclado.
+Al hacer clic el navegador deja el foco puesto en el enlace, y `:focus-within`
+seguía casando después de soltar el ratón: **el panel se quedaba abierto aunque
+el cursor ya estuviera lejos**. En escritorio el ancho lo manda el hover y nada
+más.
 
-**En escritorio el ancho lo manda el hover y nada más.**
+`:focus-visible` sólo casa cuando el navegador decide que el foco debe verse —
+en la práctica, navegando con teclado. Así el teclado sigue abriendo el panel
+(sin eso, con `Tab` sólo se vería el recorte) y el ratón no deja nada pegado.
+
+### ⚠️ El hover pide `pointer: fine`, no sólo `hover: hover`
+
+Un portátil táctil cumple `hover: hover` pero no `pointer: fine`, y ahí el hover
+deja el acordeón pegado en un panel al salir.
 
 ---
 
 ## 5 · El recorte — la técnica
 
-El cuerpo (`.pa__body`) tiene **el ancho del panel expandido** y va centrado en
-absoluto; el panel recorta con `overflow: hidden`.
-
 ```css
-.pa { container-type: inline-size; }      /* ← la clave */
-.pa__body { width: var(--pa-body); }      /* --pa-body = `open`cqw = 40cqw */
+.pa__panel { overflow: hidden; }        /* ← el recorte */
+.pa__body  { width: var(--pa-body); }   /* ← 40cqw, SIEMPRE */
 ```
 
-`container-type: inline-size` convierte al acordeón en contenedor de consulta, y
-con eso `cqw` mide contra **esta caja** y no contra el viewport. Sin esto habría
-que usar `vw` y la pieza tendría que ir a sangre para que el número cuadre. Hay
-fallback declarado para navegadores sin container queries:
+El cuerpo tiene el ancho del panel **expandido** y va centrado en absoluto; el
+panel recorta. Así, al contraerse, el producto se recorta por los dos lados en
+vez de encogerse.
 
-```css
-@supports not (container-type: inline-size) { .pa { --pa-body: var(--pa-body-vw); } }
-```
-
-El gemelo para el acordeón tumbado es `--pa-body-h`, y sale de un `calc()` sobre
-`height` **y no de `cqh`**: `cqh` exigiría `container-type: size` —contención en
-los dos ejes— y aquí basta con la del eje en línea.
+**`container-type: inline-size` en el padre es lo que hace que `cqw` mida contra
+el acordeón** y no contra el viewport. Sin eso habría que usar `vw` y la pieza
+tendría que ir a sangre. Hay `@supports` de reserva que cae a `vw`.
 
 ### El zapato se mueve con `object-position`, no con `transform`
 
-```css
-.pa__shot { object-position: center; transition: object-position .5s …; }
-.pa__panel.is-open .pa__shot { object-position: 14% center; }
-```
-
-En reposo el zapato está centrado; al abrirse se corre a la izquierda y deja
-sitio a la derecha para la ficha. **Con `transform: translateX()` la caja se
-movía entera y el zapato se salía del ancho.** `object-position` mueve la imagen
-*dentro* de su caja, que no se mueve: el recorte sigue siendo el mismo.
+`transform` mueve la **caja**, así que el zapato se salía por el borde y el
+`overflow: hidden` se lo comía. `object-position` mueve la imagen **dentro** de
+una caja que no se mueve — imposible que se salga.
 
 ---
 
 ## 6 · Los tres modos de apertura
 
-| Entrada | Comportamiento |
+| entrada | qué hace |
 |---|---|
-| **Puntero fino** | `hover` expande. El clic abre el detalle **directo**. |
-| **Táctil** | Primer tap expande. **Segundo tap** abre el detalle. |
-| **Teclado** | `Tab` expande vía `:focus-visible`. `Enter` abre. `Escape` cierra. |
+| **hover** (puntero fino) | expande. CSS puro, sin estado |
+| **teclado** (`:focus-visible`) | expande |
+| **tap** | **doble**: el primero expande, el segundo abre el detalle |
 
-La consulta se hace **al tocar y no al montar**: un portátil táctil tiene las dos
+En táctil no hay hover, así que el primer toque **expande** y el segundo abre —
+si no, el primer toque dispararía el detalle sin que se haya llegado a ver lo que
+se abrió. Con puntero fino el hover ya expandió, así que el clic abre directo.
+
+**La consulta se hace al tocar y no al montar**: un portátil táctil tiene las dos
 entradas y lo que manda es con cuál se acaba de tocar.
 
-```js
-const fino = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-if (fino || activo.value === id) { /* abre detalle */ }
-else { activo.value = id }        /* sólo expande  */
-```
-
-El doble tap existe porque **en táctil no hay hover**: sin él, el primer toque
-dispararía el detalle sin que se haya llegado a ver lo que se abrió.
-
-Y `activo` **se escribe también en escritorio** antes de abrir. El panel ya
-estaba al 40% por el hover, pero eso es CSS puro: si el detalle arranca sin que
-el estado lo diga, el punto de partida de la animación depende de dónde esté el
-ratón en ese instante. Escribiéndolo, el recorrido es siempre **40 → 100**, y al
-cerrar vuelve por donde vino.
+Y al abrir el detalle **se escribe el 40 % antes**: en escritorio el panel ya
+estaba a 40 por el hover, pero eso es CSS puro — si el detalle arranca sin que el
+estado lo diga, el punto de partida de la animación depende de dónde esté el
+ratón en ese instante.
 
 ---
 
-## 7 · El detalle, y la vuelta en dos tiempos
-
-El detalle **no es otra página**: es el mismo acordeón con un panel comiéndose
-el ancho entero y los otros tres plegados a cero. Se hace así porque lo que se
-mira es lo mismo —el producto—, sólo que más de cerca.
-
-Los plegados **no se ocultan** con `visibility` ni `display`: un ancho de cero
-con `overflow: hidden` ya no enseña nada. Para sacarlos del teclado y de los
-lectores está **`inert`**, que es exactamente para eso y no toca el pintado.
-
-### La vuelta
+## 7 · La vuelta, en dos tiempos
 
 ```js
 function volver() {
-  detalle.value = null
-  clearTimeout(volviendo)
-  volviendo = setTimeout(() => { activo.value = null }, 520)
+  detalle.value = null                                   // 100 → 40, y 0 → 20
+  volviendo = setTimeout(() => { activo.value = null }, 520)   // 40 → 25
 }
 ```
 
-**Dos tiempos a propósito.** Primero se suelta el detalle: el panel pasa de 100 a
-40 y los otros tres de 0 a 20, así que las cuatro opciones reaparecen mientras la
-que se estaba mirando sigue señalada. Cuando esa animación termina (520 ms,
-20 más que la transición de 500) se suelta la selección y los cuatro quedan al
-25%.
+Primero se suelta **el detalle**: el panel pasa de 100 a 40 y los otros tres de 0
+a 20, así que las cuatro opciones reaparecen mientras la que se miraba sigue
+señalada. Es el mismo recorrido de la ida, al revés.
 
-> Si se soltaran los dos a la vez, el panel iría de 100 a 25 de un tirón y los
-> otros de 0 a 25: se vería un salto, no una vuelta.
+Y cuando esa animación termina se suelta **la selección**. Si se soltaran los dos
+a la vez, el panel iría de 100 a 25 de un tirón y los otros de 0 a 25: se vería
+un salto, no una vuelta.
 
-El temporizador **se cancela al abrir**: si el usuario vuelve a entrar antes de
+**El temporizador se cancela al abrir** — si el usuario vuelve a entrar antes de
 que termine, la selección no puede borrarse a media apertura.
 
----
-
-## 8 · El vidrio de la pieza
-
-Los planos de color son **sólidos** — son capa de contenido y ahí no va vidrio.
-Lo que sí es vidrio son **los controles que flotan sobre el plano**: el CTA de
-cada card, el botón de volver, el de comprar y cada talla.
-
-**Material estándar, velo negro, sin variantes, en las dos disposiciones.**
-
-```vue
-<GlassSurface :radius="999" tag="span" class="pa__cta">
-```
-
-> La variante `light` se probó y se descartó: invierte a tinta oscura lo que va
-> encima —es su diseño— y el propio `glass.css` avisa de que está calibrada para
-> glifos, no para texto.
-
-La talla seleccionada usa `.av-glass-sel`, la misma selección del sistema: sobre
-el velo negro es **luz**, el mismo vidrio un poco más encendido.
+`Escape` cierra el detalle. No sustituye al botón: es la salida que un teclado
+espera, y una segunda vía si el botón queda fuera de vista.
 
 ---
 
-## 9 · Móvil — el acordeón se tumba
+## 8 · La ficha del detalle
+
+Una rejilla de **dos columnas y dos filas**, con las cuatro piezas en cuatro
+esquinas:
 
 ```css
-@media (max-width: 640px) { .pa { flex-direction: column; } }
+grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+grid-template-rows: var(--pa-back-h) 1fr;
 ```
 
-**Filas, no columnas.** Cuatro columnas en 390 px son tiras de 97, y ahí un
-zapato no se reconoce: la foto es casi cuadrada, así que lo que la limita es el
-lado corto, y en vertical el lado corto es ridículo. Tumbado, cada fila tiene los
-390 px enteros de ancho, el zapato pasa a estar limitado por el **alto** de su
-fila —que es mucho más— y encima sobra sitio al lado para la ficha.
+| pieza | celda |
+|---|---|
+| título · precio · descripción | fila 2, col 1, `align-self: start` |
+| **Regresar** | fila 2, col 1, `align-self: end` |
+| tallas · **Comprar ahora** | fila 2, col 2, `align-self: end` |
 
-**El reparto no se reescribe**: 25 / 40 / 20, los mismos números, ahora de alto.
+### ⚠️ La fila 1 está vacía y tiene que seguir estándolo
 
-En las cards de móvil **se oculta la descripción**: sólo quedan título y precio
-arriba a la izquierda y «Ver detalles» abajo a la derecha, los dos con el mismo
-margen (`--pa-pad-m: clamp(12px, 3.5vw, 20px)`) para que no se peguen al borde.
+`Regresar` estuvo arriba y bajó a la esquina opuesta a `Comprar ahora`. **La
+primera fila sigue reservando su hueco** (`--pa-back-h`) aunque ya no haya nadie
+en ella: si pasara a `auto` se quedaría en cero y **el título subiría de golpe**
+al abrir la ficha.
 
-### El detalle en móvil
+El alto está en un token que usan la fila y el propio botón, así que no pueden
+separarse.
+
+### ⚠️ Fila y columna van ESCRITAS, no automáticas
+
+Al bajar el botón, la fila 1 quedó libre y la colocación automática metió ahí lo
+primero que encontró. Pasó **dos veces** y de dos formas distintas:
+
+1. el título subió a `y=87` y `Comprar ahora` se fue a la esquina de **arriba** a
+   la derecha;
+2. con la fila fijada pero no la columna, el título se cruzó a la **columna
+   derecha**, encima de las tallas.
+
+Las tres piezas llevan `grid-row` y `grid-column` explícitos. **Aquí no queda ni
+un hueco a la suerte.**
+
+Y la columna izquierda reserva por debajo el alto del botón, para que una
+descripción larga no se le meta encima.
+
+### La entrada
 
 ```css
-@media (max-width: 640px) {
-  .pa__detail { grid-template-rows: auto auto 1fr; padding: var(--av-nav-space, 87px) …; }
-  .pa__panel.is-detail .pa__body { inset-block: auto; top: 22%; height: 40%; transform: none; }
+@keyframes pa-detail-in { from { opacity: 0 } }
+.pa__detail { animation: pa-detail-in .3s ease .25s both; }
+```
+
+Entra **cuando el panel ya casi ha terminado de abrirse** — 250 ms de los 500.
+Aparecer a la vez que el ancho se lee como que el contenido empuja al panel;
+aparecer después, como que el panel le hizo sitio.
+
+**Es una animación CSS y no un `<Transition>`**, y la diferencia importa:
+`<Transition>` secuencia con `requestAnimationFrame` y no retira el nodo hasta
+que la salida termina. Si no hay fotogramas —pestaña de fondo, salida
+interrumpida— el detalle se queda montado encima y no hay forma de volver. Con
+`v-if` el desmontaje es inmediato e incondicional y la animación sólo decora la
+entrada.
+
+---
+
+## 9 · El redondeo de las tallas — la esquina de Apple
+
+Las tallas **no son píldoras**: llevan la esquina continua de Apple.
+
+Apple tiene dos estilos de esquina y sólo uno es éste. `.circular` es un arco de
+círculo, el `border-radius` de siempre. `.continuous` —el de los controles del
+sistema— **no es un arco: es una superelipse**, |x|ⁿ + |y|ⁿ = 1 con **n ≈ 4**. El
+arco entra en la curva de golpe y deja un punto donde la curvatura salta; la
+superelipse la reparte a lo largo del lado, y por eso se ve «continua».
+
+**No hace falta imitarla:** `corner-shape: squircle` está definido en la
+especificación como exactamente `superellipse(2)`, y ese 2 es el logaritmo en
+base 2 del exponente — o sea n = 2² = **4**. La misma curva.
+
+> El squircle del icono de app es otra cosa: un bezier ajustado a mano, más cerca
+> de n ≈ 5. Aquí no aplica — esto son controles, no iconos.
+
+### ⚠️ El radio obliga a una altura
+
+**CSS no deja que dos radios de un mismo lado sumen más que el lado**; si suman
+de más, los escala todos por el mismo factor y **en silencio**.
+
+Con las tallas a 40 px de alto, dos radios de 22 suman 44 contra 40: el navegador
+pintaba **20** — media caja, o sea una **píldora otra vez**, justo lo contrario de
+lo que se buscaba. Medido: 22 pedidos, 20 pintados.
+
+Por eso el alto es **48** y no 40: por encima de 44, que es el mínimo para que 22
+quepa entero. De regalo cruza el objetivo táctil de 44 px.
+
+A 48 de alto el máximo posible es 24, así que **22 es el 92 % del camino a la
+píldora** — muy blando, con 4 px de lado recto. Si algún día se quiere una
+esquina suave pero con rectángulo claro, el número a este alto está entre 14 y
+16.
+
+### ⚠️ La forma tiene que llegar a TODAS las capas
+
+`corner-shape` **no se hereda sola**, y el material apila cuatro capas dentro de
+cada pieza —desenfoque, velo, especular y cuerpo— todas con `border-radius:
+inherit`. Si la forma se quedara en la raíz, las capas seguirían siendo
+rectángulos redondeados y asomarían por las esquinas.
+
+Y el `::after` del especular **necesita su propia línea**: es el anillo de 1.5 px
+del perímetro y un pseudo-elemento no entra en `:deep(*)`. Sin él, la pieza tiene
+cuerpo de superelipse y filo de arco — el defecto que se ve y no se sabe nombrar.
+
+```css
+@supports (corner-shape: squircle) {
+  .pa__dsize { corner-shape: squircle; }
+  .pa__dsize :deep(*) { corner-shape: inherit; }
+  .pa__dsize :deep(.av-glass__spec)::after { corner-shape: inherit; }
 }
 ```
 
-El zapato **no va centrado**: ocupa una banda del **22% al 62%** del alto. Arriba
-sólo hay un botón y dos líneas, así que no necesita media pantalla; **el tercio
-inferior queda entero para las tallas y el botón**, que es lo que se toca.
-
-La banda va en **porcentaje y no en píxeles** a propósito: el alto de un teléfono
-varía mucho y lo que tiene que mantenerse es la proporción entre las tres zonas,
-no una distancia fija.
+**Sólo las tallas.** `Regresar` y `Comprar ahora` pasaron por aquí y volvieron a
+píldora: una casilla que se **elige** no puede parecerse a un botón que se
+**pulsa**. Y la forma va en un `@supports` aparte del radio a propósito — donde
+`corner-shape` no exista queda el rectángulo redondeado de siempre, no una
+esquina rota.
 
 ---
 
-## 10 · El hueco de la barra
+## 10 · El texto gigante y la tinta
 
-```css
---pa-pad-y: var(--av-nav-space, 87px);
-```
+`useFitText(wordEl, body, fill)` — el mismo composable del escaparate, pero
+**ajustando sólo por ancho**, sin tope de alto.
 
-El acordeón es una pieza a pantalla completa y la barra es `fixed`: sin reservar
-su hueco, el título y el botón de volver acaban **debajo** de ella.
+**No hace falta el tope aquí**, y conviene saber por qué para no copiarlo del
+escaparate por inercia: estos paneles son **altos y estrechos**, así que el
+ajuste por ancho ya deja el cuerpo pequeño respecto al alto. Medido: la tinta
+ocupa el **14 %** del alto de la caja, con 250 px de aire hasta la línea de
+arriba y 236 hasta el texto de abajo. El problema que el tope resuelve en el
+escaparate **no se da**.
 
-Se aplica **arriba y abajo por igual**. Abajo no hay nada que esquivar, pero un
-texto pegado al borde inferior contra otro que arranca 87 px más abajo se lee
-torcido; simétrico se lee como un encuadre. En un teléfono, además, abajo está la
-barra del navegador.
+### ⚠️ VERSALES — la segunda excepción a la regla de la casa
 
-**El fallback importa** — ver §14.
+La palabra del fondo va en mayúsculas, y es una excepción consciente:
 
----
+- **no es texto, es TEXTURA.** Lleva `aria-hidden`, no se puede seleccionar ni
+  buscar, y a 217 px de cuerpo detrás de un zapato hace de pared;
+- la regla existe para que los títulos y las etiquetas no griten. Una marca de
+  agua no grita.
 
-## 11 · Tipografía y tinta
+Va por `text-transform`, **no cambiando el dato**: `cw.short` sigue siendo «Sal»
+para el `alt` de la foto y para lo que venga después.
 
-**Tinta blanca en todas las medidas**, y no la `--ps-ink` del colorway. Va
-declarada arriba del todo, fuera de cualquier `@media`, justamente para eso: la
-ficha se lee igual en los cuatro planos y en cualquier pantalla.
+`useFitText` no se entera y no tiene que enterarse: mide `scrollWidth` con el
+estilo ya aplicado, así que reescala solo con las letras más anchas.
+
+### La tinta de la ficha es BLANCA en todas las medidas
 
 ```css
 --pa-on-surface:      #FFFFFF;
 --pa-on-surface-soft: rgba(255, 255, 255, .72);
 ```
 
-**La jerarquía se mantiene con alfa, no con otro color**: el nombre a blanco
-puro, la descripción y el precio al 72% — el mismo «medio iluminado» que usa el
-material para lo secundario.
+Y **no** la `--ps-ink` del colorway. Va fuera de cualquier `@media` justamente
+para eso: la ficha se lee igual en los cuatro planos y en cualquier pantalla, en
+vez de cambiar de tinta según el panel o el ancho.
 
-El texto gigante del fondo usa `useFitText` y **`short`, no `name`**: `short`
-distingue el colorway (*Pino*, *Orquídea*, *Ocre*, *Chicago*), `name` los
-repetiría los cuatro. Cumple **R1** — primera mayúscula y el resto minúsculas.
+La jerarquía se mantiene con **alfa y no con otro color** — el nombre a blanco
+puro, lo secundario al 72 %, que es el mismo «medio iluminado» del material.
 
----
+**Tamaños del detalle:** título `clamp(26px, 3.5cqw, 46px)` · precio
+`clamp(20px, 2.6cqw, 32px)`. Los dos se mueven **juntos y en la misma
+proporción**: el precio no es un dato secundario del título, es la otra mitad de
+la decisión.
 
-## 12 · Los datos
-
-Reutiliza `colorways.js` **sin tocar el componente**: una entrada ya trae el
-color del panel, la tinta, el acento, la foto, el nombre y el precio. Añadir un
-producto es añadir un colorway.
-
-| Campo | Uso en el acordeón |
-|---|---|
-| `name` | título de la card y del detalle |
-| `short` | el texto gigante del fondo |
-| `line` | la descripción de una línea (arriba a la izquierda) |
-| `price` | precio |
-| `blurb` | párrafo del detalle |
-| `sizes` | las tallas del detalle |
-| `frames[0].src` | la foto |
-| tokens `--ps-*` | vía `toCss(id)`, aplicados por el padre como `:style` |
-
-> ⚠️ **Placeholder:** `price` (180$), `blurb` y `sizes` son de relleno. `sizes`
-> sale de `TALLAS_AJ1`, una constante compartida por los cuatro. Cuando llegue el
-> backend, cada producto traerá las suyas — y con disponibilidad.
+La etiqueta de las tallas es **etiqueta y no encabezado** — 11.5 px, peso 600,
+interletrado **positivo** (`.07em`). A ese cuerpo las letras se apelmazan y
+abrirlas es lo que la convierte en etiqueta; al revés que todo lo demás del
+sistema, donde el interletrado se cierra.
 
 ---
 
-## 13 · Assets
+## 11 · `svh`, y no `dvh` ni `vh`
 
-`public/products/jordan/` — cuatro `.webp`, ~45 KB cada uno.
+Sólo se nota en un teléfono de verdad:
 
-```
-jordan-pine.webp   jordan-brood.webp   jordan-ochre.webp   jordan-chi.webp
-```
-
-**Todos en la misma caja unión: 647 × 636.** Es la tinta más ancha por la más
-alta, **con 46 px de margen a cada lado**.
-
-> Ese margen no es estético. Sin él, el Chicago —cuya tinta medía exactamente el
-> alto del lienzo— tocaba el borde y era **el primero en verse cortado** al
-> contraerse el panel, mientras los otros tres aún tenían aire. Cuatro zapatos a
-> la misma escala tienen que tener también el mismo aire.
-
-Y el `<img>` lleva **`width="647" height="636"` declarados**, que no son
-decorativos: en el acordeón tumbado la foto se dimensiona por el alto
-(`height: 100%; width: auto`), y **una imagen `lazy` que aún no ha cargado no
-tiene proporción intrínseca** — medía cero de ancho y la fila salía vacía hasta
-que llegaba el fichero.
-
-La primera foto es `eager` + `fetchpriority="high"`; las demás esperan.
-
----
-
-## 14 · Dependencias — el contrato
-
-Esta es la superficie completa. **No hay nada más**, y está medida sobre el
-código, no estimada.
-
-### Imports de código — 3
-
-| Import | Qué se usa | ¿Evitable? |
+| unidad | qué mide | qué pasa |
 |---|---|---|
-| `~/assets/js/colorways` | `COLORWAYS`, `toCss`, `DEFAULT_COLORWAY` | No — son los datos |
-| `~/composables/useFitText` | el ajuste del texto gigante | No — compartido con `<ProductShowcase>` |
-| `lucide-vue-next` | `ArrowLeft`, `ArrowRight` | Sí, sustituyendo por dos SVG inline |
+| `vh` | viewport con barras **retraídas** | con la barra a la vista, el último panel sale **cortado** |
+| `dvh` | viewport **actual**, cambia al scrollear | no corta, pero los cuatro paneles se redimensionan mientras el dedo se mueve: **se ve temblar** |
+| `svh` | viewport con barras **desplegadas** | el más pequeño y **el único estable** |
 
-### Componentes — 1
+Lo que se paga con `svh` es un hueco cuando la barra se retrae, y para una pieza
+de cuatro paneles es mejor trato. En escritorio los tres valen lo mismo.
 
-`<GlassSurface>` (auto-import de Nuxt). Es el material del paquete; ver doc 01.
-
-### CSS del anfitrión — 1 token y 1 clase
-
-| Qué | Dónde vive | Cómo se protege |
-|---|---|---|
-| `--av-nav-space` | `tokens.css` | **fallback `87px`** en los dos usos |
-| `.av-glass-sel` | `glass.css` | viene con `GlassSurface` |
-
-**Los `--ps-*` no cuentan como dependencia**: los inyecta el propio componente
-con `toCss(id)` como `:style` en cada panel. No hace falta ninguna hoja de
-estilos externa para que existan.
-
-> El fallback de `--av-nav-space` no es cosmética. Una custom property que no
-> existe **no resuelve**, y una declaración que no resuelve se cae al valor
-> inicial: el hueco de la barra pasaba a **0** y el título se iba debajo de ella.
-> Con el respaldo, la pieza se monta sola en cualquier repo; donde el token sí
-> exista, manda el del anfitrión.
-
-### Para llevárselo a otro repo
-
-```
-components/product/ProductAccordion.vue
-components/product/ProductAccordionPanel.vue
-public/products/jordan/*.webp          (4 ficheros)
-```
-
-…más `colorways.js`, `useFitText.js` y `GlassSurface` (docs 01 y 03), que ya
-vienen por otros componentes. **No hay CSS global propio de esta pieza**: todo
-está en los dos `<style scoped>`.
+**El acordeón y el rollo miden lo mismo a propósito** (`100svh` los dos): las dos
+piezas se comen el viewport entero, y si no midieran igual la página dejaría de
+avanzar de pantalla en pantalla.
 
 ---
 
-## 15 · Accesibilidad
+## 12 · Lo que le pide al anfitrión
 
-| Qué | Cómo |
-|---|---|
-| El panel | `<a>` con destino real, `aria-expanded` |
-| `aria-expanded` | sigue **el foco**, no el hover — quien lee ese atributo navega con teclado |
-| Plegados | `inert` |
-| Tallas | `role="group"` + `aria-pressed` |
-| Cerrar | `Escape`, además del botón |
-| El texto gigante | `aria-hidden="true"` — su contenido ya está en el `alt` de la foto |
-| Movimiento | `@media (prefers-reduced-motion: reduce)` apaga transiciones y la animación del detalle |
+| token | hoy | para qué |
+|---|---|---|
+| `--av-nav-space` | `87px` | hueco de la barra, arriba **y abajo** |
+| `--av-action-*` | 164/44/20/13.5/9/16 | medidas de los dos botones |
+| `--av-track` | `.05em` | interletrado |
+| `--av-on-glass-strong` | `#FFFFFF` | tinta sobre el vidrio |
+| `--lg-*` | (el material) | las cuatro capas del vidrio |
+
+`--av-nav-space` lleva **fallback** (`var(--av-nav-space, 87px)`) y es lo único
+que la pieza le pide al anfitrión de forma blanda: una custom property que no
+existe no resuelve, y una declaración que no resuelve se cae al valor inicial —
+el hueco de la barra pasaba a 0 y el título se iba debajo de ella. Con el
+respaldo, la pieza se monta sola en cualquier repo.
+
+Se aplica **arriba y abajo por igual**: abajo no hay nada que esquivar, pero un
+texto pegado al borde inferior contra otro que arranca 87 px más abajo se lee
+torcido. Simétrico se lee como un encuadre.
+
+**Componentes:** `<GlassSurface>` — el CTA de cada card, `Regresar`, `Comprar
+ahora` y las diez tallas. Todos con el material **estándar**, velo negro y sin
+variantes.
+
+> **Coste:** son doce instancias de vidrio en el detalle. Está por encima del
+> presupuesto que fija el material (≈9 por vista) y se acepta porque **sólo
+> existen mientras el detalle está abierto y sólo hay un detalle a la vez**. Si
+> en un móvil de gama media se nota, lo primero que cae es la lente de las diez
+> tallas.
+
+---
+
+## 13 · Accesibilidad, y tres trampas que costaron un 404
 
 ### ⚠️ Siempre `<a>`, nunca `<component :is>`
 
-También en detalle. Alternar la etiqueta hace que **Vue destruya el elemento y
-cree otro**, y un elemento recién creado no tiene estado previo del que
-transicionar: al cerrar el detalle el panel saltaba del 100% al 25% de golpe
-mientras los otros tres sí animaban, y eso se lee como que algo se quedó colgado.
+El panel es un `<a>` con destino real **también en detalle**. Alternar la
+etiqueta con `<component :is>` hace que Vue **destruya el elemento y cree otro**,
+y un elemento recién creado no tiene estado previo del que transicionar: al
+cerrar el detalle el panel saltaba del 100 % al 25 % de golpe mientras los otros
+tres sí animaban.
 
-En detalle sólo se le **quita el `href`**: un `<a>` sin él no es enlace, no
-recibe foco y no se anuncia como tal — que es justo lo que hace falta.
+En detalle sólo se le quita el `href`: un `<a>` sin él no es enlace, no recibe
+foco y no se anuncia como tal — que es justo lo que hace falta, porque ya estás
+viendo lo que el enlace llevaba.
 
 ### ⚠️ El `href` no se pinta hasta montar
 
-```vue
-:href="isDetail || !montado ? undefined : '/producto/' + cwId"
-```
-
 Entre que el servidor manda el HTML y que Vue engancha el manejador hay una
-ventana en la que el enlace ya está pintado y **no lo cancela nadie**: un clic
-ahí lo sigue el navegador y se va a `/producto/<id>`, que hoy no es una ruta →
-**404 con traza de servidor**, porque es una carga entera.
+ventana en la que el enlace **ya está pintado y no lo cancela nadie**: un clic
+ahí lo sigue el navegador, se va a `/producto/<id>`, que no es una ruta que
+exista, y el servidor devuelve **404**.
 
-Se arregla desde el HTML y no desde el manejador: **sin `href`, un `<a>` no tiene
-comportamiento de activación y no hay nada que cancelar.** El primer render del
-cliente coincide con el del servidor —los dos sin `href`— así que no hay
-desajuste de hidratación.
+Por eso el error llegaba con traza de **servidor** y no de cliente: era una carga
+entera. En desarrollo la ventana dura lo que tarde Vite en servir los módulos, y
+por eso aparecía a ratos y no siempre.
 
-> Cuando exista `/producto/:id`, esta protección **se puede quitar**. Mientras no
-> exista, el enlace es una promesa que la app no puede cumplir: abrirlo en
-> pestaña nueva sigue dando 404.
+Se arregla desde el HTML, no desde el manejador: **sin `href`, un `<a>` no tiene
+comportamiento de activación y no hay nada que cancelar.** Se le pone después de
+montar. El primer render del cliente coincide con el del servidor —los dos sin
+`href`— así que no hay desajuste de hidratación.
 
-### ⚠️ Los botones de dentro llevan `.stop.prevent`
+### ⚠️ Los botones de dentro llevan `.stop.prevent`, y las DOS hacen falta
 
-Volver, tallas y comprar. `.stop` corta la subida hasta el `<a>` —un botón de
-cerrar no debe pasar por el elemento que abre— pero **al cortarla, el
-`preventDefault` del panel ya no corre**, y los tres viven dentro del `<a>`.
-Quien corta la burbuja tiene que cancelar por su cuenta.
+`.stop` corta la subida hasta el `<a>` del panel, que es lo que se quiere: un
+botón de cerrar no debe pasar por el elemento que abre. **Pero al cortarla, el
+`preventDefault` del panel ya no corre**, y el botón vive dentro del `<a>`: quien
+cancela la navegación tiene que ser él mismo.
 
----
+Y no basta con que en detalle el `<a>` no tenga `href`: el clic borra el detalle,
+Vue repinta en el microtask siguiente —antes de que el navegador decida qué hacer
+con el clic— y le devuelve el `href`. Para cuando toca la acción por defecto, el
+enlace existe otra vez. **`.prevent` lo mata en el sitio.**
 
-## 16 · Trampas que ya costaron una vez
+### Lo demás
 
-| Síntoma | Causa real |
-|---|---|
-| El detalle se quedaba montado al cerrar | `<Transition>` de Vue usa `requestAnimationFrame`; sin frames nunca completa. Se sustituyó por `v-if` + `@keyframes` CSS, que desmonta sin condiciones |
-| El panel se quedaba abierto tras el clic | `:focus-within` casaba con el foco que deja el ratón. → `:focus-visible` |
-| El zapato se salía del ancho al abrir | `transform` movía la caja entera. → `object-position` |
-| Una card se veía más compacta | el Chicago tenía 0 px de margen en el lienzo. → caja unión con 46 px |
-| Las filas salían vacías en móvil | `<img loading="lazy">` sin `width`/`height` mide cero |
-| La ficha del detalle desbordaba | `align-content: start` impedía que la fila `1fr` se estirara |
-| El último panel se cortaba con la barra del navegador | `vh` mide el viewport con las barras retraídas. → `svh` |
+`aria-expanded` sigue al **foco** y no al hover — quien lee ese atributo navega
+con teclado, y para él foco y apertura son la misma cosa. Un ratón no consulta
+aria.
 
-### `svh`, y no `dvh` ni `vh`
-
-- `vh` — viewport con las barras **retraídas**. Con la barra a la vista, el
-  último panel sale cortado.
-- `dvh` — el viewport **actual**, que cambia al scrollear. No corta, pero los
-  cuatro paneles se redimensionan mientras el dedo se mueve y el reparto se ve
-  temblar.
-- `svh` — viewport con las barras **desplegadas**: el más pequeño de los tres, y
-  por eso el único estable. Se paga un hueco cuando la barra se retrae, y para
-  una pieza de cuatro paneles es mejor trato.
-
-En escritorio los tres valen lo mismo.
+Los paneles plegados llevan `inert`: los saca del teclado y de los lectores sin
+tocar el pintado. **No se ocultan con `visibility` ni `display`** — un ancho de
+cero con `overflow: hidden` ya no enseña nada, y quitarlos del pintado sólo
+serviría para que la animación de plegado no se viera.
 
 ---
 
-## 17 · Medidas verificadas
+## 14 · El empalme con la pieza de encima
 
-Medido en el navegador sobre el prototipo, no calculado.
+`blendFrom` recibe **el id del colorway** de la sección anterior, y el acordeón
+difumina ese color sobre el borde de arriba de sus paneles: el corte entre las
+dos piezas deja de ser una línea.
 
-### Reparto
+Es un **id y no un color a pelo** a propósito: el que está arriba es un colorway,
+y pasar su id deja que sea `colorways.js` quien diga de qué color es. Si mañana
+el escaparate cambia de zapato, el empalme le sigue solo.
 
-| Estado | 1280 px (columnas) | 390 px (filas) |
-|---|---|---|
-| reposo | 25 · 25 · 25 · 25 | 25 · 25 · 25 · 25 |
-| señalado | 20 · 40 · 20 · 20 | 20 · 40 · 20 · 20 |
-| detalle | 0 · 100 · 0 · 0 | 0 · 100 · 0 · 0 |
-| tras volver | 25 · 25 · 25 · 25 | 25 · 25 · 25 · 25 |
+Sin vecino resuelve a `transparent` — el degradado se sigue pintando, pero de
+transparente a transparente. **Mejor eso que una regla condicional**: un valor
+que resuelve siempre no puede dejar la declaración a medias.
 
-### El detalle en teléfono — tres anchos
+La banda muere exactamente donde empieza el contenido (`--pa-blend-h:
+var(--pa-pad-y)`), porque el texto de ahí es blanco al 72 % y sobre la niebla
+clara perdería contraste.
 
-Distancias en px desde los bordes del panel.
-
-| | 375 × 812 | 390 × 844 | 430 × 932 |
-|---|---|---|---|
-| Regresar (desde arriba) | 87 | 87 | 87 |
-| Título | 137 | 137 | 137 |
-| Zapato | 178 → 504 | 185 → 522 | 205 → 578 |
-| Tallas | 581 | 613 | 701 |
-| Comprar (desde abajo) | **87** | **87** | **87** |
-| Desborde horizontal | 0 | 0 | 0 |
-| Aire zapato↔tallas | 77 | 91 | 123 |
-
-El zapato cae siempre en la banda **22%–62%** y el reserve superior e inferior es
-siempre el mismo `--av-nav-space`.
+**Y en teléfono sólo lo lleva el primero.** En columnas los cuatro tocan el borde
+de arriba; en filas, el único que toca lo que hay encima es el primero. Sin eso,
+cada fila estrenaría su propia niebla a media pieza — cuatro cortes nuevos en vez
+del que se venía a quitar. Se apaga desde **el padre**, que es quien sabe cómo
+está tumbado.
 
 ---
 
-## 18 · Qué revisar al reconstruir
+## 15 · Móvil — el acordeón se tumba
 
-1. **`@property` no tiene fallback útil.** En un navegador sin soporte, `--pa-w`
-   no interpola y el reparto **salta** en vez de animarse. Funciona, pero sin
-   transición. Es el único punto del componente que degrada de forma visible.
-2. **Los tiempos están declarados, no juzgados.** 500 ms de transición y 520 de
-   la vuelta salieron mirando el resultado en el prototipo; **verifícalos en un
-   teléfono real**, que es donde el doble tap y la vuelta se sienten.
-3. **`/producto/:id` sigue sin existir.** Cuando exista, `onProducto` en
-   `pages/index.vue` pasa a ser un `navigateTo` y la protección del `href` (§15)
-   se puede retirar.
-4. **`buy` no hace nada todavía.** Cuando exista la bolsa, es un `cart.add()`.
-5. **Los datos de §12 son placeholder.** Precio, descripción y tallas.
+**Filas, no columnas.** Cuatro columnas en 390 px son tiras de 97, y ahí un
+zapato no se reconoce: la foto es casi cuadrada, así que lo que la limita es el
+lado corto, y en vertical el lado corto es ridículo.
+
+Tumbado, cada fila tiene los 375 px enteros de ancho, el zapato pasa a estar
+limitado por el **alto** de su fila —que es mucho más— y encima sobra sitio al
+lado para la ficha.
+
+**El reparto no se reescribe:** `flex-basis` mide el eje principal, y al girar el
+eje las mismas declaraciones pasan de repartir ancho a repartir alto. 25 · 40 ·
+20 se quedan como están.
+
+En el detalle el zapato **sube y se le da una banda explícita**: del **22 % al
+62 %** del alto. Arriba sólo hay un botón y dos líneas, así que no hace falta
+reservarle media pantalla; el tercio de abajo queda entero para las tallas y el
+botón de comprar, que es lo que se toca. En porcentaje y no en píxeles porque el
+alto de un teléfono varía mucho y lo que tiene que mantenerse es la proporción
+entre las tres zonas.
+
+Y `Regresar` **vuelve arriba**, encima del título: en una columna la esquina de
+abajo a la izquierda ya no es una esquina, es el final de una lista larga, debajo
+de las tallas y del botón de comprar. Volver es lo que se hace cuando esto no era
+lo que se buscaba — tiene que estar antes, no después.
+
+---
+
+## 16 · Qué revisar al reconstruir
+
+Cosas que **se rompen en silencio** y no dan error:
+
+- [ ] **El reparto da 25/25/25/25, 20/40/20/20 y 0/100/0/0.** Si el señalado no
+      anima, `--pa-w` no está registrada con `@property`.
+- [ ] **El cuerpo mide 570 px (40 cqw) en los tres estados.** Si cambia de ancho,
+      el producto está escalando en vez de destaparse.
+- [ ] **El recorte es simétrico** — 18.75 % por lado en reposo. Si se recorta por
+      un lado, el cuerpo no está centrado.
+- [ ] **`Regresar` y `Comprar ahora` comparten `y`** en escritorio.
+- [ ] **El título no se mueve al abrir el detalle.** Si sube ~44 px, la fila 1
+      dejó de reservar su hueco.
+- [ ] **Las tres piezas de la ficha llevan `grid-row` y `grid-column` escritos.**
+- [ ] **Las tallas miden 48 de alto y pintan 22 de radio.** Si pintan 20, alguien
+      bajó el alto y CSS está recortando el radio en silencio.
+- [ ] **El anillo especular de la talla es `squircle`**, no `round`.
+- [ ] **El panel es `<a>` siempre**, y sin `href` hasta montar.
+- [ ] **Los botones de dentro llevan `.stop.prevent`.**
+- [ ] **La altura es `svh`.** Con `dvh` los paneles tiemblan al scrollear en
+      teléfono; con `vh` el último sale cortado.
+- [ ] **El empalme sólo en el primer panel** cuando está tumbado.

@@ -44,6 +44,11 @@ const CARGA = {
     'app/stores/useThemeStore.js',
     'app/components/brand/BrandMark.vue',
     'public/brand/letrero-20av-cut.webp',
+    /* El orden de pintado —rampa, grano, contenido, capa flotante— y el sitio
+       donde se montan la barra y el pie. Faltaba, y sin él el material se ve mal
+       aunque sus tokens estén bien: es el síntoma que el doc 04 §1 manda
+       comprobar antes que ningún otro. */
+    'app/layouts/default.vue',
   ],
   'Navegación (doc 02)': [
     'app/components/nav/AppNav.vue',
@@ -53,16 +58,48 @@ const CARGA = {
     'app/composables/useScrollSequence.js',
     'app/composables/useFitText.js',
     'app/assets/js/colorways.js',
+    /* LA SECUENCIA, que faltaba: el escaparate es el Mind 001 y sin sus seis
+       frames la pieza se monta vacía. Se copiaba `samba` y no esto. */
+    'public/products/mind001',
+    'scripts/build-mind001.py',
+    /* Los Samba se quedan: los sigue usando `/frame` y son la otra caja unión
+       de referencia. */
     'public/products/samba',
   ],
+  /* LAS FOTOS DEL ACORDEÓN SON LAS NEW BALANCE, no los Jordan. Cambió al pasar
+     el acordeón a `nb-sea-salt`/`nb-mushroom`/`nb-dark-mushroom`/`nb-angora`, y
+     `public/products/jordan` se quedó aquí copiándose para nadie. Los Jordan
+     siguen en el prototipo por si vuelven, pero no viajan en el paquete. */
   'Producto — acordeón (doc 06)': [
     'app/components/product/ProductAccordion.vue',
     'app/components/product/ProductAccordionPanel.vue',
-    'public/products/jordan',
+    'public/products/nb9060',
+    'scripts/build-nb9060.py',
   ],
   'Producto — panal (doc 07)': [
     'app/components/product/ProductHoneycomb.vue',
     'public/products/panel',
+  ],
+  /* EL CATÁLOGO VA CON EL ROLLO y no repetido en el díptico, aunque lo usen los
+     dos: `sneakers.js` y sus catorce recortes son UNA cosa, y copiarla dos veces
+     produciría dos carpetas iguales en el paquete. El díptico depende de lo que
+     trae el rollo — está dicho en el doc 09. */
+  'Producto — rollo (doc 08)': [
+    'app/components/product/ProductReel.vue',
+    'app/assets/js/sneakers.js',
+    'public/products/sneakers',
+    'scripts/build-sneakers.py',
+  ],
+  'Producto — díptico (doc 09)': [
+    'app/components/product/ProductDiptych.vue',
+    'public/products/diptico',
+  ],
+  /* El pie es la única pieza del paquete que no usa el material. Y es el único
+     consumidor que le queda a `brands.js`, que se escribió para un rollo de
+     marcas que después se quitó — no está huérfano aunque lo parezca. */
+  'El pie (doc 10)': [
+    'app/components/site/SiteFooter.vue',
+    'app/assets/js/brands.js',
   ],
 }
 

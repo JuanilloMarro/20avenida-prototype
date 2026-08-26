@@ -126,6 +126,113 @@ Documentadas en el doc 02 §6.
 
 ---
 
+## 3b · Las dos medidas COMPARTIDAS entre piezas
+
+Estas no son de una pieza: son de la página. Llegaron tarde, después de tener
+cinco componentes a pantalla completa hechos cada uno por su lado, y arreglan lo
+que se veía al ponerlos uno detrás de otro.
+
+### `--av-gutter` — el margen lateral, uno solo
+
+```css
+--av-gutter: clamp(16px, 4vw, 64px);
+```
+
+Había **cinco `clamp` distintos** para lo mismo: `24/4vw/64` en el escaparate,
+`3cqw/34` en el acordeón, `16/4vw/64` en el rollo, `10/2vw/26` en el panal y
+`18/3.4vw/56` en el díptico. Cada uno era defendible por separado; el problema
+es que en una landing las piezas se ven **seguidas y en scroll**, y cinco
+márgenes distintos se leen como cinco encuadres distintos — como si cada sección
+viniera de una plantilla.
+
+**Lo que NO entra aquí, y es la mitad de la regla:** lo que va a sangre por
+diseño. El texto gigante del fondo del escaparate, el plano de color del
+acordeón, las fotos del panal y el plafón de cada sección siguen llegando al
+filo. **El margen es de lo que se LEE, no del fondo.**
+
+> ⚠️ Una desviación viva: `<ProductDiptych>` se lo reescribe por debajo de
+> 860 px (`--pd-pad: clamp(16px, 4.4vw, 30px)`). Es un tope más bajo que el del
+> sistema (16→34 en ese rango) porque el díptico apila dos columnas y necesita
+> el ancho. Está consentida, pero es la única — si aparece una segunda, la que
+> hay que cambiar es la del sistema.
+
+### `--av-action-*` — todos los botones miden lo mismo
+
+```css
+--av-action-w:   164px;   /* ancho MÍNIMO, no fijo */
+--av-action-h:   44px;
+--av-action-px:  20px;    /* relleno lateral */
+--av-action-gap: 9px;     /* glifo ↔ palabra */
+--av-action-fs:  13.5px;
+--av-action-ico: 16px;
+```
+
+Los cinco botones de acción del sitio —«Comprar ahora» del escaparate, «Comprar
+ahora» y «Regresar» del acordeón, «Ver detalles» y «Regresar» del rollo— eran
+cinco tamaños. Se veían de dos en dos, uno al lado del otro, y la diferencia era
+lo primero que saltaba.
+
+**El ancho es `min-width`, no `width`.** «Regresar» y «Comprar ahora» no tienen
+el mismo número de letras: con ancho fijo, o se corta la palabra larga o la
+corta queda nadando. Con mínimo, los dos miden 164 salvo que el texto pida más,
+y entonces crecen los dos —van en la misma fila y el `align-items: stretch` los
+iguala.
+
+**44 px de alto** no es una elección estética: es el suelo de un objetivo táctil.
+
+> Al aplicarlo aparecieron `min-width: 134px` y `150px` sueltos en el rollo que
+> ganaban al token. Si un botón nuevo no mide lo que debe, eso es lo primero que
+> hay que buscar.
+
+---
+
+## 3c · La tipografía
+
+**Una sola familia para todo el sitio**, en `--av-font`, y todos los componentes
+escriben `font-family: inherit`. No hay ni una pieza con familia propia —
+comprobado a grep sobre `app/`.
+
+`--av-font-display` existe todavía y hoy **apunta a `--av-font`**. Se deja como
+nombre y no se borra porque `<ProductShowcase>` lo pide así: el día que el texto
+gigante del fondo vuelva a tener familia propia, se cambia aquí y en ningún otro
+sitio.
+
+### La regla que no depende de cuál sea la letra
+
+**La pila de reserva tiene que tener las MISMAS proporciones que la buena.** No
+es cosmética. Con `display=swap` la primera pintada siempre es con la reserva, y
+si la buena es condensada y la reserva es Arial, la página se pinta un tercio
+más ancha y se encoge de golpe al llegar la descarga. Del salto que quede se
+ocupa `useFitText`, que vuelve a medir con `document.fonts.ready` — pero
+`useFitText` sólo gobierna el texto gigante; el resto de la página se mueve.
+
+**Corolario:** cambiar de letra es cambiar DOS cosas —el `family` que se pide en
+`nuxt.config.ts` y la pila de reserva en `--av-font`— y hay que hacerlo a la
+vez.
+
+### ⚠️ Estado a 25-08-2026: la letra está en migración y DESINCRONIZADA
+
+Este apartado es una foto, no una decisión. En tres días la familia ha sido
+Playfair (sólo display) → Outfit → Anton → Oswald, y **en el árbol de trabajo
+los dos extremos no coinciden**:
+
+| dónde | qué dice |
+|---|---|
+| `nuxt.config.ts` | descarga **Oswald** `wght@400;500;600;700` |
+| `tokens.css` → `--av-font` | pide **`"Anton"`**, con reserva Impact / Haettenschweiler |
+| `main.css` | `font-synthesis-weight: none`, justificado por «Anton tiene un solo corte» |
+
+O sea: se descarga una familia que el token no nombra, así que la página se
+pinta con **Impact** y nunca cambia. Y el `font-synthesis-weight: none` estaba
+puesto para tapar que Anton sólo tiene el 400 — con Oswald, que es variable de
+200 a 700, ya no hace falta y lo único que hace es que el 800 caiga al 700.
+
+**No se ha tocado desde aquí a propósito:** los tres archivos los está editando
+otra sesión ahora mismo. Lo que falta es una línea —poner Oswald en `--av-font`
+con reserva condensada— y decidir si el `font-synthesis-weight` se queda.
+
+---
+
 ## 4 · `<BrandMark>`
 
 ```js
@@ -140,7 +247,7 @@ defineProps({
 Sin él la marca **no escribe nada** y el alto lo decide quien la coloca, atando `--av-mark-h` a su propio token. La barra hace justo eso:
 
 ```css
-.av-nav__brand { --av-mark-h: var(--av-nav-h); }
+.av-nav__brand { --av-mark-h: calc(var(--av-nav-h) * .60); }
 ```
 
 y así **el alto de la barra es UN número**. Con un default numérico el estilo en línea ganaba siempre y la marca se quedaba clavada mientras la barra cambiaba de alto.
@@ -153,7 +260,26 @@ Antes iba con `mix-blend-mode: screen` para que el negro de la foto desaparecier
 
 La salida no fue otro truco sino **recortar el fondo de verdad**: `scripts/cutout-bg.py --dark` inunda desde los bordes sobre lo oscuro. En esta foto el histograma está partido en dos —la mediana del máximo de canal está en **33** y el tercer cuartil en **253**, y el borde no pasa de **59**— así que la separación es limpia y las contraformas de las letras se conservan.
 
-Queda el **halo**, que es el mismo recurso que usan los glifos del material: el «20» es blanco y sobre un fondo claro necesita su propia sombra para despegarse.
+### La marca volvió a su burbuja, y el halo se fue con ella
+
+Cuando salió del panel se quedó suelta sobre el fondo de la página y llevaba
+**halo** —el mismo recurso que los glifos del material— porque el «20» es blanco
+y sobre un fondo claro necesita su propia sombra. Hoy vuelve a ir dentro de una
+`<GlassSurface :radius="999">` y **el halo se quitó**, por dos motivos que van
+en este orden:
+
+1. **Ya no hace falta.** Dentro de la burbuja tiene detrás el velo negro del
+   material, que es exactamente el contraste que el halo fabricaba.
+2. **Y sobre todo, hacía daño.** `filter: drop-shadow(…)` en un ancestro crea un
+   **backdrop root**: cualquier vidrio de dentro se queda sin nada que refractar
+   y deja de ser vidrio. Es la misma trampa que el doc 02 §7 documenta para
+   `.av-glyph`, y aquí se estaba pisando de verdad.
+
+**Al 60 % del alto y no a ras.** Deja unos 11 px de aire a los lados y 4 en las
+esquinas, así que se lee como un rótulo DENTRO de una burbuja y no como un icono
+recortado. El recorte es casi cuadrado, así que lo que manda es su diagonal: a
+partir del 68 % las esquinas tocan el filo. El `overflow: hidden` del cuerpo se
+queda de red — hoy no recorta nada, pero un asset más alto no se saldrá.
 
 > **PENDIENTE (D-01):** el logo vectorial. Con un SVG esto son dos rellenos y se acaba el problema.
 

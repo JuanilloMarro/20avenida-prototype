@@ -37,15 +37,33 @@ export default defineNuxtConfig({
         { name: 'color-scheme', content: 'dark' },
       ],
 
-      /* Playfair Display, y SÓLO para el texto gigante del fondo del showcase
-         (`--av-font-display`). El cuerpo del sistema sigue siendo la pila del
-         sistema: no se descarga ni un byte para leer una etiqueta.
+      /* BEBAS NEUE, y en TODO el sitio: cuerpo, títulos, banners, precios,
+         navegación, pie, botones y tallas. UNA sola familia; el reparto en dos
+         —rótulo aparte del cuerpo— se probó y se deshizo. La pila de reserva
+         está en `tokens.css`, en `--av-font`.
 
-         Se pide UN corte —900, sin cursiva— y no el rango variable entero. La
-         familia es variable de 400 a 900 en dos ejes, y traerla completa son
-         ~120 KB para usar exactamente un peso. Con `wght@900` Google sirve una
-         instancia estática de ~30 KB. Si algún día hace falta otro peso, se
-         añade aquí y no en el componente.
+         UN SOLO CORTE, el 400, y por eso `family=Bebas+Neue` va sin `wght@`: no
+         es una variable a la que se le pida una instancia, y pedirle cortes que
+         no tiene devuelve el mismo fichero repetido. Los pesos de 500 a 900 que
+         declaran los componentes no tienen instancia, y `main.css` deja apagado
+         el engorde sintético para que caigan limpios en el 400.
+
+         NO TIENE CAJA BAJA. Los glifos de minúscula no existen en el fichero, y
+         donde no hay glifo el navegador pinta la mayúscula. O sea que TODO el
+         sitio se lee en versales, se escriba como se escriba en la plantilla, y
+         la REGLA R1 —«nunca versales», `docs/10-componentes.md`— queda sin
+         efecto mientras esta familia esté puesta.
+
+         La regla sigue escrita y los componentes siguen escribiendo en caja de
+         frase, que es lo correcto: el día que se cambie de letra, todo vuelve a
+         leerse como manda R1 sin tocar una sola plantilla. Lo que NO hay que
+         hacer es reescribir los textos en mayúsculas «ya que se ven así» — eso
+         sí sería irreversible.
+
+         Y EL TRAZO SÍ SE PUSO, que es la otra mitad de R1: la regla dice que
+         con las versales se va el trazo ancho que las acompañaba, así que al
+         volver las versales vuelve el trazo. Está en `tokens.css`, en
+         `--av-track`, y es la razón de que la página ya no se lea apelmazada.
 
          `display=swap` porque el texto tiene que estar desde el primer frame:
          con el `block` por defecto habría hasta 3 s de hueco en blanco donde va
@@ -64,7 +82,7 @@ export default defineNuxtConfig({
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
           rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap',
+          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap',
         },
       ],
     },

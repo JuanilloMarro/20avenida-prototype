@@ -78,7 +78,7 @@ const style = computed(() => (props.size ? { '--av-mark-h': `${props.size}px` } 
 .av-mark__word {
   font-weight: 800;
   font-size: 15px;
-  letter-spacing: -.03em;
+  letter-spacing: var(--av-track);
   line-height: 1;
   color: var(--av-on-glass-strong);
 }

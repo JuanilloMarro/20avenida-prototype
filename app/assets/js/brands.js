@@ -7,21 +7,43 @@
  *
  * `items` son ids de `colorways.js`. La marca no duplica producto: lo apunta.
  *
- * PENDIENTES a propósito y marcados con `pendiente: true`: Nike y New Balance
- * están en el dibujo de la referencia pero no hay un solo recorte suyo en
- * `public/products/`. Se dejan visibles y sin catálogo en vez de esconderlas:
- * una tienda que enseña cuatro marcas y sólo deja entrar en dos es información
- * honesta; una que enseña dos es una tienda más pequeña de lo que es.
+ * ESTA LISTA ES EL CATÁLOGO DE MARCAS DE LA CASA, y de ella sale la columna
+ * «Marcas» del pie. Si una marca no está aquí, 20 Avenida no la vende.
  *
- * Cuando lleguen sus fotos, se les rellena `items` y se les quita el
- * `pendiente`. El componente ya sabe qué hacer con las dos formas.
+ * SE FUERON NEW BALANCE Y VEJA. Estuvieron, con producto y todo, y se han
+ * quitado enteras porque la tienda no las vende: no basta con sacarlas del
+ * rollo, porque mientras estuvieran aquí seguirían saliendo en el pie. Con
+ * ellas se fueron sus entradas de `sneakers.js` y los `nb-*` de `colorways.js`.
+ *
+ * FALTA UNDER ARMOUR, que sí se vende, y no está porque no hay ni una foto suya
+ * en `public/products/`. Se añade el día que la haya — una marca sin producto
+ * aquí es un enlace del pie que lleva a una página vacía.
+ *
+ * Hubo un campo `pendiente: true` justo para eso: enseñar la marca sin dejar
+ * entrar. El componente todavía sabe qué hacer con él, pero hoy no lo lleva
+ * ninguna, así que si Under Armour entra antes que sus fotos, ése es el camino.
+ *
+ * ⚠️ LOS IDS VIENEN DE DOS CATÁLOGOS y conviene saberlo antes de tocar `items`:
+ *
+ *   `colorways.js`  el del escaparate y el acordeón — `mind-001`, `samba-*`,
+ *                   `suede-*`, `jordan-*`. Trae el plano de color completo.
+ *   `sneakers.js`   el del rollo y el díptico — seis zapatos con el encuadre
+ *                   común, que es OTRO. Hoy ningún producto está en los dos; si
+ *                   alguno lo estuviera, necesitaría un recorte por pieza.
+ *
+ * Aquí se apunta al que tiene el producto de verdad. Nadie consume `items`
+ * todavía —el pie sólo usa `name` e `id`—, así que si el día que se consuma hace
+ * falta un id space único, éste es el sitio donde resolverlo.
  */
 
 export const MARCAS = [
   {
     id: 'adidas',
     name: 'Adidas',
-    items: ['samba-green', 'samba-night'],
+    /* Los dos primeros son de `colorways.js` —los del escaparate viejo— y los
+       tres siguientes, del catálogo del rollo. */
+    items: ['samba-green', 'samba-night',
+            'samba-bosque', 'samba-canamo', 'samba-tiza'],
   },
   {
     id: 'jordan',
@@ -34,21 +56,15 @@ export const MARCAS = [
   {
     id: 'nike',
     name: 'Nike',
-    items: [],
-    pendiente: true,
+    /* El Mind 001 es el zapato del escaparate; los tres Dunk, del rollo. */
+    items: ['mind-001', 'dunk-universidad', 'dunk-carmin', 'dunk-niebla'],
   },
   {
-    id: 'new-balance',
-    name: 'New Balance',
-    items: [],
-    pendiente: true,
-  },
-  /* La quinta, para que el rollo de marcas también llene sus cinco puestos. */
-  {
-    id: 'veja',
-    name: 'Veja',
-    items: [],
-    pendiente: true,
+    id: 'puma',
+    name: 'Puma',
+    /* Los cuatro del acordeón. Son de `colorways.js` y no de `sneakers.js`: el
+       Suede sólo sale en el acordeón, así que tiene un encuadre y no dos. */
+    items: ['suede-miel', 'suede-arena', 'suede-pecana', 'suede-hueso'],
   },
 ]
 

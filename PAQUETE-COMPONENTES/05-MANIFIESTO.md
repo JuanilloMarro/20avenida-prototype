@@ -31,44 +31,54 @@ respecto al repo — y sale con código de error para que se note.
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/assets/css/glass.css` | 507 | los arreglos del doc 01 ya están dentro |
-| `app/components/glass/GlassSurface.vue` | 99 | |
-| `app/lib/glass-variants.js` | 27 | la lista cerrada de variantes |
-| `app/composables/useGlassLens.js` | 289 | el corte de `--lg-lens-on` ya está |
+| `app/assets/css/glass.css` | 511 | los arreglos del doc 01 ya están dentro |
+| `app/components/glass/GlassSurface.vue` | 101 | |
+| `app/lib/glass-variants.js` | 26 | la lista cerrada de variantes |
+| `app/composables/useGlassLens.js` | 298 | el corte de `--lg-lens-on` ya está |
 
 ### Escenario (doc 04)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/assets/css/tokens.css` | 96 | extraer sólo lo que aplique; ver §2 |
+| `app/assets/css/tokens.css` | 235 | extraer sólo lo que aplique; ver §2 |
 | `app/assets/js/backgrounds.js` | 85 | 4 rampas + grano |
 | `app/stores/useThemeStore.js` | 41 | sólo si se quiere más de un fondo |
-| `app/components/brand/BrandMark.vue` | 86 | |
+| `app/components/brand/BrandMark.vue` | 86 | sin halo — ver doc 04 §4 |
 | `public/brand/letrero-20av-cut.webp` | — | el asset de BrandMark |
+| `app/layouts/default.vue` | 101 | **el orden de pintado**, que no es negociable |
+
+> `default.vue` **faltaba en este manifiesto** y es el archivo que decide el
+> orden rampa → grano → contenido → capa flotante. Sin él el material se ve
+> mal aunque todos sus tokens estén bien, que es el síntoma que el doc 04 §1
+> manda comprobar antes que ningún otro. Además es donde se monta `<AppNav>` y
+> `<SiteFooter>`.
 
 ### Navegación (doc 02)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/components/nav/AppNav.vue` | 2 003 | la pieza grande |
+| `app/components/nav/AppNav.vue` | 2031 | la pieza grande |
 
 ### Producto — showcase (doc 03)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/components/product/ProductShowcase.vue` | 420 | |
+| `app/components/product/ProductShowcase.vue` | 612 | |
 | `app/composables/useScrollSequence.js` | 65 | |
-| `app/composables/useFitText.js` | 45 | **compartido con el acordeón** |
-| `app/assets/js/colorways.js` | 206 | los datos de producto — showcase y acordeón |
-| `public/products/samba/*.webp` | 8 archivos | ya recortados |
+| `app/composables/useFitText.js` | 119 | **compartido con el acordeón y el rollo**; el 4º argumento —tope de ALTO— es nuevo, ver doc 03 §5 |
+| `app/assets/js/colorways.js` | 459 | los datos de producto — **showcase y acordeón**. El rollo y el díptico ya NO lo usan: leen `sneakers.js` |
+| `public/products/mind001/*.webp` | 6 archivos | **la secuencia del escaparate** — caja unión 1160×584 |
+| `public/products/samba/*.webp` | 8 archivos | ya recortados; siguen para `brands.js` y `/frame` |
+| `scripts/build-mind001.py` | 157 | arma la secuencia del Mind desde `resources/` |
 
 ### Producto — acordeón (doc 06)
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/components/product/ProductAccordion.vue` | 298 | el reparto y el estado |
-| `app/components/product/ProductAccordionPanel.vue` | 778 | el recorte y el contenido |
-| `public/products/jordan/*.webp` | 4 archivos | caja unión 647×636 — ver doc 06 §13 |
+| `app/components/product/ProductAccordion.vue` | 328 | el reparto y el estado |
+| `app/components/product/ProductAccordionPanel.vue` | 1174 | el recorte y el contenido |
+| `public/products/nb9060/*.webp` | 4 archivos | **las cuatro del acordeón** — `sea-salt`, `mushroom`, `dark-mushroom`, `angora` |
+| `scripts/build-nb9060.py` | 124 | las arma desde `resources/sneakers sin fondo/A1..A4.png` |
 
 No añade **ninguna** dependencia nueva: reutiliza `colorways.js`, `useFitText.js`
 y `GlassSurface`, que ya vienen por los bloques anteriores. Su contrato completo
@@ -78,7 +88,7 @@ está en el doc 06 §14.
 
 | Archivo | Líneas | Notas |
 |---|---|---|
-| `app/components/product/ProductHoneycomb.vue` | 447 | |
+| `app/components/product/ProductHoneycomb.vue` | 448 | |
 | `public/products/panel/*.webp` | 26 archivos | caja unión 182×134 |
 
 Usa además el grano de `assets/js/backgrounds.js`, que ya viene con el escenario
@@ -97,6 +107,53 @@ Depende de `GlassSurface` con la variante **`sheet`**, que es obligatoria aquí:
 **34 celdas** de vidrio contra un presupuesto de ≈9 con lente. Los 26 recortes
 se reparten entre las 34 celdas — ocho repetidos, cosa de prototipo.
 
+### Producto — rollo (doc 08)
+
+| Archivo | Líneas | Notas |
+|---|---|---|
+| `app/components/product/ProductReel.vue` | 1821 | el carrusel y su ficha |
+| `app/assets/js/sneakers.js` | 245 | **el catálogo del rollo** — 14 zapatos de 4 marcas. Las 4 New Balance IMPORTAN su entrada de `colorways.js` y sólo le cambian el `frames` |
+| `public/products/sneakers/*.webp` | 14 archivos | caja unión 1160×599 — **compartidas con el díptico** |
+| `scripts/build-sneakers.py` | 146 | las arma; normaliza por LARGO, no por alto |
+
+No añade ninguna dependencia nueva: reutiliza `colorways.js`, `useFitText`,
+`backgrounds.js` y `GlassSurface`. Su contrato está en el doc 08 §8.
+
+⚠️ **Comparte los assets del acordeón a propósito** — los cinco puestos del
+rollo salen de los cuatro Jordan más `jordan-royal`, que es un PLACEHOLDER que
+reutiliza la foto de `jordan-pine` con id propio. Si se copia el rollo sin el
+acordeón, hay que traerse `public/products/jordan/` igualmente.
+
+### Producto — díptico (doc 09)
+
+| Archivo | Líneas | Notas |
+|---|---|---|
+| `app/components/product/ProductDiptych.vue` | 870 | lámina + carrusel de hexágonos |
+| `public/products/diptico/` | 1 archivo | `columna.jpg` — la lámina del díptico |
+| — | — | el catálogo (`sneakers.js` y sus 14 recortes) **ya viene con el rollo**; no se copia dos veces |
+
+Reproduce el hexágono y el filo del panal (doc 07 §3 y §7) sin compartir
+código con él: son dos piezas distintas que llegaron a la misma solución. Si
+alguna vez se unifican, es aquí.
+
+**Las celdas se distinguen por la EXTENSIÓN del archivo**, no por un prop: `.jpg`
+llena el hexágono a sangre, `.png` flota sobre el material. Copiar los assets
+cambiando el formato rompe el componente en silencio.
+
+### El pie (doc 10)
+
+| Archivo | Líneas | Notas |
+|---|---|---|
+| `app/components/site/SiteFooter.vue` | 414 | **no usa el material** |
+| `app/assets/js/brands.js` | 59 | el mapa de marcas |
+
+`brands.js` es hoy dependencia **sólo** del pie. Se escribió para un rollo de
+marcas que después se quitó, y si alguien lo borra creyendo que quedó huérfano,
+la tercera columna del pie se queda vacía.
+
+El pie va en el LAYOUT y no en la página — un `<footer>` dentro de `<main>`
+deja de ser el landmark `contentinfo`. Ver doc 10 §1.
+
 ### NO copiar
 
 | Archivo | Por qué |
@@ -104,8 +161,9 @@ se reparten entre las 34 celdas — ocho repetidos, cosa de prototipo.
 | `app/components/dev/DevPanel.vue` | herramienta de desarrollo del prototipo |
 | `app/pages/frame.vue` | ruta de capturas para Figma; útil sólo si se sigue diseñando |
 | `app/assets/js/materials.js` | tabla de referencia, no la consume nadie en runtime |
-| `app/pages/index.vue` | es el banco de pruebas del prototipo, no una landing real. Mirar sólo cómo monta los componentes |
+| `app/pages/index.vue` | es el banco de pruebas del prototipo, no una landing real. Mirar sólo cómo monta los componentes — **y el ORDEN**, que está razonado en sus comentarios: escaparate · acordeón · rollo · panal · díptico |
 | `docs/*` | 2 649 líneas de bitácora del prototipo. **Este paquete las sustituye.** |
+| `public/products/jordan/*.webp` | 4 recortes de Air Jordan. **Ya no los usa nadie**: el acordeón pasó a las New Balance y el rollo a `sneakers/`. Se quedan en el prototipo por si vuelven, pero no viajan. |
 
 ---
 

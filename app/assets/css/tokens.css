@@ -19,38 +19,97 @@
   --av-ink:   #0E0E0F;
   --av-paper: #FBFAF7;
 
-  /* TIPOGRAFÍA — Outfit, y en TODO. Es la única familia del sitio: cuerpo,
-     títulos y el texto gigante del fondo. Se pide a Google Fonts en
-     `nuxt.config.ts`.
+  /* ── TIPOGRAFÍA ──────────────────────────────────────────────────────────
+     BEBAS NEUE, y en TODO: cuerpo, títulos, banners, precios, navegación, pie,
+     botones y tallas. Una sola familia. Se pide a Google Fonts en
+     `nuxt.config.ts`, en su único corte: el 400.
 
-     La pila de reserva es la del sistema, y está por si la descarga falla o
-     tarda: con `display=swap` se pinta con ella y se cambia al llegar la buena.
-     Lo que se mueve al cambiar es el ancho, y de eso se ocupa `useFitText`, que
-     vuelve a medir con `document.fonts.ready`. */
-  --av-font: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
-             Roboto, "Helvetica Neue", Arial, sans-serif;
+     ESTE TOKEN ES EL ÚNICO SITIO donde se nombra la letra, y por eso cambiarla
+     es cambiar esta línea: `body` lo lee en `main.css`, Tailwind lo lee ahí
+     mismo a través de `--font-sans` —así que también lo heredan las clases de
+     utilidad y el preflight— y todos los componentes escriben
+     `font-family: inherit`. Ninguna pieza nombra familia propia.
 
-  /* LA DE DISPLAY, y display quiere decir display: es para cuerpos enormes y
-     para nada más. Hoy la usa una sola pieza —`.ps__word`, el texto gigante del
-     fondo del showcase— y el día que la use otra, será otra igual de grande.
-     Ni un título de sección, ni una etiqueta: Playfair es una didona de
-     contraste alto, y lo que a 300 px es un trazo fino a 14 px es un trazo que
-     desaparece.
+     POR DÓNDE HA PASADO, que explica los tokens de abajo: Outfit, luego
+     Playfair Display sólo para el texto gigante, luego Anton, luego Oswald, y
+     un rato repartida en dos —Inter para leer y Bebas para mirar—. El reparto
+     se deshizo: lo que se quería era el carácter de la condensada en toda la
+     página, no la legibilidad de una de interfaz.
 
-     La reserva no es «una serif cualquiera»: son las que ya están instaladas y
-     tienen la misma pinta de didona con remates finos —Didot en Mac, Bodoni en
-     Windows— así que mientras la web carga, la palabra se pinta con una letra
-     parecida y el cambio no es un salto de estilo, sólo de ancho. Se pide en
-     nuxt.config; ver ahí por qué un solo corte y por qué `swap`. */
-  /* El texto gigante del fondo del showcase usaba Playfair Display. Ya no: la
-     letra es Outfit en todo el sitio, así que esto apunta a la misma familia y
-     se queda como nombre —lo que distingue a ese texto es el CUERPO y el peso,
-     no otra tipografía—. Se deja el token en vez de borrarlo porque el
-     componente lo pide por nombre y así el día que vuelva a haber una familia
-     de display, se cambia aquí y en ningún sitio más. */
+     SIN CAJA BAJA. Bebas no trae glifos de minúscula, así que el sitio entero
+     se pinta en versales se escriba como se escriba. El porqué largo, y lo que
+     eso implica para la regla R1, está en `nuxt.config.ts` junto a la petición.
+     Aquí basta con saber que NO se puede deshacer desde el CSS — y que es la
+     razón de que exista `--av-track`, unas líneas más abajo.
+
+     LA RESERVA ES CONDENSADA, y no es cosmética: Bebas es estrecha, así que con
+     Arial de reserva la página se pinta bastante más ancha y al llegar la buena
+     todo se encoge de golpe. Las de aquí son las condensadas que ya están
+     instaladas —Roboto Condensed en Android, Arial Narrow en Windows y Mac,
+     Liberation Sans Narrow en Linux—, que miden aproximadamente lo mismo.
+
+     REGULARES Y NO PESADAS. Bebas es de peso medio, no una negra: con Impact o
+     Haettenschweiler delante, todo el texto se pintaría en negrita hasta que
+     llegara la buena y el cambio sería un salto de color además de ancho.
+
+     Lo que la reserva NO puede imitar es la falta de caja baja: mientras la
+     buena no llega se lee en caja de frase y al llegar salta a versales. Es un
+     cambio de forma, no de ancho, y va con la letra. Del salto de ancho se
+     ocupa `useFitText`, que vuelve a medir con `document.fonts.ready`. */
+  --av-font: "Bebas Neue", "Bebas Neue Fallback", "Roboto Condensed",
+             "Liberation Sans Narrow", "Arial Narrow", "Segoe UI", Arial,
+             sans-serif;
+
+  /* ── EL TRAZO ────────────────────────────────────────────────────────────
+     Cuánto aire va entre letra y letra. Existe por las versales: una caja alta
+     necesita más trazo que una baja, porque sus letras son todas rectángulos
+     del mismo alto y sin astas que las separen. Es la regla R1 al revés — R1
+     quitó el trazo ancho cuando quitó las versales; al volver las versales por
+     la letra, vuelve el trazo.
+
+     Y con Bebas hace falta el doble: además de caja alta es CONDENSADA, o sea
+     que sus letras ya nacen juntas. Sin esto la página se lee apelmazada.
+
+     .05em Y NO MÁS. A 14 px son 0,7 px entre letras: se nota que respira y no
+     se nota que está espaciado, que es el punto. Por debajo de .03 no hace
+     nada; por encima de .08 las palabras empiezan a deshacerse en letras
+     sueltas y un párrafo pasa a leerse como un rótulo.
+
+     EN `em` Y NO EN PÍXELES, para que escale con el cuerpo: un valor fijo sería
+     invisible a 44 px y enorme a 11.
+
+     Se aplica en `body` (`main.css`) y de ahí lo hereda todo lo que no declare
+     el suyo; lo que sí lo declara apunta a este token. El trazo del sitio se
+     cambia AQUÍ y en ningún otro sitio. */
+  --av-track: .05em;
+
+  /* EL TRAZO DE LOS RÓTULOS — el texto gigante del showcase y del acordeón, y
+     el título del rollo con sus dos posadas.
+
+     MENOS QUE EL DE CUERPO, y no es capricho: el trazo va en `em`, así que a
+     288 px de cuerpo el .05em del texto normal serían 14 px de hueco entre
+     letras. Lo que a 14 px es respirar, a 288 es una palabra rota en pedazos.
+     La regla de siempre: el trazo BAJA según sube el cuerpo.
+
+     .02em son ~6 px a ese tamaño — lo justo para que las letras no se toquen,
+     que es todo lo que un rótulo necesita. */
+  --av-track-display: .02em;
+
+  /* LA DE RÓTULO. Hoy NO ES OTRA: apunta a la de cuerpo, porque el sitio entero
+     va en Bebas y Bebas ya es una de display.
+
+     SE DEJA, y no por inercia. Es el ÚNICO punto por el que volver a separar
+     cuerpo y rótulo: se le pone aquí otra familia, se pide en `nuxt.config.ts`,
+     y las piezas que quieran rótulo la piden por nombre. Hoy sólo la nombra
+     `.ps__word` en <ProductShowcase>, que mientras esto apunte a `--av-font` es
+     lo mismo que heredar.
+
+     Si se vuelve a separar, la lista de candidatas está medida: `.ps__word`,
+     `.pa__word`, `.rl__title`, `.rl__name` y `.rl__ftitle`. Las tres del rollo
+     van juntas por fuerza — son la misma palabra en tres sitios y la escala del
+     vuelo es `ancho de la ranura / ancho del título`, así que con familias
+     distintas el calco se posa con un tamaño que no es el suyo. */
   --av-font-display: var(--av-font);
-  --av-font-display-old: "Playfair Display", "Didot", "Bodoni MT",
-                     "Times New Roman", Georgia, serif;
 
   /* ── Lo que va ENCIMA del vidrio ──────────────────────────────────────────
      Estos NO se invierten con el fondo, y es a propósito: el velo es negro

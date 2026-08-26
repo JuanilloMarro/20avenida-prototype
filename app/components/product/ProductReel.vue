@@ -36,38 +36,59 @@
  * para un listado de resultados sí — y por eso el buscador NO gira.
  */
 import { ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-vue-next'
-import { COLORWAYS } from '~/assets/js/colorways'
+import { SNEAKERS, SNEAKER_IDS } from '~/assets/js/sneakers'
 import { GRAIN_URL, GRAIN_DEFAULT } from '~/assets/js/backgrounds'
 import { useFitText } from '~/composables/useFitText'
 
 const props = defineProps({
   /**
-   * Ids de colorways, en orden de giro.
+   * Ids de `sneakers.js`, en orden de giro.
    *
-   * Los cinco Jordan y no una mezcla: los cinco comparten CAJA UNIÓN (647×636),
-   * así que se leen a la misma escala al pasar de uno a otro. Meter los Samba,
-   * que vienen de otro recorte, haría que el zapato pegara un salto de tamaño
-   * justo en el momento en que se está mirando — que es el único momento que
-   * importa en esta pieza.
+   * SEIS, de dos marcas: tres adidas Samba y tres Nike Dunk Low. Alternadas y
+   * no agrupadas — agrupadas, el rollo enseña tres Dunk seguidos y parece que
+   * la tienda sólo vende eso.
    *
-   * Regla para cuando haya catálogo real: **un rollo, un encuadre**. Si los
-   * assets no comparten caja, no van en el mismo rollo.
+   * FUERON CATORCE. Se cayeron las cinco New Balance y los tres Veja al quitar
+   * esas dos marcas del catálogo; el porqué está en `sneakers.js`. Y SEIS ES EL
+   * MÍNIMO PRÁCTICO: el rollo enseña cinco a la vez, así que con seis se ve casi
+   * todo de una y el giro deja de descubrir nada. Si hay que recortar más, lo
+   * que falta es producto.
+   *
+   * **UN ROLLO, UN ENCUADRE.** Los seis comparten caja unión (1160×550), así
+   * que se leen a la misma escala al pasar de uno a otro. Si los assets no
+   * comparten caja, el zapato pega un salto de tamaño justo en el momento en
+   * que se está mirando — que es el único momento que importa en esta pieza.
+   *
+   * Y la caja se normalizó por LARGO, no por alto: un 42 mide un 42 lo fabrique
+   * quien lo fabrique, mientras que un Dunk es más alto de caña que un Samba.
+   * Igualando alturas se perdería justo lo que distingue a un modelo de otro.
+   * Ver `scripts/build-sneakers.py`.
    */
   items: {
     type: Array,
-    default: () => ['jordan-pine', 'jordan-brood', 'jordan-royal', 'jordan-ochre', 'jordan-chi'],
+    default: () => SNEAKER_IDS,
   },
   /** Cuál arranca en el centro. */
   initial: { type: Number, default: 0 },
   /**
-   * El plano de detrás. SÓLIDO y negro fuerte, el MISMO que el panal:
-   * `#050506` es la primera parada de la rampa `negro` de marca, no un negro
-   * inventado.
+   * El plano de detrás. SÓLIDO y negro fuerte por defecto, el MISMO que el
+   * panal: `#050506` es la primera parada de la rampa `negro` de marca, no un
+   * negro inventado.
    *
    * Sin degradado a propósito — sobre negro plano, la iluminación del vidrio y
    * la silueta del zapato son lo único que se ve, y es justo lo que tiene que
    * verse. El escenario de la página trae una rampa y aquí se tapa: esta pieza
    * pone su propio suelo.
+   *
+   * ACEPTA TONOS CLAROS, y no de refilón: la landing le pasa el `surface` del
+   * colorway del escaparate para que las dos piezas se lean como una sola —el
+   * porqué está en `pages/index.vue`—. Cuando el tono es claro, la tinta de
+   * todo lo que va suelto sobre el plano se da la vuelta sola; ver `claro`.
+   * Lo que va sobre vidrio no se entera, y tampoco debe.
+   *
+   * Hexadecimal de 6 cifras. `luminancia()` no sabe leer otra cosa y ante la
+   * duda deja la pieza en oscuro — o sea que un `rgb()` aquí no rompe nada,
+   * pero tampoco hace lo que se espera.
    */
   bg: { type: String, default: '#050506' },
   /** el grano, 0–100. No es textura: es lo que el vidrio dobla. */
@@ -76,10 +97,93 @@ const props = defineProps({
 
 const emit = defineEmits(['select', 'change', 'buy'])
 
+/**
+ * Luminancia relativa de un `#rrggbb`, por el cálculo de la WCAG.
+ *
+ * Existe por una sola pregunta —¿el plano de detrás es claro?— y aun así es una
+ * cuenta y no una lista de colores conocidos: `bg` entra por prop, así que el
+ * día que la landing le pase otro tono, o que haya catálogo y cada sección
+ * traiga el suyo, esto sigue siendo cierto sin tocarlo. Una lista habría que
+ * mantenerla, y se quedaría atrás en silencio.
+ *
+ * Devuelve 0 si el color no es un hexadecimal de 6 cifras — o sea, se comporta
+ * como el negro, que es el defecto de la pieza. Es el fallo correcto: si algún
+ * día entra un `rgb()` o un `oklch()` por aquí, el rollo se queda como estaba
+ * en vez de darse la vuelta a medias.
+ */
+function luminancia(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex).trim())
+  if (!m) return 0
+  const n = parseInt(m[1], 16)
+  /* sRGB → lineal, canal a canal. El 0.03928 y el 2.4 no son ajustables: son
+     la curva de la especificación. */
+  const lin = c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const r = lin(((n >> 16) & 255) / 255)
+  const g = lin(((n >> 8) & 255) / 255)
+  const b = lin((n & 255) / 255)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/**
+ * ¿EL PLANO DE DETRÁS ES CLARO? De esto depende la tinta de todo lo que se
+ * pinta SUELTO sobre él: el título gigante, el nombre, el subtítulo, el precio
+ * y la pista de móvil. Hasta ahora era blanca fija porque el fondo era negro
+ * fijo; desde que la landing le pasa el mismo tono que el escaparate de arriba
+ * —ver `pages/index.vue`— el fondo puede ser cualquier cosa y la tinta tiene
+ * que seguirlo o la pieza se queda ilegible.
+ *
+ * LO QUE VA SOBRE VIDRIO NO PASA POR AQUÍ y se queda en `--av-on-glass-*`: las
+ * flechas, el «Ver detalle», las tallas, «Regresar» y «Comprar». Ese material
+ * lleva velo negro PROPIO, así que su contenido está siempre sobre oscuro dé
+ * igual lo que tenga debajo — es justo el motivo de tener un material
+ * estandarizado, y está escrito en `tokens.css`. Darles la vuelta a la vez que
+ * al texto suelto los dejaría negro sobre negro.
+ *
+ * El corte en 0.5 y no en 0.18 ni en 0.4: es el punto donde el blanco y el
+ * negro empatan en contraste sobre el mismo fondo, así que a cada lado gana el
+ * que se elige.
+ */
+const claro = computed(() => luminancia(props.bg) > 0.5)
+
+/**
+ * El color del TÍTULO GIGANTE — el que vuela y el que llevan los zapatos de los
+ * lados.
+ *
+ * Sobre plano oscuro es el `word` del colorway: un tono más claro que su propia
+ * `surface`, pensado para leerse como una MASA encendida al fondo del encuadre,
+ * no como un texto. Sobre plano claro esa misma masa se apaga —un verde medio
+ * sobre un verde pálido deja de tener perfil— así que ahí la palabra pasa a la
+ * tinta, y lo que le da la profundidad es el desenfoque, que ya estaba.
+ *
+ * Va por función y no por CSS porque `--rl-word` se escribe INLINE, elemento a
+ * elemento: cada zapato del rollo lleva el suyo, así que un valor puesto en
+ * `.rl` no llegaría nunca a ganarle.
+ */
+function tonoTitulo(cw) {
+  return claro.value ? 'var(--rl-ink)' : cw?.word
+}
+
 const estilo = computed(() => ({
   '--rl-bg': props.bg,
   '--rl-grain': GRAIN_URL,
   '--rl-grain-a': props.grain / 100,
+  /* LA TINTA DE LO QUE VA SUELTO SOBRE EL PLANO — ver `claro` justo arriba.
+
+     La rama oscura apunta a los tokens de vidrio y no a `#FFFFFF` escrito a
+     mano: es literalmente lo que la pieza renderizaba antes de que esto
+     existiera, así que con el `bg` por defecto no cambia ni un píxel. La clara
+     va al negro de la casa, el mismo `--av-ink` que usa el papel. */
+  '--rl-ink': claro.value ? 'var(--av-ink)' : 'var(--av-on-glass-strong)',
+  /* El segundo nivel —subtítulo, descripción, pista—. Sobre oscuro es el 72% de
+     la casa; sobre claro, el 62% del negro: el mismo `--av-solid-fg-soft` con
+     el que se pinta el texto secundario sobre papel, para que el sitio no tenga
+     dos grises de segundo nivel. */
+  '--rl-ink-soft': claro.value ? 'var(--av-solid-fg-soft)' : 'var(--av-on-glass)',
+  /* El tercer nivel, el de FILO: los puntos apagados del contador. No es texto,
+     así que no puede ir al gris del subtítulo —a ese peso una raya de 16×2 se
+     lee como encendida— y necesita su propia parada. Mismo par de tokens que el
+     resto: el filo sobre vidrio y el filo sobre papel. */
+  '--rl-ink-hair': claro.value ? 'var(--av-solid-hair)' : 'var(--av-on-glass-hair)',
   ...(vuelo.value ? {
     '--rl-fly-x': vuelo.value.x + 'px',
     '--rl-fly-y': vuelo.value.y + 'px',
@@ -87,10 +191,16 @@ const estilo = computed(() => ({
   } : null),
 }))
 
-/* El colorway completo de cada id, resuelto una vez. Si un id no existe se cae
-   fuera en vez de pintar una tarjeta rota. */
+/* El producto completo de cada id, resuelto una vez. Si un id no existe se cae
+   fuera en vez de pintar una tarjeta rota.
+
+   SALE DE `sneakers.js` Y NO DE `colorways.js`, y la diferencia es el ENCUADRE:
+   los seis de ahí comparten caja unión, que es lo que pide la regla de esta
+   pieza — un rollo, un encuadre. `colorways.js` tiene otra caja, la del
+   acordeón, así que un producto que saliera en las dos piezas necesitaría un
+   recorte por pieza. Hoy no hay ninguno que salga en las dos. */
 const productos = computed(() =>
-  props.items.map(id => ({ id, ...COLORWAYS[id] })).filter(p => p.name))
+  props.items.map(id => ({ id, ...SNEAKERS[id] })).filter(p => p.name))
 
 const n = computed(() => productos.value.length)
 const idx = ref(0)
@@ -391,9 +501,24 @@ onMounted(() => {
   nextTick(medirVuelo)
   document.fonts?.ready.then(medirVuelo)
   window.addEventListener('resize', medirVuelo)
-  if (typeof ResizeObserver !== 'undefined' && seccion.value) {
+  if (typeof ResizeObserver !== 'undefined') {
     ro = new ResizeObserver(medirVuelo)
-    ro.observe(seccion.value)
+    if (seccion.value) ro.observe(seccion.value)
+    /* Y AL PROPIO TÍTULO, que es lo que faltaba y se pilló midiendo.
+
+       `useFitText` trae su observador y reescribe el cuerpo del título por su
+       cuenta. Si ese reajuste llega DESPUÉS del último `medirVuelo`, la escala
+       del calco —`ancho de la ranura / ancho del título`— se queda calculada
+       contra un ancho que ya no existe, y el título deja de calzar sobre su
+       ranura. Visto: cuerpo en 7.53 px y el título pintado a 82 donde la ranura
+       medía 460.
+
+       Observando el título, cualquier reajuste suyo vuelve a disparar la
+       medida. No hay bucle: `medirVuelo` llama a `ajustarTitulo()`, que es
+       idempotente —comprobado, dos pasadas seguidas dan el mismo cuerpo—, así
+       que la segunda vuelta no cambia el tamaño y el observador no vuelve a
+       emitir. */
+    if (tituloEl.value) ro.observe(tituloEl.value)
   }
 })
 
@@ -477,7 +602,7 @@ watch(idx, () => nextTick(medirVuelo))
       <p
         ref="tituloEl"
         class="rl__title"
-        :style="{ '--rl-word': actual?.word }"
+        :style="{ '--rl-word': tonoTitulo(actual) }"
         aria-hidden="true"
       >{{ actual?.name }}</p>
       <button
@@ -485,7 +610,7 @@ watch(idx, () => nextTick(medirVuelo))
         :key="p.id"
         type="button"
         :class="claseDe(i)"
-        :style="{ '--rl-word': p.word }"
+        :style="{ '--rl-word': tonoTitulo(p) }"
         :tabindex="distancia(i) === 0 ? 0 : -1"
         :aria-hidden="Math.abs(distancia(i)) > 1"
         :aria-label="distancia(i) === 0 ? `Ver detalle de ${p.name}` : `Traer al centro ${p.name}`"
@@ -573,74 +698,102 @@ watch(idx, () => nextTick(medirVuelo))
 
          Montado siempre y apagado en reposo, como el resto del gesto: así se va
          animándose al cerrar en vez de desaparecer de golpe. -->
+    <!-- ══ LA FICHA ═══════════════════════════════════════════════════════
+         DOS COLUMNAS, 65 / 35.
+
+         Izquierda: el nombre y, debajo, el zapato dentro de un panel. Derecha:
+         precio, descripcion, tallas y las dos salidas.
+
+         EL FONDO LO HACE EL ZAPATO, no el titulo. Antes el nombre viajaba hasta
+         el centro y se desenfocaba detras; ahora el que se va al fondo es el
+         propio zapato —crece y se difumina— y el nombre se queda donde se lee.
+         Es la misma idea de profundidad con la pieza correcta: lo que se mira
+         en una ficha de producto es el producto, y lo que puede permitirse
+         estar fuera de foco es su copia grande.
+
+         Montada siempre y apagada en reposo, como el resto del gesto: asi se va
+         animando al cerrar en vez de desaparecer de golpe. -->
     <div class="rl__ficha">
-      <div
-        v-if="actual?.sizes?.length"
-        class="rl__tallas"
-        role="group"
-        aria-label="Selecciona tu talla, escala US"
-      >
-        <!-- Mismo tamaño y misma esquina que las tallas del acordeón — 48 px de
-             alto y 22 de superelipse. No es coincidencia buscada: una talla es
-             la misma casilla en las dos fichas, y si cada una tuviera su forma
-             el sistema tendría dos maneras de decir lo mismo. -->
-        <GlassSurface
-          v-for="t in actual.sizes"
-          :key="t"
-          :radius="22"
-          tag="span"
-          class="rl__talla"
-        >
-          <button
-            type="button"
-            :tabindex="ficha ? 0 : -1"
-            :aria-pressed="t === talla"
-            @click="talla = t"
+      <!-- ── columna izquierda ─────────────────────────────────────────── -->
+      <div class="rl__fcol rl__fcol--l">
+        <h2 class="rl__ftitle">{{ actual?.name }}</h2>
+
+        <!-- EL PANEL. Vidrio `light` —velo blanco— y no un relleno solido: es la
+             unica pieza clara del sitio y aun asi sigue siendo el material de la
+             casa, no un rectangulo pintado. Dentro no hay texto, asi que el velo
+             claro no le quita contraste a nada.
+
+             La sombra va DEBAJO y muy abierta: es lo que lo despega del zapato
+             difuminado que tiene detras. Sin ella el panel y el fondo se leen
+             en el mismo plano. -->
+        <GlassSurface variant="light" class="rl__panel">
+          <img
+            :src="actual?.frames?.[0]?.src"
+            :alt="`${actual?.name} — ${actual?.line}`"
+            decoding="async"
           >
-            <!-- la selección del sistema: sobre el velo negro es LUZ, el mismo
-                 vidrio un poco más encendido -->
-            <span v-if="t === talla" class="av-glass-sel" aria-hidden="true" />
-            {{ t }}
-          </button>
         </GlassSurface>
       </div>
 
-      <!-- PÍLDORA, como «Regresar» y como todo lo que se pulsa en la casa. Y de
-           vidrio, que aquí sí se puede por lo mismo que el «Ver detalle»: detrás
-           no pasa una foto, pasa el negro plano del escenario, que es un fondo
-           conocido. -->
-      <GlassSurface :radius="999" class="rl__comprar">
-        <!-- La MISMA bolsa que el acordeón y que la barra, y delante del texto
-             por lo mismo: dice qué es esto antes de que se lea. Las dos fichas
-             del sitio —ésta y la del acordeón— rematan igual. -->
-        <button
-          type="button"
-          :tabindex="ficha ? 0 : -1"
-          @click="emit('buy', { id: actual?.id, size: talla })"
+      <!-- ── columna derecha ───────────────────────────────────────────── -->
+      <div class="rl__fcol rl__fcol--r">
+        <p class="rl__fprice">{{ actual?.price }}</p>
+        <p v-if="actual?.blurb" class="rl__fblurb">{{ actual.blurb }}</p>
+
+        <!-- SIN ETIQUETA VISIBLE. El grupo lleva `aria-label` porque una fila de
+             numeros sueltos si necesita decir que es a quien no la ve. -->
+        <div
+          v-if="actual?.sizes?.length"
+          class="rl__tallas"
+          role="group"
+          aria-label="Selecciona tu talla, escala US"
         >
-          <ShoppingBag :stroke-width="1.8" /> Comprar ahora
-        </button>
-      </GlassSurface>
+          <!-- Mismo tamano y misma esquina que las tallas del acordeon — 48 px
+               de alto y 22 de superelipse. Una talla es la misma casilla en las
+               dos fichas; si cada una tuviera su forma, el sistema tendria dos
+               maneras de decir lo mismo. -->
+          <GlassSurface
+            v-for="t in actual.sizes"
+            :key="t"
+            :radius="22"
+            tag="span"
+            class="rl__talla"
+          >
+            <button
+              type="button"
+              :tabindex="ficha ? 0 : -1"
+              :aria-pressed="t === talla"
+              @click="talla = t"
+            >
+              <span v-if="t === talla" class="av-glass-sel" aria-hidden="true" />
+              {{ t }}
+            </button>
+          </GlassSurface>
+        </div>
+
+        <!-- LAS DOS SALIDAS, en una fila y en los extremos: volver a la
+             izquierda y comprar a la derecha. Mismas medidas que todas las
+             acciones del sitio — ver `--av-action-*`. -->
+        <div class="rl__facciones">
+          <GlassSurface :radius="999" class="rl__back">
+            <button type="button" :tabindex="ficha ? 0 : -1" @click="cerrar">
+              <ArrowLeft :stroke-width="1.8" />
+              Regresar
+            </button>
+          </GlassSurface>
+
+          <GlassSurface :radius="999" class="rl__comprar">
+            <button
+              type="button"
+              :tabindex="ficha ? 0 : -1"
+              @click="emit('buy', { id: actual?.id, size: talla })"
+            >
+              <ShoppingBag :stroke-width="1.8" /> Comprar ahora
+            </button>
+          </GlassSurface>
+        </div>
+      </div>
     </div>
-
-    <!-- REGRESAR — arriba a la izquierda y con la flecha mirando a la
-         IZQUIERDA, igual que en el acordeón: se retrocede en el mismo plano, no
-         se sube a otro sitio. Es el mismo vidrio que las flechas del rollo.
-
-         También está siempre montado, por lo mismo que el fantasma: al cerrar
-         tiene que poder irse animándose. Sin ficha queda apagado, sin eventos y
-         fuera del recorrido del tabulador. -->
-    <GlassSurface :radius="999" class="rl__back">
-      <button
-        type="button"
-        :tabindex="ficha ? 0 : -1"
-        :aria-hidden="!ficha"
-        @click="cerrar"
-      >
-        <ArrowLeft :stroke-width="2" />
-        Regresar
-      </button>
-    </GlassSurface>
   </section>
 </template>
 
@@ -907,12 +1060,19 @@ watch(idx, () => nextTick(medirVuelo))
   font-size: clamp(40px, 12vw, 178px);
   text-transform: uppercase;
   font-weight: 800;
-  letter-spacing: -.04em;
+  /* EL TRAZO DE RÓTULO. Éste y `.rl__name` tienen que llevar el MISMO valor en
+     `em`: la escala del vuelo es `ancho de la ranura / ancho del título`, y el
+     trazo entra en los dos anchos. Con el mismo em la razón se mantiene al
+     cambiar de cuerpo; con valores distintos, no. */
+  letter-spacing: var(--av-track-display);
   line-height: .95;
   white-space: nowrap;
-  /* El color del colorway, el mismo `word` que pinta el escaparate y el
-     acordeón. Lo escribe la plantilla desde el producto activo. */
-  color: var(--rl-word, var(--av-on-glass-hair));
+  /* Sobre plano oscuro, el color del colorway — el mismo `word` que pinta el
+     escaparate y el acordeón. Sobre plano claro, la tinta. Lo decide
+     `tonoTitulo()` y lo escribe la plantilla, elemento a elemento. */
+  /* SIEMPRE BLANCO, como el de la ficha. Llevaba el `word` del colorway y con
+     eso el nombre cambiaba de color en cada giro; un titulo no hace eso. */
+  color: var(--av-on-glass-strong);
   pointer-events: none;
 
   /* apagado hasta que hay medida — ver `--rl-fly-x` */
@@ -949,21 +1109,127 @@ watch(idx, () => nextTick(medirVuelo))
 
    Apagado y sin eventos en reposo, como el resto del gesto. Sube 10 px al
    entrar: lo justo para que se lea como que llega, no como que se enciende. */
+/* DOS COLUMNAS, 65 / 35. Ocupa la sección entera por dentro del relleno —los
+   mismos números que el resto de la pieza, no unos nuevos— y se pone por encima
+   del escenario, que en ficha ya sólo es el fondo difuminado.
+
+   `align-items: center` en las dos: la columna de la derecha es más corta que
+   la de la izquierda y alineada arriba se quedaba flotando en el aire. */
 .rl__ficha {
   position: absolute;
   z-index: 4;
-  right: clamp(16px, 4vw, 64px);
-  bottom: calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
+  inset:
+    var(--av-nav-space, 87px)
+    var(--av-gutter)
+    calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
 
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 65fr 35fr;
+  align-items: center;
+  gap: clamp(20px, 4vw, 64px);
 
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
   transition: opacity var(--rl-flow), transform var(--rl-flow);
+}
+
+.rl__fcol { display: flex; flex-direction: column; min-width: 0; }
+
+/* ── columna izquierda: nombre y panel ──────────────────────────────────── */
+.rl__fcol--l { gap: clamp(12px, 2vh, 26px); min-height: 0; }
+
+/* El nombre. Grande pero NO gigante: el que llenaba el ancho era el que se iba
+   al fondo, y ese papel lo hace ahora el zapato. Aquí es un título que se lee,
+   así que manda la legibilidad y no la mancha. */
+/* SIEMPRE BLANCO. El resto del rollo tine la tinta con el `word` del colorway
+   —un tono del propio zapato— y para un titulo eso lo apaga: cambia de color
+   con cada producto y en los tonos oscuros deja de leerse. El nombre es la
+   pieza que siempre tiene que estar arriba del todo en contraste, asi que no
+   depende del zapato que toque. */
+.rl__ftitle {
+  color: var(--av-on-glass-strong);
+  margin: 0;
+  font-size: clamp(28px, 3.6vw, 54px);
+  font-weight: 800;
+  letter-spacing: var(--av-track-display);
+  line-height: .95;
+  text-transform: uppercase;
+  color: var(--rl-ink);
+}
+
+/* EL PANEL. Se lleva todo el alto que quede y la foto se ajusta dentro con
+   `contain`: así el panel no cambia de forma según el recorte del zapato.
+
+   La sombra va DEBAJO y muy abierta —0 34px 60px con desplazamiento hacia
+   abajo— porque es lo que lo despega del zapato difuminado que tiene detrás.
+   Sin ella los dos se leen en el mismo plano. */
+.rl__panel {
+  flex: 1;
+  min-height: 0;
+  box-shadow: 0 34px 60px -24px rgba(0, 0, 0, .75);
+}
+.rl__panel :deep(.av-glass__body) {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: clamp(14px, 2.2vw, 34px);
+}
+.rl__panel img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ── columna derecha: precio, descripción, tallas y salidas ─────────────── */
+/* TODO A LA DERECHA. Precio, descripción, tallas y botones acaban en la misma
+   vertical —el margen derecho de la sección— y esa línea compartida es lo que
+   hace que la columna se lea como un bloque y no como cuatro cosas apiladas.
+   Con el contenido alineado a la izquierda, cada pieza terminaba donde le
+   tocaba por su largo y el borde derecho quedaba dentado. */
+.rl__fcol--r {
+  gap: clamp(12px, 2vh, 22px);
+  align-items: flex-end;
+  text-align: right;
+}
+
+.rl__fprice {
+  margin: 0;
+  font-size: clamp(24px, 2.6vw, 38px);
+  font-weight: 700;
+  letter-spacing: var(--av-track);
+  line-height: 1;
+  color: var(--rl-ink);
+}
+
+.rl__fblurb {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: var(--av-track);
+  color: var(--rl-ink-soft);
+}
+
+/* Las dos salidas, una en cada extremo de su fila: volver a la izquierda y
+   comprar a la derecha. */
+/* LOS DOS BOTONES JUNTOS Y PEGADOS AL MARGEN, sin hueco entre ellos. Estuvieron
+   uno en cada extremo de la fila y con la columna ya justificada a la derecha
+   eso rompía la vertical: «Regresar» se quedaba solo a la izquierda, fuera de
+   la línea que comparten el precio, la descripción y las tallas.
+
+   Sin separación porque son la misma decisión en dos mitades —salir o comprar—
+   y pegados se leen como un control de dos partes; con hueco se leen como dos
+   botones sueltos que casualmente están cerca. */
+.rl__facciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
 }
 
 .rl__tallas {
@@ -1004,7 +1270,7 @@ watch(idx, () => nextTick(medirVuelo))
   font-size: 12.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   cursor: pointer;
 }
@@ -1047,7 +1313,7 @@ watch(idx, () => nextTick(medirVuelo))
   font-family: inherit;
   font-size: var(--av-action-fs);
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   cursor: pointer;
 }
@@ -1123,9 +1389,11 @@ watch(idx, () => nextTick(medirVuelo))
      al posarse: subirlo aquí es acercar los dos estados. */
   font-size: clamp(34px, 8.4vw, 108px);
   font-weight: 800;
-  letter-spacing: -.04em;
+  /* EL MISMO em que `.rl__title` — ver la nota de allí; es el cálculo del
+     vuelo el que obliga, no el gusto. */
+  letter-spacing: var(--av-track-display);
   line-height: .95;
-  color: var(--av-on-glass-strong);
+  color: var(--rl-ink);
 }
 
 /* SIN PRECIO. El rollo es un escaparate y su trabajo es dar ganas de abrir la
@@ -1134,8 +1402,8 @@ watch(idx, () => nextTick(medirVuelo))
   margin: 0;
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -.005em;
-  color: var(--av-on-glass);
+  letter-spacing: var(--av-track);
+  color: var(--rl-ink-soft);
 }
 
 /* EL PRECIO. Sólo en la ficha, y FUERA DEL FLUJO — colgado del borde de abajo
@@ -1165,8 +1433,8 @@ watch(idx, () => nextTick(medirVuelo))
   white-space: nowrap;
   font-size: clamp(20px, 2.4vw, 30px);
   font-weight: 700;
-  letter-spacing: -.02em;
-  color: var(--av-on-glass-strong);
+  letter-spacing: var(--av-track);
+  color: var(--rl-ink);
 
   opacity: 0;
   /* La cadena de funciones es la MISMA en los dos estados; sólo cambia el
@@ -1222,7 +1490,7 @@ watch(idx, () => nextTick(medirVuelo))
   font-family: inherit;
   font-size: var(--av-action-fs);
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   cursor: pointer;
 }
@@ -1252,21 +1520,13 @@ watch(idx, () => nextTick(medirVuelo))
    objetivo del ratón — antes eso importaba en el borde superior, por donde pasa
    el cursor al bajar la página; abajo importa igual, que es donde se posa al
    llegar. */
+/* Ya no va absoluto en la esquina: vive dentro de la fila de acciones de la
+   ficha, así que hereda de ella el encendido y el apagado y no necesita los
+   suyos. Una pieza menos que sincronizar. */
 .rl__back {
-  position: absolute;
-  z-index: 5;
+  flex: none;
   min-width: var(--av-action-w);
-  bottom: calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
-  left: clamp(16px, 4vw, 64px);
   height: var(--av-action-h);
-
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(10px);
-  transition:
-    opacity    var(--rl-flow),
-    transform  var(--rl-flow),
-    visibility 0s linear var(--rl-flow-t);
 }
 .rl__back :deep(.av-glass__body) { height: 100%; }
 .rl__back button {
@@ -1286,7 +1546,7 @@ watch(idx, () => nextTick(medirVuelo))
   font-family: inherit;
   font-size: var(--av-action-fs);
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--av-on-glass-strong);
   cursor: pointer;
 }
@@ -1305,12 +1565,12 @@ watch(idx, () => nextTick(medirVuelo))
   width: 16px;
   height: 2px;
   border-radius: 2px;
-  background: var(--av-on-glass-hair);
+  background: var(--rl-ink-hair);
   transition: background-color .3s ease, width .3s ease;
 }
 .rl__ticks li.is-on {
   width: 26px;
-  background: var(--av-on-glass-strong);
+  background: var(--rl-ink);
 }
 
 /* ── el cambio de nombre ──────────────────────────────────────────────────
@@ -1343,10 +1603,16 @@ watch(idx, () => nextTick(medirVuelo))
 /* El título vuelve a su sitio de verdad: centro del escenario, tamaño entero y
    al fondo. Los tres ceros no son «nada»: son el estado sin transformar, o sea
    el que el título tendría si nunca hubiera bajado a la ranura. */
-.rl.is-ficha .rl__title {
-  transform: translate(-50%, -50%) translate(0px, 0px) scale(1);
-  filter: blur(var(--rl-title-blur));
-}
+/* EL TITULO YA NO VIAJA. Se queda calzado en su ranura y solo se apaga.
+
+   Volaba al centro y se desenfocaba detras porque ese era el fondo de la ficha
+   antigua; ahora el fondo lo hace el zapato, asi que el viaje ya no lleva a
+   ninguna parte — y se notaba: al cerrar, el titulo volvia deslizandose desde
+   el centro mientras todo lo demas solo se desvanecia, de modo que entrar y
+   salir se veian distintos.
+
+   Sin cambio de `transform` no hay nada que interpolar y las dos direcciones
+   son el mismo fundido al reves. */
 
 /* SE VAN LOS VECINOS. La ficha habla de UN zapato; dejar dos siluetas
    desenfocadas a los lados invita a girar, y girar está bloqueado. Se apagan en
@@ -1356,39 +1622,52 @@ watch(idx, () => nextTick(medirVuelo))
   pointer-events: none;
 }
 
-/* El zapato cede un poco de tamaño — no por espacio, sino porque al perder a
-   los vecinos se queda solo en el encuadre y a escala 1 se lee más grande de lo
-   que era. Encogerlo un 6% lo devuelve a su peso anterior. Y deja de ser
-   pulsable: en la ficha ya estás viendo lo que el clic abría. */
+/* EL ZAPATO SE VA AL FONDO. Crece y se difumina: pasa de ser el objeto que se
+   mira a ser el plano sobre el que se lee la ficha. Es el papel que antes hacía
+   el título, y cambiarlo de pieza es todo el rediseño — en una ficha de
+   producto, lo que puede permitirse estar fuera de foco es la copia grande del
+   producto, no su nombre.
+
+   El desenfoque es el mismo `--rl-title-blur` que usaba el título: es el número
+   que ya estaba calibrado para «esto está detrás». */
+/* EL ZAPATO DE FONDO: centrado en la SECCION y lo mas grande que cabe sin que
+   el desenfoque se salga.
+
+   Centrado en los dos ejes — el escenario pasa a `absolute; inset: 0`, que se
+   resuelve contra la caja de relleno ENTERA, asi que su centro es el de la
+   seccion y no el del hueco que dejan la cabecera y el pie.
+
+   El tamano lo pone el lado corto, el alto. La caja del zapato ya girada mide
+   unos 440 px a 1440x900 y el desenfoque anade su radio por los cuatro
+   costados; 1.55 es donde la suma toca el borde sin pasarse. Mas grande y el
+   halo se corta contra el `overflow: hidden` de la seccion, y un desenfoque
+   cortado en recto deja de leerse como profundidad. */
+.rl.is-ficha .rl__stage {
+  position: absolute;
+  inset: 0;
+}
 .rl.is-ficha .rl__item.is-focus {
-  transform: rotate(var(--rl-tilt)) scale(.94);
+  transform: rotate(var(--rl-tilt)) scale(1.55);
+  filter: blur(calc(var(--rl-title-blur) * 2.6));
+  opacity: .34;
   pointer-events: none;
 }
 
-/* El nombre del pie NO tiene regla de ficha, y esa ausencia es el cambio: ya
-   está apagado desde que hay medida, y lo que se mueve es el título de verdad.
-   Antes había aquí un apagado suyo sincronizado con el encendido del otro —
-   dos textos haciendo un relevo— y eso era un fundido, no un viaje.
+/* Y el título deja de viajar: en ficha se apaga, porque el nombre lo pone la
+   columna de la izquierda. En reposo sigue haciendo lo de siempre. */
+.rl.is-ficha .rl__title { opacity: 0; }
 
-   Y entra lo que sí es de la ficha. */
-.rl.is-ficha .rl__price {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+/* El nombre, la linea y el precio del pie se apagan enteros: la ficha trae los
+   suyos y dos copias del mismo dato en pantalla es peor que ninguna. */
+.rl.is-ficha .rl__head,
+.rl.is-ficha .rl__foot {
+  opacity: 0;
+  transition: opacity var(--rl-flow);
 }
 .rl.is-ficha .rl__ficha {
   opacity: 1;
   transform: none;
   pointer-events: auto;
-}
-
-.rl.is-ficha .rl__back {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition:
-    opacity    var(--rl-flow),
-    transform  var(--rl-flow),
-    visibility 0s;
 }
 
 /* Se apaga TODO EL MANDO del carrusel: flechas, contador, la pista del gesto y
@@ -1418,6 +1697,23 @@ watch(idx, () => nextTick(medirVuelo))
    cinco columnas que repartir, y `42%` es lo que a este ancho hace que se lean
    como profundidad y no como tres fotos. */
 @media (max-width: 900px) {
+  /* UNA COLUMNA. El 65/35 pide dos bloques de lectura uno al lado del otro y a
+     375 px ninguno de los dos llega a ancho de lectura. Apilados, el orden es
+     el mismo que se lee de arriba abajo en escritorio: nombre, zapato, precio,
+     descripcion, tallas y las dos salidas. */
+  .rl__ficha {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: clamp(14px, 2.4vh, 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .rl__panel { flex: none; max-height: 40svh; }
+  .rl__tallas { max-width: none; }
+  /* Las dos salidas siguen una en cada extremo, que es lo que las hace pareja
+     tambien aqui. */
+  .rl__facciones { --av-action-w: 130px; }
+
   .rl {
     --rl-side-scale: 0.42;
     --rl-side-blur:  7px;
@@ -1478,8 +1774,8 @@ watch(idx, () => nextTick(medirVuelo))
     margin: 0 0 2px;
     font-size: 12px;
     font-weight: 500;
-    letter-spacing: -.005em;
-    color: var(--av-on-glass);
+    letter-spacing: var(--av-track);
+    color: var(--rl-ink-soft);
     opacity: .6;
   }
 

@@ -2,9 +2,13 @@
 /**
  * Un panel de <ProductAccordion>. No se usa suelto.
  *
- * Existe como componente propio por UNA razón concreta: `useFitText` es un
- * composable con `onMounted` y `ResizeObserver`, así que necesita una instancia
- * por panel. Llamarlo dentro de un `v-for` del padre no es posible.
+ * Existe como componente propio porque un panel es TODO esto —el recorte, la
+ * ficha corta, el detalle y los tres estados de cada uno—, y desplegado dentro
+ * del `v-for` del padre no habría forma de leer ninguno de los dos.
+ *
+ * Hubo además un motivo técnico y ya no está: `useFitText` es un composable con
+ * `onMounted` y `ResizeObserver`, así que pedía una instancia por panel. Aquí
+ * ya no se usa —el porqué está en `.pa__word`— y el showcase sigue con él.
  *
  * EL RECORTE — lo único no obvio de la pieza.
  * El cuerpo tiene el ancho del panel EXPANDIDO y va centrado en absoluto; el
@@ -18,7 +22,6 @@
  */
 import { ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-vue-next'
 import { COLORWAYS, DEFAULT_COLORWAY } from '~/assets/js/colorways'
-import { useFitText } from '~/composables/useFitText'
 
 const props = defineProps({
   /** clave de COLORWAYS */
@@ -27,8 +30,6 @@ const props = defineProps({
   isOpen: { type: Boolean, default: false },
   /** la primera foto se precarga; las demás esperan */
   eager: { type: Boolean, default: false },
-  /** cuánto del ancho de su caja llena el texto gigante */
-  fill: { type: Number, default: 0.9 },
   /** este panel se ha comido el acordeón y enseña la ficha completa */
   isDetail: { type: Boolean, default: false },
   /** hay OTRO panel en detalle: éste queda plegado a cero */
@@ -46,13 +47,6 @@ const cw = computed(() => COLORWAYS[props.cwId] || COLORWAYS[DEFAULT_COLORWAY])
 const shot = computed(() => cw.value.frames?.[0]?.src)
 /* en caja de frase (R1). `short` distingue el colorway; `name` los repetiría */
 const word = computed(() => cw.value.short || cw.value.name)
-
-/* La caja del texto es `.pa__body`, que mide siempre lo mismo —el ancho del
-   expandido— aunque el panel se contraiga. Por eso el texto no baila al abrir
-   y cerrar: lo que cambia es el recorte, no su caja. */
-const body = ref(null)
-const wordEl = ref(null)
-useFitText(wordEl, body, props.fill)
 
 /* El panel se expande por tres vías y sólo una es estado de JS: el tap. El
    hover y el foco los resuelve CSS, que es lo correcto — el ratón no tiene por
@@ -131,17 +125,24 @@ function onClick(e) {
     @focus="onFocus"
     @blur="focused = false"
   >
-    <span ref="body" class="pa__body">
+    <span class="pa__body">
       <!-- decoración: su contenido ya está en el alt de la foto -->
-      <span ref="wordEl" class="pa__word" aria-hidden="true">{{ word }}</span>
+      <span class="pa__word" aria-hidden="true">{{ word }}</span>
 
       <!-- `width`/`height` son la CAJA UNIÓN del recorte, la misma para los
-           cuatro — 647×636, que es la tinta más ancha por la más alta con 46 px
-           de margen a cada lado. Ese margen no es estético: sin él el Chicago,
-           cuya tinta medía exactamente el alto del lienzo, tocaba el borde y
-           era el primero en verse cortado al contraerse el panel mientras los
-           otros tres aún tenían aire. Cuatro zapatos a la misma escala tienen
-           que tener también el mismo aire. No son decorativos: en el acordeón tumbado la foto se
+           cuatro — hoy 1200×549, la que escribe `scripts/build-suede.py`: la
+           tinta más ancha por la más alta, con 48 px de margen a cada lado y
+           todo reducido a 1200 de ancho. Ese margen no es estético: sin él, el
+           zapato más ancho de los cuatro toca el borde del lienzo y es el
+           primero en verse cortado al contraerse el panel mientras los otros
+           tres aún respiran. Cuatro zapatos a la misma escala tienen que tener
+           también el mismo aire.
+
+           SON LA PROPORCIÓN DECLARADA Y HAY QUE CAMBIARLOS CON LAS FOTOS: aquí
+           estuvo la caja de los Jordan —647×636, casi cuadrada— y la del 9060 es
+           el doble de ancha que de alta. Dejar la vieja reserva una caja con la
+           proporción equivocada y la fila pega un salto justo al cargar la
+           imagen. No son decorativos: en el acordeón tumbado la foto se
            dimensiona por el alto (`height: 100%; width: auto`), y una imagen
            `lazy` que aún no ha cargado no tiene proporción intrínseca — medía
            CERO de ancho y la fila salía vacía hasta que llegaba el fichero.
@@ -152,8 +153,8 @@ function onClick(e) {
         class="pa__shot"
         :src="shot"
         :alt="cw.name + ' — ' + cw.line"
-        width="647"
-        height="636"
+        width="1200"
+        height="616"
         :loading="eager ? 'eager' : 'lazy'"
         :fetchpriority="eager ? 'high' : 'auto'"
         decoding="async"
@@ -413,17 +414,49 @@ function onClick(e) {
 }
 
 /* ── el texto gigante ──────────────────────────────────────────────────────
-   Detrás de todo y sólo en el expandido. Su tamaño lo mide `useFitText` contra
-   `.pa__body`, con `fill` 0.9 y no el 0.995 del showcase: aquí hay que dejar
-   aire lateral o la palabra choca con el recorte del panel vecino. */
+   Detrás de todo, y del MISMO CUERPO EN LOS CUATRO PANELES.
+
+   Aquí estuvo `useFitText`, que es lo que usa el showcase: medía la palabra y
+   la reescalaba hasta llenar el 90% de `.pa__body`. Eso está bien cuando hay
+   UNA palabra en pantalla, y está mal cuando hay cuatro al lado: llenar el
+   mismo ancho con tres letras o con seis obliga a cuerpos muy distintos —«SAL»
+   salía casi al doble que «ANGORA»— y el acordeón se leía como cuatro
+   tipografías en vez de como cuatro paneles de lo mismo. Lo que tiene que ser
+   igual entre paneles es el CUERPO, no el ancho ocupado.
+
+   Así que es una medida fija en `cqw`, o sea proporcional al ancho del
+   acordeón: la misma en los cuatro, la misma en cualquier pantalla y —esto es
+   lo que arregla el detalle— la misma también cuando el cuerpo del panel pasa
+   de 40cqw a 100cqw. Con la medición, abrir el detalle multiplicaba la palabra
+   por dos y media.
+
+   Y LA PALABRA TIENE QUE SALIRSE DEL PANEL. No es que se tolere: es el efecto.
+   A este cuerpo, «ANGORA» mide unos 1060 px contra los 316 de un panel
+   contraído, o sea que cada panel enseña UNA O DOS LETRAS de la suya y el
+   acordeón entero se lee como una banda de letras cortadas. El recorte no es un
+   accidente que haya que evitar encogiendo el texto — es el mismo `overflow` que
+   recorta el zapato, aplicado a la tipografía.
+
+   Y ES LA FICHA LA QUE PONE EL TOPE, no el panel. Al abrir el detalle el cuerpo
+   pasa a 100cqw y la palabra entra ENTERA —1060 de 1265, un 84%—, que es
+   justamente el momento que la pieza cuenta: en el acordeón adivinas la palabra,
+   al ampliar la lees. Por eso el número no puede subir hasta donde el panel
+   aguante, sino hasta donde la ficha la enseñe completa con aire a los lados.
+
+   Que «SAL» ocupe entonces la mitad de ancho que «ANGORA» NO es un defecto: es
+   lo que significa que las cuatro tengan el mismo cuerpo. Lo que se comparte
+   entre paneles es la ALTURA de las letras, no el hueco que llenan.
+
+   Si un día entra un `short` más largo, lo que hay que comprobar es que siga
+   cabiendo en la ficha — es la única medida que este número no puede pasarse. */
 .pa__word {
   position: absolute;
   left: 50%;
   top: 46%;
   transform: translate(-50%, -50%);
-  font-size: 12cqw;           /* punto de partida; useFitText lo reescala */
+  font-size: 33cqw;
   font-weight: 900;
-  letter-spacing: -.055em;
+  letter-spacing: var(--av-track-display);
   line-height: .8;
   white-space: nowrap;
   color: var(--ps-word);
@@ -442,8 +475,10 @@ function onClick(e) {
      «Pino» para todo lo demás — el `alt` de la foto, la ficha, lo que venga.
      Aquí sólo cambia cómo se dibuja.
 
-     `useFitText` no se entera y no tiene que enterarse: mide `scrollWidth` con
-     el estilo ya aplicado, así que reescala solo con las letras más anchas. */
+     Y ENTRA EN EL CÁLCULO DEL CUERPO de aquí arriba: la caja alta de una
+     grotesca es más ancha que la baja, así que el 6.6cqw está medido ya en
+     versales. Quitar el `text-transform` dejaría la palabra corta de ancho, no
+     pasada. */
   text-transform: uppercase;
 
   /* SIEMPRE visible, también en los paneles contraídos. No es un estado: es el
@@ -477,7 +512,54 @@ function onClick(e) {
      Mismo tiempo y misma curva que el ancho del panel: el zapato y su panel se
      mueven como una sola cosa, no como dos animaciones a destiempo. */
   object-position: center;
-  transition: object-position .5s cubic-bezier(.22, 1, .36, 1);
+
+  /* ── EL GIRO ──────────────────────────────────────────────────
+     La puntera baja hacia la esquina de abajo a la izquierda. Las cuatro fotos
+     son perfiles exteriores planos —el zapato mirando a la izquierda, clavado
+     en la horizontal— y cuatro horizontales seguidas se leen como un catálogo,
+     no como un escaparate. Con el mismo grado en los cuatro, la diagonal es
+     otra constante compartida: siguen comparándose entre sí, pero la pieza deja
+     de ser una fila de fichas.
+
+     ES UNA SOLA VARIABLE Y ESE ES EL PUNTO. `--pa-tilt` se declara aquí y la
+     usan los dos estados —el acordeón y el detalle—, así que el zapato NO se
+     endereza al abrir: al entrar en la ficha se queda exactamente igual de
+     torcido y sólo cambia de tamaño. Si el giro estuviera escrito dos veces,
+     bastaría con tocar uno para que el detalle girara al abrirse.
+
+     EL SIGNO ES NEGATIVO Y NO ES UN DETALLE. `rotate()` positivo gira en el
+     sentido de las agujas del reloj, así que en positivo el lado que baja es el
+     DERECHO —el talón— y la puntera se levanta: justo lo contrario de lo que se
+     pide. En negativo baja el lado izquierdo, que es donde miran los cuatro
+     zapatos.
+
+     30°, que es el giro de la pieza que sirvió de referencia. Es bastante más
+     que una inclinación y se nota: la puntera APUNTA a la esquina, no la
+     insinúa.
+
+     A LO ANCHO CABE, que es lo que había que comprobar en escritorio: la tinta
+     de la foto mide 403×189 dentro de un cuerpo de 506, y girada 30° su
+     envolvente pasa a 443×449 — sigue entrando a lo ancho, así que el panel
+     abierto no le toca la puntera. Subir mucho más de aquí sí la cortaría.
+
+     En el móvil la envolvente pasa a medir 287 de alto contra los 203 de una
+     fila contraída, o sea que ahí el giro SÍ se recorta por arriba y por abajo.
+     No es un defecto que haya que corregir bajando el ángulo: la fila contraída
+     recorta por definición —es la misma ventana, girada 90°— y la fila abierta,
+     que mide 325, lo enseña entero. */
+  --pa-tilt: -30deg;
+  /* cuánto se escala la foto al abrir la ficha. El porqué del número, en
+     `.pa__panel.is-detail .pa__shot`; el móvil lo pisa más abajo. */
+  --pa-zoom: .45;
+  transform: rotate(var(--pa-tilt));
+
+  /* La misma curva y el mismo tiempo que el ancho del panel, ahora también para
+     el `transform`: entre el acordeón y el detalle el zapato cambia de escala,
+     y sin transición ese cambio era un salto en mitad de una apertura que sí se
+     movía. */
+  transition:
+    object-position .5s cubic-bezier(.22, 1, .36, 1),
+    transform .5s cubic-bezier(.22, 1, .36, 1);
   filter:
     drop-shadow(0 10px 12px rgba(0, 0, 0, .26))
     drop-shadow(0 38px 46px rgba(0, 0, 0, .34));
@@ -528,7 +610,7 @@ function onClick(e) {
   left: var(--pa-pad-x);
   right: var(--pa-pad-x);
   font-size: 10.5px;
-  letter-spacing: .01em;
+  letter-spacing: var(--av-track);
   color: var(--pa-on-surface-soft);
   /* que no empuje: si no cabe, se corta */
   overflow: hidden;
@@ -541,7 +623,7 @@ function onClick(e) {
 .pa__name {
   font-size: 19px;
   font-weight: 700;
-  letter-spacing: -.02em;
+  letter-spacing: var(--av-track);
   color: var(--pa-on-surface);
 }
 .pa__price {
@@ -567,7 +649,7 @@ function onClick(e) {
   color: var(--pa-on-surface);
   font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: -.01em;
+  letter-spacing: var(--av-track);
   white-space: nowrap;
 }
 .pa__cta-in :deep(svg) { width: 14px; height: 14px; }
@@ -642,6 +724,14 @@ function onClick(e) {
     width: 100%;
     height: 100%;
     min-width: 0;
+
+    /* AQUÍ EL CUERPO NO SE ENSANCHA AL ABRIR LA FICHA — ya ocupa la fila entera
+       en el acordeón, y en el detalle lo único que cambia es dónde se posa y
+       cuánto mide de alto. Así que no hay ensanchado que compensar: el .45 de
+       escritorio dejaría el zapato a un tercio justo cuando se ha pedido verlo
+       de cerca. 1.08 es el mismo gesto que allí —un paso hacia delante— medido
+       para lo que sí cambia aquí. */
+    --pa-zoom: 1.08;
   }
 
   /* En una fila no caben tres bloques: la DESCRIPCIÓN se va. Es lo primero que
@@ -671,8 +761,8 @@ function onClick(e) {
     margin-top: auto;
   }
 
-  /* el texto gigante no entra: a lo ancho de una fila `useFitText` lo pondría
-     enorme y taparia el zapato, y no hay hueco vertical donde bajarlo */
+  /* el texto gigante no entra: a lo ancho de una fila taparía el zapato, y no
+     hay hueco vertical donde bajarlo */
   .pa__word { display: none; }
 
   .pa__name { font-size: 15px; }
@@ -698,22 +788,30 @@ function onClick(e) {
    izquierda. */
 .pa__panel.is-detail .pa__body { width: 100cqw; }
 
-/* EL ZAPATO CEDE UN 10% AL ABRIRSE, y no es por espacio: es por JERARQUÍA. En
-   la ficha entran un título y un precio que en el panel cerrado no existían, y
-   con el zapato a tamaño completo esos dos textos se leen como pies de foto.
-   Bajándolo un escalón, la ficha tiene tres piezas de peso parecido en vez de
-   una grande y dos notas.
+/* EL ZAPATO CRECE UN PELÍN AL ABRIRSE, Y NADA MÁS. Esta es la regla que decide
+   el tamaño de la foto en la ficha, y el número no es un gusto: es una cuenta.
+
+   `.pa__body` pasa de 40cqw a 100cqw al abrir el detalle, y la foto mide el
+   100% de su cuerpo. O sea que, sin tocar nada, el zapato se multiplica por dos
+   y medio de golpe — que es lo que pasaba con el `scale(.9)` de antes: se salía
+   de la pantalla y dejaba el título y las tallas de adorno alrededor.
+
+   Lo que se quiere es que entrar en la ficha se note como ACERCARSE un paso, no
+   como cambiar de página. Así que se compensa el ensanchado del cuerpo:
+
+     0.45 ÷ 0.40 = 1.13 — el zapato de la ficha es un 13% mayor que el del panel
 
    `scale` y no un `width` menor: el ancho lo pone `.pa__body`, que es la caja
    que recorta, y tocarlo movería el recorte. `scale` encoge lo PINTADO y deja
    la caja donde está — que además es lo único que puede animarse en la GPU sin
    provocar reflujo en mitad de la apertura del panel.
 
-   Sólo en la ficha. En el acordeón cerrado los cuatro zapatos se comparan entre
-   sí y ahí no hay texto que compita: encogerlos allí sería quitar sin dar. */
+   Y EL GIRO SE REPITE AQUÍ. `transform` es una sola propiedad: escribir sólo el
+   `scale` borraría el `rotate` de arriba y el zapato se enderezaría justo al
+   abrir la ficha. Van los dos, en este orden — primero gira, después escala. */
 .pa__panel.is-detail .pa__shot {
   object-position: center;
-  transform: scale(.9);
+  transform: rotate(var(--pa-tilt)) scale(var(--pa-zoom));
 }
 
 /* El detalle entra CUANDO el panel ya casi ha terminado de abrirse — 250 ms de
@@ -817,7 +915,7 @@ function onClick(e) {
   font-family: inherit;
   font-size: var(--av-action-fs);
   font-weight: 500;
-  letter-spacing: -.005em;
+  letter-spacing: var(--av-track);
   color: var(--pa-on-surface);
   cursor: pointer;
 }
@@ -868,7 +966,7 @@ function onClick(e) {
   margin: 0;
   font-size: clamp(26px, 3.5cqw, 46px);
   font-weight: 800;
-  letter-spacing: -.02em;
+  letter-spacing: var(--av-track);
   line-height: 1.05;
   color: var(--pa-on-surface);
 }
