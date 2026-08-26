@@ -1549,7 +1549,19 @@ watch(idx, () => nextTick(medirVuelo))
   z-index: 2;
   padding: 10px;
 }
-.rl__tpanel :deep(.av-glass__body) {
+/* EL `>` NO ES ADORNO Y AQUÍ ESTUVO UN BUG. Cada talla es TAMBIÉN un
+   `GlassSurface`, así que dentro del panel hay un `.av-glass__body` por casilla
+   además del del propio panel. Sin el hijo directo, esta regla se los pintaba a
+   todos: la casilla mide 56 px y su cuerpo pasaba a medir lo que el panel, el
+   botón —`width: 100%`— se estiraba hasta ahí y el número, centrado en el botón,
+   se dibujaba fuera de su casilla.
+
+   En escritorio no llegaba a verse porque `.rl__talla :deep(.av-glass__body)`
+   —más abajo— tiene la misma especificidad y va después, así que le ganaba por
+   orden. En la media query de teléfono no: aquella está al final del fichero y
+   pisaba a las dos. Un empate de especificidad resuelto por orden es una bomba
+   de relojería; con el hijo directo las dos reglas ya no se pisan. */
+.rl__tpanel > :deep(.av-glass__body) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -2303,7 +2315,7 @@ watch(idx, () => nextTick(medirVuelo))
      la barra del navegador. Tres por fila son cuatro filas y 236 px, que es casi
      el doble — cabe, pero es el número que hay que vigilar el día que la lista de
      tallas crezca. Con doce ya serían cuatro filas justas; con trece, cinco. */
-  .rl__tpanel :deep(.av-glass__body) { width: 184px; }
+  .rl__tpanel > :deep(.av-glass__body) { width: 184px; }
 
   .rl {
     --rl-side-scale: 0.42;
