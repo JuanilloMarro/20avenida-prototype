@@ -54,12 +54,24 @@ function onComprar({ id, size }) {
 </script>
 
 <template>
+  <!-- `av-snap` marca las piezas que miden UNA PANTALLA EXACTA — acordeón,
+       cartel y rollo— para que el scroll las centre solo al acercarse. Medido:
+       las tres dan 1.00 pantallas; el panal 0.80 y el díptico 0.76, y por eso NO
+       la llevan: una pieza más corta que el viewport anclada al centro obliga a
+       enseñar recortes de sus vecinas sí o sí.
+
+       El escaparate tampoco: son 3.75 pantallas de carril con `sticky`, y
+       anclarlo lo partiría por la mitad. El imán del acordeón ya recoge la
+       salida del carril.
+
+       El cómo —y por qué `proximity` y no `mandatory`— está en `main.css`. -->
   <div class="home">
     <ProductShowcase @buy="onComprar" />
 
     <!-- EL ACORDEÓN ENTRA JUSTO DEBAJO DEL SCROLLOVER, que se lleva 375vh de
          carril: cuando esto aparece, su `sticky` ya soltó. -->
     <ProductAccordion
+      class="av-snap"
       :items="['suede-miel', 'suede-arena', 'suede-pecana', 'suede-hueso']"
       @select="onProducto"
       @buy="onComprar"
@@ -70,7 +82,7 @@ function onComprar({ id, size }) {
          rollo abre la seguidilla de negros con la que cierra la página. Metido
          entre ellos, el cartel es la última pieza clara y la transición va de
          claro a claro a oscuro en vez de dar dos saltos. -->
-    <ProductPoster />
+    <ProductPoster class="av-snap" />
 
     <!-- EL ROLLO, DESPUÉS DEL ACORDEÓN. Se probó al revés —rollo primero— y se
          volvió: el rollo abre su propia ficha a pantalla completa, y ponerlo
@@ -83,7 +95,7 @@ function onComprar({ id, size }) {
          colorway para que la costura no se notara; ya no hace falta y se quitó
          — el rollo es una de las tres piezas negras con las que cierra la
          página. -->
-    <ProductReel @select="onRollo" @buy="onComprar" />
+    <ProductReel class="av-snap" @select="onRollo" @buy="onComprar" />
 
     <!-- El panal entra después del acordeón: el acordeón enseña CUATRO productos
          de cerca y el panal enseña que hay muchos más. En ese orden cuenta algo;

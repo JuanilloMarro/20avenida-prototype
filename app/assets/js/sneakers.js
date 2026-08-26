@@ -50,10 +50,18 @@ const TALLAS = [7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5]
 /** El encuadre del rollo. Un solo sitio que sepa dónde viven estas fotos. */
 const foto = (id, label) => [{ src: `/products/sneakers/${id}.webp`, label }]
 
+/* LA MARCA VA APARTE DEL NOMBRE, y no deducida de el. Partir `name` por el
+   primer espacio funciona con «adidas Samba OG» y se rompe con «New Balance
+   9060» — que estuvo en este fichero y puede volver. Ademas es el dato que
+   mandara el backend por su lado.
+
+   `model` no se guarda: es `name` sin el prefijo de la marca, y calcularlo
+   evita que las dos cadenas se contradigan cuando alguien edite una sola. */
 export const SNEAKERS = {
   /* ── adidas Samba ────────────────────────────────────────────────────── */
   'samba-bosque': {
     name: 'adidas Samba OG',
+    brand: 'adidas',
     short: 'Bosque',
     line: 'Collegiate Green · Off White · Gum',
     surface: '#22382D',
@@ -70,6 +78,7 @@ export const SNEAKERS = {
   },
   'samba-canamo': {
     name: 'adidas Samba XLG',
+    brand: 'adidas',
     short: 'Cáñamo',
     line: 'Hemp · Cream White · Gum',
     surface: '#4A4034',
@@ -86,6 +95,7 @@ export const SNEAKERS = {
   },
   'samba-tiza': {
     name: 'adidas Samba OG',
+    brand: 'adidas',
     short: 'Tiza',
     line: 'Cloud White · Core Black · Gum',
     surface: '#33322F',
@@ -104,6 +114,7 @@ export const SNEAKERS = {
   /* ── Nike Dunk Low ───────────────────────────────────────────────────── */
   'dunk-universidad': {
     name: 'Nike Dunk Low',
+    brand: 'Nike',
     short: 'Universidad',
     line: 'University Blue · White',
     surface: '#1E3A52',
@@ -120,6 +131,7 @@ export const SNEAKERS = {
   },
   'dunk-carmin': {
     name: 'Nike Dunk Low',
+    brand: 'Nike',
     short: 'Carmín',
     line: 'University Red · White',
     surface: '#4A1414',
@@ -136,6 +148,7 @@ export const SNEAKERS = {
   },
   'dunk-niebla': {
     name: 'Nike Dunk Low',
+    brand: 'Nike',
     short: 'Niebla',
     line: 'Wolf Grey · Summit White',
     surface: '#3A3A38',

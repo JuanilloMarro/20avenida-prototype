@@ -125,3 +125,45 @@
   }
   button { cursor: pointer; }
 }
+
+/* ══ EL IMÁN DE LAS PIEZAS A PANTALLA COMPLETA ════════════════════════
+ *
+ * La landing encadena piezas que miden UNA pantalla exacta —el acordeón, el
+ * cartel y el rollo— con otras que miden menos. Sin imán, un scroll que se queda
+ * a medias deja dos piezas partidas a la vez: media de arriba y media de abajo.
+ * Y una pieza que está diseñada para llenar el viewport, vista a medias, no es
+ * la pieza.
+ *
+ * `proximity` Y NO `mandatory`, y la diferencia importa:
+ *
+ *   `mandatory`  el scroll SIEMPRE acaba en un punto de anclaje. Aquí eso
+ *                significa que las piezas que NO llenan la pantalla —el panal,
+ *                el díptico— dejarían de poder mirarse: al soltar, la página
+ *                saltaría a la pieza completa más cercana. Y el escaparate,
+ *                que son 3.75 pantallas de carril con `sticky`, quedaría
+ *                atrapado a la mitad.
+ *   `proximity`  el imán sólo tira cuando ya estás cerca. Es lo que se pidió:
+ *                que al reconocer que llegas a una pieza completa se centre
+ *                sola, sin secuestrar el resto del scroll.
+ *
+ * Va en `html` porque el documento es el contenedor de scroll: `.stage` usa
+ * `overflow-x: clip` justamente para NO serlo (ver el layout — con `hidden`
+ * rompería el `sticky` del escaparate).
+ *
+ * QUIÉN se ancla lo decide la página, no el componente: es una relación entre
+ * secciones, no una propiedad de ninguna. Por eso `.av-snap` es una clase que se
+ * pone en el sitio donde se montan (`pages/index.vue`) y no una regla dentro de
+ * cada pieza. */
+html { scroll-snap-type: y proximity; }
+
+/* `center` y no `start`: la pieza mide exactamente una pantalla, así que centrada
+   la llena entera y no asoma nada. Y cuando NO la mide del todo —en un teléfono
+   `100svh` es algo menos que el viewport con la barra retraída— centrar reparte
+   ese sobrante en dos mitades simétricas en vez de amontonarlo abajo. */
+.av-snap { scroll-snap-align: center; }
+
+/* El imán es una comodidad, no una barrera: quien haya pedido menos movimiento
+   no tiene por qué encontrarse la página corrigiéndole el gesto. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-snap-type: none; }
+}

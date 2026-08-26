@@ -35,7 +35,7 @@
  * es que no se sabe dónde empieza la lista; para un escaparate eso no importa,
  * para un listado de resultados sí — y por eso el buscador NO gira.
  */
-import { ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-vue-next'
 import { SNEAKERS, SNEAKER_IDS } from '~/assets/js/sneakers'
 import { GRAIN_URL, GRAIN_DEFAULT } from '~/assets/js/backgrounds'
 import { useFitText } from '~/composables/useFitText'
@@ -184,6 +184,23 @@ const estilo = computed(() => ({
      lee como encendida— y necesita su propia parada. Mismo par de tokens que el
      resto: el filo sobre vidrio y el filo sobre papel. */
   '--rl-ink-hair': claro.value ? 'var(--av-solid-hair)' : 'var(--av-on-glass-hair)',
+
+  /* ── los tres colores que la ficha toma del PRODUCTO ──────────────────
+     No son colores nuevos: son los que el catálogo ya trae para ese zapato, los
+     mismos con los que el acordeón pinta su plano. La ficha no inventa una
+     paleta, consume la que hay.
+
+     `--rl-banner`  el plano de la franja — `surface`, el color del zapato.
+     `--rl-bword`   la palabra escrita a lo largo de la franja. Sale del `word`
+                    del propio colorway, que ya es «el surface un punto más
+                    claro»; si faltara, un blanco muy bajo. Es FONDO, no rótulo:
+                    tiene que reconocerse sin competir con el nombre del modelo.
+     `--rl-accent`  el acento, y aquí sólo lo lleva el precio. Es el único dato
+                    de la columna con color, y por eso se despega sin necesitar
+                    más cuerpo ni más peso. */
+  '--rl-banner': actual.value?.surface ?? '#222',
+  '--rl-bword': actual.value?.word ?? 'rgba(255,255,255,.22)',
+  '--rl-accent': actual.value?.accent ?? 'var(--av-y-400)',
   ...(vuelo.value ? {
     '--rl-fly-x': vuelo.value.x + 'px',
     '--rl-fly-y': vuelo.value.y + 'px',
@@ -275,6 +292,91 @@ function abrir() {
   emit('select', actual.value.id)
 }
 function cerrar() { ficha.value = false }
+
+/* ══ LA TALLA, EN DOS TIEMPOS ══════════════════════════════════
+ *
+ * Antes las diez tallas estaban a la vista siempre. Ahora hay un disparador que
+ * dice «Seleccionar talla» y abre un panel con las disponibles; al elegir, el
+ * panel se cierra y el rótulo pasa a «Talla seleccionada».
+ *
+ * Lo que se gana no es sitio: es que la ficha deje de pedir una decisión antes
+ * de haber enseñado el producto. Diez casillas abiertas compiten con el zapato;
+ * un botón, no.
+ *
+ * EL PANEL BAJA, y la flecha apunta abajo. Estuvo al revés —subía— por miedo a
+ * que se saliera de la sección, y era miedo mal puesto: entre el disparador y la
+ * descripción hay un hueco vacío que es exactamente donde tiene que caer. Bajando
+ * lo ocupa en vez de taparse a sí mismo contra la barra.
+ *
+ * Y va en DOS COLUMNAS, no en cinco. Diez tallas en cinco columnas son dos filas
+ * anchas y chatas que se comen el ancho de la columna de lectura; en dos son
+ * cinco filas estrechas que caen justo en ese hueco. La forma del panel la manda
+ * el sitio que tiene, no la cuenta de tallas. */
+const tallasAbiertas = ref(false)
+
+function elegirTalla(t) {
+  talla.value = t
+  tallasAbiertas.value = false
+}
+
+/* Se cierra solo en los dos casos en que quedarse abierto sería mentira: al
+   cerrar la ficha, y al cambiar de producto — las tallas del panel son las de
+   `actual`, y enseñar las de uno mientras se mira otro es peor que no enseñar
+   ninguna. */
+watch(ficha, abierta => { if (!abierta) tallasAbiertas.value = false })
+watch(actual, () => { tallasAbiertas.value = false })
+
+/* ¿Qué pone el rótulo. Dos estados y no tres: sin talla pide, con talla informa. */
+const rotuloTalla = computed(() => talla.value ? 'Talla seleccionada' : 'Seleccionar talla')
+
+/* LA MARCA Y EL MODELO, separados. La marca es dato (`brand` en `sneakers.js`);
+   el modelo es el nombre sin ese prefijo — calculado y no guardado, para que las
+   dos cadenas no puedan contradecirse. Si el nombre no empieza por la marca, se
+   deja entero: más vale repetir la marca que borrar media palabra. */
+const marca = computed(() => actual.value?.brand ?? '')
+
+/* LA MARCA SE AJUSTA AL ANCHO DE SU COLUMNA, no lleva un cuerpo fijo. Con un
+   `clamp` en vw, «Nike» —cuatro letras— dejaba la mitad de la columna vacía y
+   «adidas» —seis— la llenaba: el mismo número da manchas distintas según la
+   palabra. `useFitText` mide y reescala, que es lo que ya hacen el escaparate y
+   el acordeón con su texto gigante. Un composable más no; el mismo.
+
+   MEDIA COLUMNA, no la columna entera. A ancho completo la marca se comía la
+   pieza, y una marca de más letras se habría estirado todavía más. Al 0.5 todas
+   —de cuatro letras o de diez— ocupan la misma mitad, que es justamente la
+   gracia de ajustar por MEDIDA en vez de por cuerpo fijo. */
+const cajaMarca = ref(null)
+const palabraMarca = ref(null)
+useFitText(palabraMarca, cajaMarca, 0.5)
+
+/* Y LA DEL BANNER SE AJUSTA AL ALTO. Es el mismo ajuste medido contra una caja
+   GIRADA — ver `.rl__bbox`: la caja tiene el alto del banner por ancho, así que
+   llenar su ancho es llenar el alto de la franja. Sin esto, la palabra quedaba
+   flotando en medio con aire arriba y abajo, que es justo lo que no se quiere:
+   tiene que tocar los dos bordes. */
+const cajaBanner = ref(null)
+const palabraBanner = ref(null)
+useFitText(palabraBanner, cajaBanner, 1, 0)
+
+/* `1, 0` — LLENA EL ALTO Y SIN TOPE DE ANCHO, y el cero tiene precio.
+ *
+ * Lo pedido es que la palabra no deje hueco ni arriba ni abajo, así que el largo
+ * manda y no se le pone freno. Con la franja a un cuarto del ancho eso significa
+ * que a las marcas CORTAS la letra se les sale por los costados y la franja se la
+ * recorta: para que «NIKE» —cuatro letras— mida el alto entero hace falta un
+ * cuerpo cuya altura de mayúscula supera el ancho de la franja.
+ *
+ * Con marcas largas no pasa: «adidas» llena el alto con bastante menos cuerpo y
+ * entra de sobra. El recorte aparece y desaparece según la marca.
+ *
+ * Hubo aquí un trazo de .16em inventado para esquivar esto — alargaba la palabra
+ * sin engordar la letra. Se quitó: no se había pedido. Si el recorte molesta, las
+ * salidas son ensanchar la franja o dejar de pedir que toque los dos bordes. */
+const modelo = computed(() => {
+  const n = actual.value?.name ?? ''
+  const m = marca.value
+  return m && n.toLowerCase().startsWith(m.toLowerCase()) ? n.slice(m.length).trim() : n
+})
 
 function ir(paso) {
   if (!n.value || ficha.value) return
@@ -461,6 +563,10 @@ function arriba(e) {
 }
 
 function tecla(e) {
+  /* Escape cierra DE DENTRO HACIA FUERA: primero el panel de tallas y sólo
+     después la ficha. Al revés, una tecla cerraría dos capas de golpe y se
+     perdería la de arriba sin haberla visto cerrarse. */
+  if (e.key === 'Escape' && tallasAbiertas.value) { tallasAbiertas.value = false; e.preventDefault(); return }
   if (e.key === 'Escape' && ficha.value) { cerrar(); e.preventDefault(); return }
   if (ficha.value) return
   if (e.key === 'ArrowLeft') { ir(-1); e.preventDefault() }
@@ -678,121 +784,155 @@ watch(idx, () => nextTick(medirVuelo))
       </ol>
     </div>
 
-    <!-- ── LA FICHA: TALLAS Y COMPRAR ───────────────────────────────────
-         EN LA ESQUINA DE ABAJO A LA DERECHA, y el sitio es la mitad del
-         encargo. Debajo del zapato ya hay una columna —subtítulo y precio— y
-         apilar ahí las diez tallas y un botón habría empujado al zapato hacia
-         arriba y convertido el escaparate en un formulario. Pero al abrir la
-         ficha se apagan las flechas y se van los dos zapatos de los lados: ese
-         tercio derecho queda VACÍO. Ocuparlo no quita nada a nadie.
+    <!-- ── EL BANNER VERTICAL ────────────────────────────────────────────
+         Una franja del COLOR DEL ZAPATO con su marca escrita a lo largo, y la
+         compra al pie.
 
-         Así queda repartido, y cada cosa en una esquina distinta: regresar
-         arriba a la izquierda, el título al fondo, el zapato en el centro, el
-         nombre y el precio debajo, y la decisión —talla y compra— abajo a la
-         derecha. Es el mismo reparto por esquinas del acordeón, que es lo que
-         hace que las dos fichas del sitio se lean como la misma pieza.
+         El color sale de `surface`, el mismo plano con el que el acordeón
+         pinta ese producto: la ficha no inventa un color, usa el que el
+         catálogo ya le da. Y la palabra va en un tono del propio plano —no en
+         blanco— porque es fondo, no rótulo: se reconoce sin competir con el
+         nombre del modelo, que es el que sí hay que leer.
 
-         SIN ETIQUETA VISIBLE, que era lo pedido: sólo los botones. El grupo
-         lleva `aria-label` porque una fila de números sueltos sí necesita
-         decir qué es a quien no la ve.
+         Va FUERA de la ficha, como hermana suya, y no dentro: tiene que medirse
+         contra la SECCIÓN para llegar a sus bordes. Metida en la rejilla de la
+         ficha sólo llegaba hasta donde llegara su `inset`. La franja toca los
+         bordes; el TEXTO de dentro sigue respetando el hueco de la barra. -->
+    <aside class="rl__banner">
+      <!-- LA CAJA GIRADA. La palabra se escribe en horizontal dentro de una caja
+           que mide lo que el banner pero al revés —su ancho es el alto de la
+           franja— y la caja entera se gira un cuarto de vuelta. Así el ajuste de
+           texto mide un ANCHO, que es lo único que sabe medir, y el resultado
+           llena el ALTO de la franja.
 
-         Montado siempre y apagado en reposo, como el resto del gesto: así se va
-         animándose al cerrar en vez de desaparecer de golpe. -->
-    <!-- ══ LA FICHA ═══════════════════════════════════════════════════════
-         DOS COLUMNAS, 65 / 35.
-
-         Izquierda: el nombre y, debajo, el zapato dentro de un panel. Derecha:
-         precio, descripcion, tallas y las dos salidas.
-
-         EL FONDO LO HACE EL ZAPATO, no el titulo. Antes el nombre viajaba hasta
-         el centro y se desenfocaba detras; ahora el que se va al fondo es el
-         propio zapato —crece y se difumina— y el nombre se queda donde se lee.
-         Es la misma idea de profundidad con la pieza correcta: lo que se mira
-         en una ficha de producto es el producto, y lo que puede permitirse
-         estar fuera de foco es su copia grande.
-
-         Montada siempre y apagada en reposo, como el resto del gesto: asi se va
-         animando al cerrar en vez de desaparecer de golpe. -->
-    <div class="rl__ficha">
-      <!-- ── columna izquierda ─────────────────────────────────────────── -->
-      <div class="rl__fcol rl__fcol--l">
-        <h2 class="rl__ftitle">{{ actual?.name }}</h2>
-
-        <!-- EL PANEL. Vidrio `light` —velo blanco— y no un relleno solido: es la
-             unica pieza clara del sitio y aun asi sigue siendo el material de la
-             casa, no un rectangulo pintado. Dentro no hay texto, asi que el velo
-             claro no le quita contraste a nada.
-
-             La sombra va DEBAJO y muy abierta: es lo que lo despega del zapato
-             difuminado que tiene detras. Sin ella el panel y el fondo se leen
-             en el mismo plano. -->
-        <GlassSurface variant="light" class="rl__panel">
-          <img
-            :src="actual?.frames?.[0]?.src"
-            :alt="`${actual?.name} — ${actual?.line}`"
-            decoding="async"
-          >
-        </GlassSurface>
+           Con `writing-mode` la palabra también se pondría de canto, pero
+           entonces su medida de ancho sería el grosor de la letra y el ajuste no
+           tendría contra qué trabajar. -->
+      <div ref="cajaBanner" class="rl__bbox" aria-hidden="true">
+        <p ref="palabraBanner" class="rl__bword">{{ marca }}</p>
       </div>
 
-      <!-- ── columna derecha ───────────────────────────────────────────── -->
-      <div class="rl__fcol rl__fcol--r">
-        <p class="rl__fprice">{{ actual?.price }}</p>
-        <p v-if="actual?.blurb" class="rl__fblurb">{{ actual.blurb }}</p>
-
-        <!-- SIN ETIQUETA VISIBLE. El grupo lleva `aria-label` porque una fila de
-             numeros sueltos si necesita decir que es a quien no la ve. -->
-        <div
-          v-if="actual?.sizes?.length"
-          class="rl__tallas"
-          role="group"
-          aria-label="Selecciona tu talla, escala US"
+      <GlassSurface :radius="999" class="rl__comprar">
+        <!-- `aria-label` FIJO aunque la palabra se vea: en teléfono el rótulo se
+             esconde y el botón se queda en glifo, y un botón de compra que no se
+             anuncia es de los que no se pueden usar a ciegas. Escrito aquí y no
+             sólo en el CSS para que no dependa de la medida. -->
+        <button
+          type="button"
+          :tabindex="ficha ? 0 : -1"
+          aria-label="Comprar ahora"
+          @click="emit('buy', { id: actual?.id, size: talla })"
         >
-          <!-- Mismo tamano y misma esquina que las tallas del acordeon — 48 px
-               de alto y 22 de superelipse. Una talla es la misma casilla en las
-               dos fichas; si cada una tuviera su forma, el sistema tendria dos
-               maneras de decir lo mismo. -->
-          <GlassSurface
-            v-for="t in actual.sizes"
-            :key="t"
-            :radius="22"
-            tag="span"
-            class="rl__talla"
-          >
-            <button
-              type="button"
-              :tabindex="ficha ? 0 : -1"
-              :aria-pressed="t === talla"
-              @click="talla = t"
+          <ShoppingBag :stroke-width="1.8" />
+          <span class="rl__clabel">Comprar ahora</span>
+        </button>
+      </GlassSurface>
+    </aside>
+    <!-- ══ LA FICHA ════════════════════════════════════════
+         UNA COLUMNA DE LECTURA + EL ZAPATO + UN BANNER, en ese orden de
+         izquierda a derecha.
+
+         EL ZAPATO SE QUEDA NÍTIDO. Estuvo yéndose al fondo —creciendo a 1.55 y
+         desenfocado a 18 px— para hacer de plano sobre el que leer la ficha. Se
+         cambió: ahora sólo crece un poco. La transición se sigue notando —el
+         zapato da un paso adelante— pero lo que se mira en una ficha de producto
+         es EL PRODUCTO, y desenfocarlo era pedirle a la pieza principal que
+         hiciera de fondo. El fondo lo hace ahora el banner.
+
+         Cada cosa en una banda distinta y ninguna encima de otra: la lectura
+         entra por la columna izquierda, el zapato ocupa el centro y la decisión
+         —comprar— vive en el banner. Es el mismo reparto por zonas del acordeón,
+         que es lo que hace que las dos fichas del sitio se lean como la misma
+         pieza.
+
+         Montada siempre y apagada en reposo, como el resto del gesto: así se va
+         animando al cerrar en vez de desaparecer de golpe. -->
+    <div class="rl__ficha">
+      <!-- ── EL CUERPO: CUATRO BANDAS ──────────────────────────────────────
+           Regresar arriba · marca, precio y talla debajo · el hueco donde vive
+           el zapato · el nombre y la descripción al fondo.
+
+           Todo pegado al MARGEN IZQUIERDO, en una sola vertical. El zapato
+           ocupa el centro y el banner la derecha, así que la lectura entra por
+           una columna y no se cruza con la foto en ningún punto. -->
+      <div class="rl__fmain">
+        <div ref="cajaMarca" class="rl__fdatos">
+          <!-- LA MARCA, y a este cuerpo es la mancha de la ficha. Es el dato
+               que se reconoce de lejos; el modelo se lee después, abajo. -->
+          <p ref="palabraMarca" class="rl__fbrand">{{ marca }}</p>
+          <p class="rl__fprice">{{ actual?.price }}</p>
+
+          <!-- ── LA TALLA, EN DOS TIEMPOS ───────────────────────────────
+               El rótulo cambia con el estado: pide antes de elegir e informa
+               después. Ver `elegirTalla` en el script. -->
+          <div v-if="actual?.sizes?.length" class="rl__tsel">
+            <p class="rl__trot">{{ rotuloTalla }}</p>
+
+            <GlassSurface :radius="999" tag="div" class="rl__tbtn">
+              <button
+                type="button"
+                :tabindex="ficha ? 0 : -1"
+                :aria-expanded="tallasAbiertas"
+                aria-controls="rl-tallas"
+                @click="tallasAbiertas = !tallasAbiertas"
+              >
+                <span class="rl__tval">{{ talla ?? '—' }}</span>
+                <ChevronDown class="rl__tchev" :stroke-width="2" />
+              </button>
+            </GlassSurface>
+
+            <!-- `v-show` Y NO `v-if`, y es la regla R5 del paquete: con `v-if`
+                 el panel se monta y se destruye en cada apertura, su `<filter>`
+                 SVG se crea y se borra cada vez y el navegador no llega a
+                 resolver la referencia del `backdrop-filter`. El menú de la
+                 barra estuvo sin deformación durante días exactamente por esto. -->
+            <GlassSurface
+              v-show="tallasAbiertas"
+              id="rl-tallas"
+              tag="div"
+              class="rl__tpanel"
+              role="group"
+              aria-label="Tallas disponibles, escala US"
             >
-              <span v-if="t === talla" class="av-glass-sel" aria-hidden="true" />
-              {{ t }}
-            </button>
-          </GlassSurface>
+              <GlassSurface
+                v-for="t in actual.sizes"
+                :key="t"
+                :radius="22"
+                tag="span"
+                class="rl__talla"
+              >
+                <button
+                  type="button"
+                  :tabindex="tallasAbiertas ? 0 : -1"
+                  :aria-pressed="t === talla"
+                  @click="elegirTalla(t)"
+                >
+                  <span v-if="t === talla" class="av-glass-sel" aria-hidden="true" />
+                  {{ t }}
+                </button>
+              </GlassSurface>
+            </GlassSurface>
+          </div>
         </div>
 
-        <!-- LAS DOS SALIDAS, en una fila y en los extremos: volver a la
-             izquierda y comprar a la derecha. Mismas medidas que todas las
-             acciones del sitio — ver `--av-action-*`. -->
-        <div class="rl__facciones">
+        <div class="rl__fpie">
+          <h2 class="rl__ftitle">{{ modelo }}</h2>
+          <p v-if="actual?.blurb" class="rl__fblurb">{{ actual.blurb }}</p>
+
+          <!-- REGRESAR VA AQUÍ, al pie de la columna, y no arriba del todo: así
+               queda a la misma altura que «Comprar ahora», que vive al pie de la
+               franja. Las dos salidas de la ficha —irse o comprar— comparten
+               línea aunque estén en extremos opuestos, y eso es lo que las hace
+               leerse como pareja. Arriba, «Regresar» quedaba suelto. -->
           <GlassSurface :radius="999" class="rl__back">
             <button type="button" :tabindex="ficha ? 0 : -1" @click="cerrar">
               <ArrowLeft :stroke-width="1.8" />
               Regresar
             </button>
           </GlassSurface>
-
-          <GlassSurface :radius="999" class="rl__comprar">
-            <button
-              type="button"
-              :tabindex="ficha ? 0 : -1"
-              @click="emit('buy', { id: actual?.id, size: talla })"
-            >
-              <ShoppingBag :stroke-width="1.8" /> Comprar ahora
-            </button>
-          </GlassSurface>
         </div>
       </div>
+
     </div>
   </section>
 </template>
@@ -834,6 +974,32 @@ watch(idx, () => nextTick(medirVuelo))
      Abajo, `--rl-suelo`: los 70 px donde se posa la barra del NAVEGADOR en
      teléfono. Nada que haya que leer o tocar entra en esas dos franjas. */
   --rl-suelo: 70px;
+
+  /* EL ANCHO DEL BANNER de la ficha. Bastante para que la palabra vertical se
+     lea y poco para que siga siendo una franja y no una columna.
+
+     Vive AQUÍ y no en `.rl__ficha` aunque sólo la ficha lo pinte: el escenario
+     también lo necesita —lo resta de su `inset` para que el zapato se centre en
+     el hueco que la franja deja— y el escenario es HERMANO de la ficha, no su
+     hijo. Declarado abajo no lo vería. */
+  /* ══ LAS TRES COLUMNAS DE LA FICHA: 25 / 50 / 25 ═══════════════════════
+     Lectura · zapato · banner. Un solo número las gobierna: lo que mide una
+     lateral. La del medio es lo que queda, y no hace falta escribirla.
+
+     El 100% es la caja de relleno de la sección, así que hay que descontarle los
+     dos márgenes ANTES de repartir — si no, las laterales salen más anchas de la
+     cuenta y la del medio se come el reparto.
+
+     LAS DOS LATERALES LLEVAN EL MISMO MARGEN. El banner estuvo pegado al borde
+     derecho mientras la columna de lectura respetaba el suyo, y una pieza con
+     margen en un lado y a sangre en el otro se lee torcida aunque cada mitad esté
+     bien. */
+  --rl-col-info:   calc((100% - 2 * var(--av-gutter)) * .25);
+  --rl-col-banner: calc((100% - 2 * var(--av-gutter)) * .25);
+
+  /* Cuánto crece el zapato al abrirse la ficha. Ver la nota de
+     `.rl.is-ficha .rl__item.is-focus`. */
+  --rl-ficha-scale: 1.75;
   padding:
     var(--av-nav-space, 87px)
     var(--av-gutter)
@@ -1109,24 +1275,38 @@ watch(idx, () => nextTick(medirVuelo))
 
    Apagado y sin eventos en reposo, como el resto del gesto. Sube 10 px al
    entrar: lo justo para que se lea como que llega, no como que se enciende. */
-/* DOS COLUMNAS, 65 / 35. Ocupa la sección entera por dentro del relleno —los
-   mismos números que el resto de la pieza, no unos nuevos— y se pone por encima
-   del escenario, que en ficha ya sólo es el fondo difuminado.
+/* ══ LA FICHA ═══════════════════════════════════════════════════════════
+   Columna de lectura + banner. El zapato no está en la rejilla: vive en
+   `.rl__stage`, detrás, y ocupa el hueco que la columna le deja libre.
 
-   `align-items: center` en las dos: la columna de la derecha es más corta que
-   la de la izquierda y alineada arriba se quedaba flotando en el aire. */
+   El `inset` es el de siempre —el hueco de la barra arriba y el suelo del rollo
+   abajo— y no unos números nuevos.
+
+   Apagada y sin eventos en reposo, como el resto del gesto. Sube 10 px al
+   entrar: lo justo para que se lea como que llega, no como que se enciende. */
 .rl__ficha {
+  /* El ancho del banner. Bastante para que la palabra vertical se lea y poco
+     para que siga siendo una franja y no una columna. */
   position: absolute;
   z-index: 4;
-  inset:
-    var(--av-nav-space, 87px)
-    var(--av-gutter)
-    calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
+  /* Ocupa SÓLO la primera columna. Antes se estiraba de margen a margen y dejaba
+     hueco a la derecha con un `padding-right`; ahora su caja ES la columna, que
+     es lo que hace que el reparto 25/50/25 sea una sola cuenta y no tres. */
+  top: var(--av-nav-space, 87px);
+  bottom: calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
+  left: var(--av-gutter);
+  width: var(--rl-col-info);
 
+  /* UNA SOLA COLUMNA y un hueco reservado a la derecha. El banner ya no vive
+     aquí dentro —es hermano de la ficha— porque tiene que medirse contra la
+     SECCIÓN para sangrar hasta sus bordes; metido en la rejilla sólo llegaba
+     hasta donde llegara el `inset`, y salirse a base de márgenes negativos
+     obligaba a adivinar el relleno de `.rl`. Con `padding-right` la columna de
+     lectura sigue sin meterse debajo de la franja y no hay ningún número que
+     tenga que cuadrar con otro. */
   display: grid;
-  grid-template-columns: 65fr 35fr;
-  align-items: center;
-  gap: clamp(20px, 4vw, 64px);
+  grid-template-columns: minmax(0, 1fr);
+
 
   opacity: 0;
   transform: translateY(10px);
@@ -1134,23 +1314,180 @@ watch(idx, () => nextTick(medirVuelo))
   transition: opacity var(--rl-flow), transform var(--rl-flow);
 }
 
-.rl__fcol { display: flex; flex-direction: column; min-width: 0; }
+/* CUATRO BANDAS: volver · datos · el hueco del zapato · el nombre.
+   La tercera es un `1fr` VACÍO a propósito: es el sitio que la columna le cede
+   al zapato. Sin ella, los datos y el nombre se juntarían en el centro y la
+   foto quedaría detrás del texto. */
+/* DOS BANDAS: datos arriba · el pie abajo. La tercera es `1fr` y el pie se pega a
+   su final con `align-self: end`, así que el hueco que sobra queda EN MEDIO —
+   que es el sitio que la columna le cede al zapato.
 
-/* ── columna izquierda: nombre y panel ──────────────────────────────────── */
-.rl__fcol--l { gap: clamp(12px, 2vh, 26px); min-height: 0; }
+   Estuvo declarada con cuatro (`auto auto 1fr auto`) pensando en una banda vacía
+   de separación, y era un error de bulto: sólo hay tres hijos, así que el pie
+   caía en la banda `1fr` y la cuarta se quedaba a cero. Con `align-items: center`
+   encima —que le llegaba desde la media query de teléfono— el resultado era la
+   columna entera flotando en mitad de la ficha.
 
-/* El nombre. Grande pero NO gigante: el que llenaba el ancho era el que se iba
-   al fondo, y ese papel lo hace ahora el zapato. Aquí es un título que se lee,
-   así que manda la legibilidad y no la mancha. */
-/* SIEMPRE BLANCO. El resto del rollo tine la tinta con el `word` del colorway
-   —un tono del propio zapato— y para un titulo eso lo apaga: cambia de color
-   con cada producto y en los tonos oscuros deja de leerse. El nombre es la
-   pieza que siempre tiene que estar arriba del todo en contraste, asi que no
-   depende del zapato que toque. */
-.rl__ftitle {
-  color: var(--av-on-glass-strong);
+   `justify-items: start` encoge cada banda a su contenido, que es lo que se
+   quiere para el botón de volver y para el disparador de la talla: un botón
+   estirado a mil píxeles no es un botón. El pie se escapa de esa regla con su
+   propio `justify-self` — con `start` la descripción se plegaba a 281 px. */
+.rl__fmain {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  justify-items: start;
+  gap: clamp(10px, 1.6vh, 20px);
+  min-width: 0;
+}
+
+/* ANCHO COMPLETO DE LA COLUMNA, y no es cosmético: esta caja es contra la que se
+   mide la marca para ajustar su cuerpo. Con `justify-items: start` en el padre se
+   encogía a su contenido —114 px— y el ajuste se medía contra sí mismo: la
+   palabra salía del tamaño que ya tenía, que es una regla de tres que no
+   converge. */
+.rl__fdatos {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vh, 12px);
+  min-width: 0;
+}
+
+/* LA MARCA. Es la mancha de la ficha — el dato que se reconoce de lejos, antes
+   de leer nada. Por eso va al cuerpo más grande de la pieza y en versal.
+
+   SIEMPRE BLANCA (o negra sobre claro): el resto del rollo tinta con el `word`
+   del colorway —un tono del propio zapato— y para un título eso lo apaga,
+   porque cambia con cada producto y en los tonos oscuros deja de leerse. */
+.rl__fbrand {
   margin: 0;
-  font-size: clamp(28px, 3.6vw, 54px);
+  /* ABRAZA SU TEXTO, no la columna. `useFitText` mide `scrollWidth` para saber
+     cuánto ocupa la palabra, y en un bloque estirado eso devuelve el ancho de la
+     CAJA —327— en vez del de la tinta: la regla de tres salía 1 y el cuerpo no
+     se movía del valor semilla. Encogido, `scrollWidth` vuelve a ser la palabra.
+     El destino de la medida sigue siendo la columna, que es `.rl__fdatos`. */
+  align-self: flex-start;
+  /* SEMILLA. El cuerpo de verdad lo pone `useFitText` midiendo contra el ancho de
+     la columna — ver `palabraMarca` en el script. Un `clamp` en vw dejaba «Nike»
+     ocupando un tercio de la columna y «adidas» la mitad: el mismo número da
+     manchas distintas según cuántas letras tenga la palabra. */
+  font-size: 80px;
+  font-weight: 800;
+  letter-spacing: var(--av-track-display);
+  line-height: .88;
+  text-transform: uppercase;
+  color: var(--rl-ink);
+}
+
+.rl__fprice {
+  margin: 0;
+  font-size: clamp(26px, 2.9vw, 42px);
+  font-weight: 700;
+  letter-spacing: var(--av-track);
+  line-height: 1;
+  /* EL PRECIO SÍ LLEVA COLOR, y es el único dato de la columna que lo lleva: el
+     acento del propio zapato. Es lo que hace que se despegue del bloque sin
+     necesitar más cuerpo ni más peso. */
+  color: var(--rl-accent, var(--rl-ink));
+}
+
+/* ══ LA TALLA ══════════════════════════════════════════════════════════
+   `relative` porque el panel se ancla a ESTA caja y no a la ficha: así sube
+   pegado al disparador aunque la columna cambie de alto. */
+.rl__tsel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: clamp(6px, 1.4vh, 16px);
+}
+
+/* El rótulo. Cuerpo de interfaz y no de display: es una etiqueta, no un
+   título. Cambia de texto con el estado — ver `rotuloTalla` en el script. */
+.rl__trot {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--rl-ink-soft);
+}
+
+/* EL DISPARADOR. Mismo alto que cualquier acción del sitio —`--av-action-h`—
+   pero SIN `min-width`: aquí lo que se enseña es un número corto y una flecha,
+   y estirarlo a los 164 de una acción dejaría un hueco vacío en medio. El alto
+   sí se respeta, que es lo que hace que se lea como parte del mismo juego. */
+.rl__tbtn { height: var(--av-action-h); }
+.rl__tbtn :deep(.av-glass__body) { height: 100%; }
+.rl__tbtn button {
+  display: flex;
+  align-items: center;
+  gap: var(--av-action-gap);
+  height: 100%;
+  padding: 0 var(--av-action-px);
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--av-action-fs);
+  font-weight: 600;
+  letter-spacing: var(--av-track);
+  color: var(--av-on-glass-strong);
+  cursor: pointer;
+}
+.rl__tval {
+  font-variant-numeric: tabular-nums;
+  min-width: 2.4ch;
+  text-align: center;
+}
+
+/* LA FLECHA APUNTA ARRIBA porque el panel sube. No es decoración: es la promesa
+   de dónde va a aparecer. Gira al abrirse para decir que ya está abierto. */
+.rl__tchev {
+  width: var(--av-action-ico);
+  height: var(--av-action-ico);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1);
+}
+.rl__tbtn button[aria-expanded="true"] .rl__tchev { transform: rotate(180deg); }
+
+/* EL PANEL BAJA, y la flecha del disparador dice exactamente eso. Cae en el hueco
+   que hay entre la talla y la descripción, que estaba vacío. */
+.rl__tpanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 2;
+  padding: 10px;
+}
+.rl__tpanel :deep(.av-glass__body) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* DOS por fila: 2×56 + 8 = 120. Y no cinco.
+     Cinco columnas dan dos filas anchas y chatas que se comen el ancho entero de
+     la columna de lectura —que ahora es un cuarto de la pieza, no la mitad— y
+     dejan sin usar el hueco vertical. Dos dan cinco filas estrechas que caben
+     justo en ese hueco. La forma del panel la manda el SITIO que tiene, no la
+     cuenta de tallas. */
+  width: 120px;
+}
+
+/* ══ EL PIE DE LA COLUMNA ══════════════════════════════════════════════ */
+.rl__fpie {
+  align-self: end;
+  justify-self: stretch;
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.2vh, 14px);
+  min-width: 0;
+}
+
+/* EL MODELO, sin la marca delante: ésa ya está arriba a triple cuerpo, así que
+   aquí se lee «Dunk Low» y no «Nike Dunk Low». Ver `modelo` en el script. */
+.rl__ftitle {
+  margin: 0;
+  font-size: clamp(24px, 2.7vw, 40px);
   font-weight: 800;
   letter-spacing: var(--av-track-display);
   line-height: .95;
@@ -1158,89 +1495,128 @@ watch(idx, () => nextTick(medirVuelo))
   color: var(--rl-ink);
 }
 
-/* EL PANEL. Se lleva todo el alto que quede y la foto se ajusta dentro con
-   `contain`: así el panel no cambia de forma según el recorte del zapato.
-
-   La sombra va DEBAJO y muy abierta —0 34px 60px con desplazamiento hacia
-   abajo— porque es lo que lo despega del zapato difuminado que tiene detrás.
-   Sin ella los dos se leen en el mismo plano. */
-.rl__panel {
-  flex: 1;
-  min-height: 0;
-  box-shadow: 0 34px 60px -24px rgba(0, 0, 0, .75);
-}
-.rl__panel :deep(.av-glass__body) {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  padding: clamp(14px, 2.2vw, 34px);
-}
-.rl__panel img {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-/* ── columna derecha: precio, descripción, tallas y salidas ─────────────── */
-/* TODO A LA DERECHA. Precio, descripción, tallas y botones acaban en la misma
-   vertical —el margen derecho de la sección— y esa línea compartida es lo que
-   hace que la columna se lea como un bloque y no como cuatro cosas apiladas.
-   Con el contenido alineado a la izquierda, cada pieza terminaba donde le
-   tocaba por su largo y el borde derecho quedaba dentado. */
-.rl__fcol--r {
-  gap: clamp(12px, 2vh, 22px);
-  align-items: flex-end;
-  text-align: right;
-}
-
-.rl__fprice {
-  margin: 0;
-  font-size: clamp(24px, 2.6vw, 38px);
-  font-weight: 700;
-  letter-spacing: var(--av-track);
-  line-height: 1;
-  color: var(--rl-ink);
-}
-
 .rl__fblurb {
   margin: 0;
-  max-width: 42ch;
-  font-size: 13.5px;
+  /* SIN `max-width`. La medida de lectura la pone ya la columna —un cuarto de la
+     pieza— y un tope encima la estrechaba todavía más. */
+  font-size: 14.5px;
   font-weight: 500;
   line-height: 1.55;
   letter-spacing: var(--av-track);
   color: var(--rl-ink-soft);
 }
 
-/* Las dos salidas, una en cada extremo de su fila: volver a la izquierda y
-   comprar a la derecha. */
-/* LOS DOS BOTONES JUNTOS Y PEGADOS AL MARGEN, sin hueco entre ellos. Estuvieron
-   uno en cada extremo de la fila y con la columna ya justificada a la derecha
-   eso rompía la vertical: «Regresar» se quedaba solo a la izquierda, fuera de
-   la línea que comparten el precio, la descripción y las tallas.
+/* ══ EL BANNER ═════════════════════════════════════════════════════════
+   SANGRA HASTA LOS BORDES DE LA SECCIÓN. Es la diferencia entre una franja y una
+   tarjeta alta: una franja toca los bordes.
 
-   Sin separación porque son la misma decisión en dos mitades —salir o comprar—
-   y pegados se leen como un control de dos partes; con hueco se leen como dos
-   botones sueltos que casualmente están cerca. */
-.rl__facciones {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0;
+   Y se sale POR ABSOLUTO CON EXCESO —200 px de más por arriba y por abajo— en
+   vez de con márgenes negativos que deshagan el `inset`. Se probó lo segundo y
+   se quedaba corto: el `inset` de la ficha se resuelve contra la caja de relleno
+   de la sección, así que deshacerlo deja fuera el propio relleno de `.rl` y la
+   franja arrancaba 10 px por debajo del borde. Con exceso no hace falta saber
+   cuánto relleno hay: sobra por los dos lados y el `overflow: hidden` de la
+   sección lo recorta exactamente donde toca.
+
+   La columna del banner NO desaparece de la rejilla al sacarlo del flujo: es una
+   pista de ancho fijo, así que sigue reservando su hueco y la columna de lectura
+   no se mete debajo.
+
+   El color sale de `surface`, el mismo plano con el que el acordeón pinta ese
+   producto: la ficha no inventa un color, usa el que el catálogo ya da. */
+.rl__banner {
+  position: absolute;
+  /* Pegado arriba y abajo, CON MARGEN a la derecha — el mismo `--av-gutter` que
+     respeta la columna de lectura por su lado. Estuvo con `right: 0` y la pieza
+     quedaba a sangre por un lado y con margen por el otro. */
+  top: 0;
+  bottom: 0;
+  right: var(--av-gutter);
+  width: var(--rl-col-banner);
+
+  /* Contenedor de consulta POR TAMAÑO, y no es decoración: es lo que le permite
+     a la caja girada de dentro medirse con `cqh`/`cqw`, o sea intercambiar el
+     alto y el ancho de la franja. Sin esto no hay forma de decirle a una caja
+     «mide lo que mi alto» en CSS puro. */
+  container-type: size;
+  /* Por encima de la ficha: la compra vive aquí y tiene que recibir los clics. */
+  z-index: 5;
+  background: var(--rl-banner);
+  overflow: hidden;
+
+  /* Aparece y se va CON la ficha, con el mismo tiempo que todo lo demás del
+     gesto. Montado siempre y apagado en reposo, como el resto de la pieza. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rl-flow);
+}
+.rl.is-ficha .rl__banner {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.rl__tallas {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  /* CINCO por fila: 5×56 + 4×8 = 312. El mismo reparto que el acordeón, y por
-     el mismo motivo — con diez tallas, seis por fila deja una segunda fila de
-     cuatro y la rejilla queda coja. */
-  max-width: 312px;
+/* LA PALABRA, A LO LARGO. `writing-mode` y no un `rotate`: el modo de escritura
+   gira el TEXTO y deja que la caja siga siendo una caja normal, así que el
+   centrado y el recorte funcionan solos. Con `transform` habría que recolocarla
+   a mano cada vez que cambiara el alto.
+
+   `sideways-lr` la deja legible de abajo a arriba, que es como se leen los lomos
+   de los libros.
+
+   EN UN TONO DEL PROPIO PLANO y no en blanco: es FONDO, no rótulo. Se reconoce
+   sin competir con el nombre del modelo, que es el que sí hay que leer. */
+/* El TEXTO no sangra: la franja se sale por los cuatro costados pero la palabra
+   se centra en el hueco ÚTIL, el mismo que respeta la columna de lectura. Sin
+   esto quedaba centrada contra una caja 400 px más alta que la sección y se
+   leía descolgada hacia abajo. */
+/* LA CAJA GIRADA. Mide lo que el banner pero con los ejes cambiados —su ancho es
+   el alto de la franja— y se gira un cuarto de vuelta sobre su centro. Dos cosas
+   salen de aquí:
+
+     · el ajuste de texto puede trabajar, porque mide un ANCHO y ese ancho es el
+       alto de la franja;
+     · la palabra queda en horizontal en su propia caja, así que `line-height`,
+       centrado y recorte se comportan como en cualquier otro sitio.
+
+   `-90deg` la deja legible de abajo a arriba, como el lomo de un libro. */
+.rl__bbox {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100cqh;
+  height: 100cqw;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* LA PALABRA TOCA LOS DOS BORDES de la franja, arriba y abajo, y por eso no lleva
+   ningún hueco reservado: es FONDO, no rótulo, y un fondo que respeta márgenes
+   deja de leerse como fondo. El cuerpo lo pone `useFitText` midiendo contra la
+   caja de arriba — el `font-size` de aquí es sólo la semilla desde la que mide.
+
+   EN UN TONO DEL PROPIO PLANO y no en blanco: tiene que reconocerse sin competir
+   con el nombre del modelo, que es el que sí hay que leer. */
+.rl__bword {
+  margin: 0;
+  font-size: 100px;
+  font-weight: 800;
+  /* El trazo de display de la casa, el mismo que cualquier otro titular. */
+  letter-spacing: var(--av-track-display);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--rl-bword);
+}
+
+/* LA COMPRA, AL PIE DEL BANNER. `absolute` para que el centrado de la palabra no
+   la mueva, y separada del borde por el mismo suelo que usa el rollo. */
+.rl__banner > .rl__comprar {
+  position: absolute;
+  bottom: calc(var(--rl-suelo) + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* CAJA FIJA: un «9» y un «10.5» miden distinto y la rejilla saldría descuadrada.
@@ -1255,6 +1631,16 @@ watch(idx, () => nextTick(medirVuelo))
   width: 56px;
   height: 48px;
   flex: none;
+}
+/* EL CUERPO DEL VIDRIO TIENE QUE LLENAR LA CASILLA. Es la única capa del material
+   que va en flujo —`__back`, `__veil` y `__spec` son absolutas— así que sin esto
+   se encoge al tamaño de su contenido: el botón medía lo que el número, se
+   apoyaba arriba a la izquierda y el número salía corrido dentro de la casilla en
+   vez de centrado. El `width/height: 100%` del botón se medía contra una caja que
+   se estaba midiendo a sí misma. */
+.rl__talla :deep(.av-glass__body) {
+  width: 100%;
+  height: 100%;
 }
 .rl__talla button {
   position: relative;
@@ -1622,34 +2008,45 @@ watch(idx, () => nextTick(medirVuelo))
   pointer-events: none;
 }
 
-/* EL ZAPATO SE VA AL FONDO. Crece y se difumina: pasa de ser el objeto que se
-   mira a ser el plano sobre el que se lee la ficha. Es el papel que antes hacía
-   el título, y cambiarlo de pieza es todo el rediseño — en una ficha de
-   producto, lo que puede permitirse estar fuera de foco es la copia grande del
-   producto, no su nombre.
-
-   El desenfoque es el mismo `--rl-title-blur` que usaba el título: es el número
-   que ya estaba calibrado para «esto está detrás». */
-/* EL ZAPATO DE FONDO: centrado en la SECCION y lo mas grande que cabe sin que
-   el desenfoque se salga.
-
-   Centrado en los dos ejes — el escenario pasa a `absolute; inset: 0`, que se
-   resuelve contra la caja de relleno ENTERA, asi que su centro es el de la
-   seccion y no el del hueco que dejan la cabecera y el pie.
-
-   El tamano lo pone el lado corto, el alto. La caja del zapato ya girada mide
-   unos 440 px a 1440x900 y el desenfoque anade su radio por los cuatro
-   costados; 1.55 es donde la suma toca el borde sin pasarse. Mas grande y el
-   halo se corta contra el `overflow: hidden` de la seccion, y un desenfoque
-   cortado en recto deja de leerse como profundidad. */
+/* ══ EL ZAPATO EN LA FICHA ═════════════════════════════════════════════
+ *
+ * SE QUEDA NÍTIDO Y SÓLO CRECE UN POCO. Esto es un cambio de criterio y merece
+ * quedar escrito, porque antes hacía justo lo contrario.
+ *
+ * Estuvo yéndose al fondo: `scale(1.55)`, desenfoque de 18 px y opacidad .34,
+ * para pasar de objeto que se mira a plano sobre el que se lee la ficha —el
+ * papel que antes hacía el título—. La idea de profundidad era buena y la pieza
+ * elegida, no: **en una ficha de producto lo que se mira es el producto**, y
+ * desenfocarlo es pedirle a la pieza principal que haga de fondo. El fondo lo
+ * hace ahora el banner, que para eso es una franja de color.
+ *
+ * 1.75, que es lo que llena la columna del medio. El zapato en reposo mide
+ * `min(25vw, 46vh, 440px)` —316 px a 1265 de ancho— y la columna central son 568:
+ * la regla de tres da 1.79 y se deja en 1.75 para que quede aire a los lados.
+ *
+ * Estuvo en 1.08 y se quedaba corto: la referencia es el detalle del acordeón,
+ * donde el zapato ocupa el alto ENTERO del panel (medido: 1.09 veces su alto). A
+ * 1.08 el paso adelante se notaba pero el zapato seguía siendo pequeño para una
+ * ficha a pantalla completa.
+ *
+ * EL ESCENARIO NO SE TOCA: `inset: 0`, el mismo que en reposo, y ahí está la
+ * gracia. Con las columnas repartidas 25/50/25 y el MISMO margen a los dos lados,
+ * el centro de la columna del medio es el centro de la sección — así que centrar
+ * en la sección ya es centrar en su columna, sin restarle nada a nadie.
+ *
+ * Estuvo restándole el ancho del banner y por eso el zapato aparecía corrido a la
+ * izquierda: se centraba en el hueco que quedaba, no en su columna. El desajuste
+ * era justo medio banner.
+ *
+ * Y NO CAMBIA DE SITIO AL ABRIR LA FICHA, que es lo que hace que la transición se
+ * lea limpia: mismo centro que en el carrusel, sólo que más grande. */
 .rl.is-ficha .rl__stage {
   position: absolute;
   inset: 0;
 }
 .rl.is-ficha .rl__item.is-focus {
-  transform: rotate(var(--rl-tilt)) scale(1.55);
-  filter: blur(calc(var(--rl-title-blur) * 2.6));
-  opacity: .34;
+  transform: rotate(var(--rl-tilt)) scale(var(--rl-ficha-scale));
+  filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .58));
   pointer-events: none;
 }
 
@@ -1697,22 +2094,78 @@ watch(idx, () => nextTick(medirVuelo))
    cinco columnas que repartir, y `42%` es lo que a este ancho hace que se lean
    como profundidad y no como tres fotos. */
 @media (max-width: 900px) {
-  /* UNA COLUMNA. El 65/35 pide dos bloques de lectura uno al lado del otro y a
-     375 px ninguno de los dos llega a ancho de lectura. Apilados, el orden es
-     el mismo que se lee de arriba abajo en escritorio: nombre, zapato, precio,
-     descripcion, tallas y las dos salidas. */
-  .rl__ficha {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: center;
-    gap: clamp(14px, 2.4vh, 24px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+  /* ══ EL REPARTO CAMBIA: AQUÍ NO HAY 25/50/25 ═══════════════════════════
+     Un cuarto de 390 px son 90, y en 90 px no cabe una columna de lectura: la
+     marca, el precio y la descripción se salen todos. El reparto de tres
+     columnas iguales es de escritorio.
+
+     En teléfono manda otra regla: **la franja se queda con lo justo para su
+     palabra y la lectura se lleva el resto**. El zapato sigue en medio de lo que
+     queda —ver el `inset` del escenario más abajo—, así que las tres zonas
+     siguen existiendo; lo que cambia es el reparto, no la idea.
+
+     La franja no se puede quitar: la compra vive ahí, y es la única acción que
+     esta ficha tiene que ofrecer siempre. */
+  .rl {
+    --rl-col-banner: clamp(64px, 22vw, 96px);
+    --rl-col-info: calc(100% - 2 * var(--av-gutter) - var(--rl-col-banner) - 14px);
   }
-  .rl__panel { flex: none; max-height: 40svh; }
-  .rl__tallas { max-width: none; }
-  /* Las dos salidas siguen una en cada extremo, que es lo que las hace pareja
-     tambien aqui. */
-  .rl__facciones { --av-action-w: 130px; }
+
+  /* Y EL ZAPATO SE CENTRA EN LO QUE QUEDA, no en la sección. En escritorio las
+     dos laterales miden lo mismo, así que el centro de la sección ES el centro de
+     la columna del medio y no hay que restar nada. Aquí no: la franja y la
+     lectura miden distinto, y centrar en la sección dejaría el zapato metido
+     debajo del banner. */
+  .rl.is-ficha .rl__stage { inset: 0 var(--rl-col-banner) 0 0; }
+
+  /* EL BANNER, AL FONDO. En escritorio va por encima porque el zapato se queda
+     en su columna y no llega a tocarlo; aquí el zapato es mucho más grande en
+     proporción y se le monta encima, y una franja de color por delante del
+     producto lo tapa. Detrás hace de fondo, que es su papel.
+
+     La compra sigue recibiendo clics: el zapato es una imagen con
+     `pointer-events: none`, así que lo que se le ponga encima no intercepta
+     nada. */
+  .rl__banner { z-index: 0; }
+
+  /* LA PALABRA DEJA DE AJUSTARSE Y VUELVE A UN CUERPO FIJO, y es la única medida
+     donde pasa. En escritorio la franja son 327 px y llenar el alto le cuesta a
+     la letra que se le corte un 14% por cada lado, que se lee como un encuadre.
+     Aquí la franja son 86: el mismo criterio deja fuera el 80% de la letra y lo
+     que queda no es una palabra, es una raya.
+
+     Las dos cosas que se piden —tocar arriba y abajo, y que la letra se lea— no
+     caben juntas en 86 px con una marca de cuatro letras. A este ancho gana la
+     legibilidad. El `!important` es para pisar el cuerpo que `useFitText` escribe
+     en línea, que es la única forma de anularlo desde CSS. */
+  .rl__bword { font-size: clamp(44px, 29vw, 116px) !important; }
+
+  /* Y EL ZAPATO SE MODERA. A 1.75 medía 462 px de ancho contra los 304 que deja
+     la franja: se salía por los dos lados y lo recortaba la sección. 1.15 lo deja
+     dentro. La escala de escritorio no vale aquí porque la referencia tampoco es
+     la misma — allí llena una columna del 50%, aquí llena lo que queda. */
+  .rl { --rl-ficha-scale: 1.15; }
+
+  /* LA COMPRA SE QUEDA EN GLIFO. 164 px de acción no caben en una franja de 96,
+     y estirar la franja hasta que quepan se comería un cuarto de la pantalla.
+
+     Se va la PALABRA y se queda el ALTO —44 px, el de cualquier acción del
+     sitio— que es lo que la mantiene dentro del mismo juego. El botón sigue
+     anunciándose entero: lleva `aria-label`, así que para un lector no cambia
+     nada. Ver la plantilla. */
+  .rl__banner > .rl__comprar { --av-action-w: 0px; min-width: 0; }
+  .rl__comprar button { padding: 0; width: var(--av-action-h); justify-content: center; }
+  .rl__clabel { display: none; }
+
+  /* EL PANEL MANTIENE SUS 312 y no se estrecha, aunque parezca que a 390 px
+     debería. El motivo es el ALTO, no el ancho: estrechado a 250 caben cuatro
+     tallas por fila, y diez tallas en filas de cuatro son TRES filas —180 px—
+     que suben por encima del hueco de la barra y se meten debajo de ella.
+     Con 312 caben cinco por fila, o sea dos filas y 124 px, y el panel entra
+     entero entre el disparador y la barra.
+
+     312 caben de sobra: 390 menos los 16 de cada margen deja 358. */
+  .rl__tpanel :deep(.av-glass__body) { width: min(312px, calc(100vw - 32px)); }
 
   .rl {
     --rl-side-scale: 0.42;
@@ -1792,12 +2245,15 @@ watch(idx, () => nextTick(medirVuelo))
      misma propiedad obligaría a repetir la cadena entera en los dos estados
      para que el navegador pudiera interpolar. Con los dos bordes anclados, el
      centrado lo hace el `align-items` y el `transform` queda libre. */
+  /* SIN `align-items: center`. Lo llevaba, y con la ficha convertida en una
+     rejilla de una sola columna eso impedía que `.rl__fmain` se estirase: la
+     columna medía lo que su contenido y quedaba flotando en mitad de la pantalla
+     en vez de repartirse entre el borde de arriba y el de abajo. El centrado que
+     aquel comentario buscaba lo hace ahora el reparto de bandas. */
   .rl__ficha {
     left: clamp(16px, 4vw, 64px);
     right: clamp(16px, 4vw, 64px);
-    align-items: center;
   }
-  .rl__tallas { justify-content: center; margin-inline: auto; }
 }
 
 /* ── accesibilidad ────────────────────────────────────────────────────────
