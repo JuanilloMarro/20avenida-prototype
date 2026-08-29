@@ -988,13 +988,44 @@ watch(idx, () => nextTick(medirVuelo))
                queda a la misma altura que «Comprar ahora», que vive al pie de la
                franja. Las dos salidas de la ficha —irse o comprar— comparten
                línea aunque estén en extremos opuestos, y eso es lo que las hace
-               leerse como pareja. Arriba, «Regresar» quedaba suelto. -->
-          <GlassSurface :radius="999" class="rl__back">
-            <button type="button" :tabindex="ficha ? 0 : -1" @click="cerrar">
-              <ArrowLeft :stroke-width="1.8" />
-              Regresar
-            </button>
-          </GlassSurface>
+               leerse como pareja. Arriba, «Regresar» quedaba suelto.
+
+               EN TELÉFONO SE JUNTAN DE VERDAD, en esta misma fila: ver
+               `.rl__acciones`. -->
+          <div class="rl__acciones">
+            <GlassSurface :radius="999" class="rl__back">
+              <button type="button" :tabindex="ficha ? 0 : -1" @click="cerrar">
+                <ArrowLeft :stroke-width="1.8" />
+                <!-- EN UN `<span>` Y NO SUELTO porque en teléfono se esconde, y
+                     un nodo de texto pelado no se puede esconder desde CSS. El
+                     botón se queda entonces en glifo — con `aria-label`, ver
+                     abajo — que es lo que pide una ficha de 375 px. -->
+                <span class="rl__blabel">Regresar</span>
+              </button>
+            </GlassSurface>
+
+            <!-- LA COPIA DE TELÉFONO DE «COMPRAR AHORA», apagada en escritorio.
+                 Marcado duplicado, que es el patrón de la casa —el mismo del
+                 nombre del rollo y el de la barra— y aquí no hay alternativa:
+                 el original vive dentro de `.rl__banner`, que es una franja con
+                 `overflow: hidden` y su propio contexto de posición, así que no
+                 hay CSS que lo saque de ahí para ponerlo al lado de «Regresar».
+
+                 Las dos copias mandan el mismo evento con los mismos datos: sólo
+                 una está montada a la vez, así que no hay estado que sincronizar
+                 ni dos botones anunciándose a la vez para un lector. -->
+            <GlassSurface :radius="999" class="rl__comprar rl__comprar--pie">
+              <button
+                type="button"
+                :tabindex="ficha ? 0 : -1"
+                aria-label="Comprar ahora"
+                @click="emit('buy', { id: actual?.id, size: talla })"
+              >
+                <ShoppingBag :stroke-width="1.8" />
+                <span class="rl__clabel">Comprar ahora</span>
+              </button>
+            </GlassSurface>
+          </div>
         </div>
       </div>
 
@@ -2011,6 +2042,19 @@ watch(idx, () => nextTick(medirVuelo))
 /* Ya no va absoluto en la esquina: vive dentro de la fila de acciones de la
    ficha, así que hereda de ella el encendido y el apagado y no necesita los
    suyos. Una pieza menos que sincronizar. */
+/* LA FILA DE LAS DOS SALIDAS. En escritorio no cambia nada: dentro sólo hay un
+   botón visible —«Comprar ahora» vive en la franja— así que una fila de un
+   elemento se pinta igual que el elemento suelto. En teléfono es donde sirve. */
+.rl__acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* La copia de teléfono, apagada aquí. `display: none` y no `visibility`: no
+   ocupa, no se enfoca y no se anuncia — es marcado que en esta medida no
+   existe. */
+.rl__comprar--pie { display: none; }
+
 .rl__back {
   flex: none;
   min-width: var(--av-action-w);
@@ -2294,16 +2338,32 @@ watch(idx, () => nextTick(medirVuelo))
      la misma — allí llena una columna del 50%, aquí llena lo que queda. */
   .rl { --rl-ficha-scale: 1.15; }
 
-  /* LA COMPRA SE QUEDA EN GLIFO. 164 px de acción no caben en una franja de 96,
-     y estirar la franja hasta que quepan se comería un cuarto de la pantalla.
+  /* ── LAS DOS SALIDAS SE JUNTAN, Y CAMBIAN DE PESO ────────────────────
+     En escritorio están en extremos opuestos de la ficha y las dos escritas:
+     hay ancho para eso. Aquí no, y además no valen lo mismo — de las dos cosas
+     que se pueden hacer en una ficha de producto, comprar es la que importa.
 
-     Se va la PALABRA y se queda el ALTO —44 px, el de cualquier acción del
-     sitio— que es lo que la mantiene dentro del mismo juego. El botón sigue
-     anunciándose entero: lleva `aria-label`, así que para un lector no cambia
-     nada. Ver la plantilla. */
-  .rl__banner > .rl__comprar { --av-action-w: 0px; min-width: 0; }
-  .rl__comprar button { padding: 0; width: var(--av-action-h); justify-content: center; }
-  .rl__clabel { display: none; }
+     Así que se ponen en la MISMA LÍNEA y con distinto peso: «Regresar» pierde
+     la palabra y se queda en glifo, y «Comprar ahora» se trae la suya. Un
+     círculo al lado de una píldora con texto se lee como «salir» y «hacer», que
+     es exactamente la jerarquía.
+
+     LA COMPRA SE VA DE LA FRANJA. Estuvo ahí en glifo, y en glifo la acción
+     principal de la pieza pesaba lo mismo que una flecha de volver. La franja se
+     queda con lo suyo — el color y la marca a lo largo. */
+  .rl__banner > .rl__comprar { display: none; }
+  .rl__comprar--pie { display: block; }
+
+  /* «Regresar», a glifo: fuera el ancho mínimo de acción y fuera el relleno
+     lateral, que es lo que lo hacía píldora. Queda el ALTO —44 px, el de
+     cualquier acción del sitio— y con el ancho igualado sale el círculo. El
+     botón sigue anunciándose entero por su texto alternativo. */
+  .rl__back {
+    min-width: 0;
+    width: var(--av-action-h);
+  }
+  .rl__back button { padding: 0; }
+  .rl__blabel { display: none; }
 
   /* TRES POR FILA. El panel es el mismo que en escritorio —misma caja, mismo
      sitio, misma forma de abrirse— y lo único que cambia es cuántas tallas caben

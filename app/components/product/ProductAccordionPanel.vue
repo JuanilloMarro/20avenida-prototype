@@ -208,8 +208,12 @@ function onClick(e) {
              `href` al <a>. Para cuando toca la acción por defecto, el enlace
              existe otra vez y el navegador se iba a /producto/<id>, que no es
              una ruta: 404. `.prevent` lo mata en el sitio. -->
-        <button type="button" @click.stop.prevent="emit('back')">
-          <ArrowLeft :stroke-width="2" /> Regresar
+        <button type="button" aria-label="Regresar" @click.stop.prevent="emit('back')">
+          <!-- EL TEXTO EN UN `<span>` Y NO SUELTO: en teléfono se esconde para
+               dejar el botón en glifo, y un nodo de texto pelado no se puede
+               esconder desde CSS. El `aria-label` del botón va escrito arriba
+               para que el nombre no dependa de qué medida esté pintando. -->
+          <ArrowLeft :stroke-width="2" /> <span class="pa__back-txt">Regresar</span>
         </button>
       </GlassSurface>
 
@@ -1142,18 +1146,64 @@ function onClick(e) {
 
      Con él otra vez en la primera fila, la de arriba deja de ser un hueco
      guardado y vuelve a medirlo su contenido. */
-  /* En una columna cada bloque vuelve a tener su propia fila, así que se
-     deshace el `grid-row: 2` de escritorio y manda otra vez el orden del DOM. */
-  .pa__detail { grid-template-rows: auto auto 1fr; }
-  .pa__dcol { grid-row: auto; }
-  .pa__back { grid-row: 1; align-self: start; height: auto; }
-  .pa__back button { padding-block: 10px; }
-  .pa__dcol--l { padding-bottom: 0; }
+  /* ── LAS DOS SALIDAS, EN LA MISMA LÍNEA Y CON DISTINTO PESO ──────────
+     «Regresar» estuvo arriba del todo y solo, que es donde cabía cuando la ficha
+     era tres bandas apiladas. Baja al pie, junto a «Comprar ahora», por lo mismo
+     que en el rollo: de las dos cosas que se pueden hacer aquí, comprar es la
+     que importa, y ponerlas juntas es lo que deja verlo — un círculo al lado de
+     una píldora con texto se lee como «salir» y «hacer».
 
-  .pa__dcol--r { grid-column: 1; align-items: flex-start; text-align: left; }
+     LA REJILLA PASA A DOS COLUMNAS Y DOS FILAS, y no es un capricho: los dos
+     botones tienen que compartir línea, pero uno es hijo del detalle y el otro
+     vive dentro de la columna de tallas. No hay forma de meterlos en el mismo
+     contenedor sin duplicar marcado, así que se les da la MISMA CELDA de la
+     rejilla —fila 2— y cada uno se pega a su lado: el de volver a la izquierda
+     con `justify-self`, y la columna entera con `align-self: end` para que su
+     último hijo, el de comprar, acabe a la misma altura.
+
+     Lo único que hay que cuadrar a mano es que no se pisen, y de eso se encarga
+     el margen izquierdo de `.pa__buy`: el ancho del círculo más el aire. */
+  .pa__detail {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .pa__dcol { grid-row: auto; }
+  .pa__dcol--l { grid-column: 1 / -1; grid-row: 1; padding-bottom: 0; }
+
+  .pa__dcol--r {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    /* pegada al suelo de su fila: es lo que pone el botón de comprar a la altura
+       del de volver, sin escribir ninguna distancia */
+    align-self: end;
+    align-items: flex-start;
+    text-align: left;
+  }
   .pa__dsizes { justify-content: flex-start; }
   .pa__dblurb { display: none; }   /* no cabe, y el nombre ya orienta */
-  .pa__buy { align-self: flex-start; }
+
+  /* A GLIFO: fuera el ancho mínimo de acción y fuera el relleno lateral, que es
+     lo que lo hacía píldora. Queda el alto —44 px, el de cualquier acción del
+     sitio— y con el ancho igualado sale el círculo. El nombre lo lleva el
+     `aria-label` del botón, así que a ciegas no cambia nada. */
+  .pa__back {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: end;
+    justify-self: start;
+    min-width: 0;
+    width: var(--av-action-h);
+    height: var(--av-action-h);
+  }
+  .pa__back button { padding: 0; height: 100%; }
+  .pa__back-txt { display: none; }
+
+  .pa__buy {
+    align-self: flex-start;
+    margin-top: 18px;
+    /* el hueco del círculo que tiene al lado, más el aire entre los dos */
+    margin-left: calc(var(--av-action-h) + 10px);
+  }
 
   /* EL ZAPATO SUBE. Arriba sólo hay un botón y dos líneas de texto, así que no
      hace falta reservarle media pantalla: se le da la banda alta y el tercio

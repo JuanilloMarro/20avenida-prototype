@@ -16,6 +16,13 @@
  * es el pie.
  */
 
+/* El cartel de portada. Las tres salidas —una categoría, «Ver todo» y el botón
+   de la campaña— llevan al mismo sitio que todo lo demás de esta página: a
+   ninguno todavía. Cuando exista `/categoria/:id`, esto es un `navigateTo`. */
+function onCategoria(id) {
+  if (import.meta.dev) console.info('[portada] categoría:', id)
+}
+
 /* La ruta de producto todavía no existe, así que de momento el acordeón sólo
    dice a dónde iría. Cuando exista `/producto/:id`, esto es un `navigateTo`. */
 function onProducto(id) {
@@ -66,6 +73,20 @@ function onComprar({ id, size }) {
 
        El cómo —y por qué `proximity` y no `mandatory`— está en `main.css`. -->
   <div class="home">
+    <!-- EL CARTEL DE PORTADA ABRE LA PÁGINA, antes del scrollover. Es la única
+         pieza que se puede mirar sin haber scrolleado nada, así que es la que
+         tiene que decir de qué va la tienda: campaña arriba y las categorías al
+         pie, en una pantalla.
+
+         Y LLEVA `av-snap` porque mide una pantalla exacta — es la condición de
+         la clase, no un adorno. Al entrar ya está encuadrada; el imán trabaja a
+         la vuelta, cuando se sube desde el escaparate. -->
+    <HomeHero
+      class="av-snap"
+      @pick="onCategoria"
+      @todo="onCategoria('todas')"
+    />
+
     <ProductShowcase @buy="onComprar" />
 
     <!-- EL ACORDEÓN ENTRA JUSTO DEBAJO DEL SCROLLOVER, que se lleva 375vh de
